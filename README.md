@@ -1,6 +1,6 @@
 # kortex
 
-![kortex in KRunner: a question answered, then a theme switch that waits for Allow once](docs/demo/kortex-demo.gif)
+![kortex in KRunner: a question answered, then PhotoCraft installed in two steps, each waiting for Allow once](docs/demo/kortex-demo.gif)
 
 <sub>A replay of a real run of kortex 0.1.0 with opencode 1.19.4 and a scripted model:
 kortex answered over D-Bus what you see, the panel is drawn for the replay. How it is

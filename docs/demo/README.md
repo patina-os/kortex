@@ -8,9 +8,10 @@ drawn by `page.html` in patina's aurora colours.
   starts it by D-Bus activation, a stand-in for KRunner, a real `opencode serve`), with
   opencode set up as patina sets it up, and a scripted model, `demo_llm.py`, that
   answers slowly and uses tools like an agent. It asks how full the disk is (a
-  read-only `df`, which runs without asking) and to switch to the light theme (which
-  waits for Allow once; `patina` is a stand-in that only prints). Every Match and Run
-  and what kortex answered goes into `timeline.json`.
+  read-only `df`, which runs without asking) and to install PhotoCraft: patina's
+  artcraft bundle, then the ArtCraft Launcher opened, each command waiting for Allow
+  once (`patina` and the launcher are stand-ins that only print or do nothing).
+  Every Match and Run and what kortex answered goes into `timeline.json`.
 - `capture.js` fills `timeline.json` into `page.html`, writes `replay.html` (open it in
   a browser to step through the run, with the D-Bus log beside it) and records its
   `#gif` mode into `kortex-demo.gif`.

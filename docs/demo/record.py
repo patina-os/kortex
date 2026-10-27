@@ -75,11 +75,18 @@ def main():
                                 "models": {MODEL: {"name": MODEL, "tool_call": True}}}},
         "model": f"ollama/{MODEL}", "small_model": f"ollama/{MODEL}", "permission": PERMISSION,
     }))
-    # A stand-in `patina`, so the theme switch has something harmless to run.
+    # Stand-ins for `patina` and the ArtCraft Launcher, so the install has something
+    # harmless to run: patina prints what `patina install --bundles artcraft` prints.
     (home / "bin").mkdir()
-    fake = home / "bin/patina"
-    fake.write_text("#!/bin/sh\necho \"patina: aurora is in its light mode now\"\n")
-    fake.chmod(0o755)
+    stand_ins = {
+        "patina": "printf 'patina: %s\\n' 'bundles: base artcraft (apt backend, x86_64)' "
+                  "'packages: installing fuse3' 'artcraft-launcher: installing (binary)' 'done: 2 changes'",
+        "artcraft-launcher": "exit 0",
+    }
+    for name, body in stand_ins.items():
+        fake = home / "bin" / name
+        fake.write_text(f"#!/bin/sh\n{body}\n")
+        fake.chmod(0o755)
     env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(home / ".config"),
                XDG_DATA_HOME=str(home / ".local/share"), XDG_STATE_HOME=str(home / ".local/state"),
                XDG_CACHE_HOME=str(home / ".cache"), KORTEX_OPENCODE=OPENCODE, NO_PROXY="127.0.0.1,localhost",
@@ -148,15 +155,16 @@ def main():
         type_query(q1)
         run("ask" + SEP + q1[3:])
         watch(answered("free of"))
-        q2 = "ai switch to the light theme"
+        q2 = "ai install photocraft"
         type_query(q2)
         run("ask" + SEP + q2[3:])
-        watch(lambda ms: any(m["id"] == "permission" for m in ms))
-        time.sleep(1.5)
-        note("pause", what="nothing has run yet")
-        asked = next(m for m in k.Match("ai ›") if str(m[0]).startswith("permission" + SEP))
-        run(str(asked[0]), "allow-once")
-        watch(answered("switches back"))
+        for command in ("patina install", "artcraft-launcher"):
+            watch(lambda ms, command=command: any(m["id"] == "permission" and command in m["text"] for m in ms))
+            time.sleep(1.5)
+            note("pause", what="nothing has run yet")
+            asked = next(m for m in k.Match("ai ›") if str(m[0]).startswith("permission" + SEP))
+            run(str(asked[0]), "allow-once")
+        watch(answered("up to date"))
         type_query("ai")
         k.Teardown()
     finally:
