@@ -27,8 +27,8 @@ def plan(body):
     if not body.get("tools") or "title" in system and "generate" in system:
         if "disk" in asked:
             return "Disk space at home", None
-        if "theme" in asked:
-            return "Light theme", None
+        if "photocraft" in asked:
+            return "PhotoCraft", None
         return "Conversation", None
     if "disk" in asked:
         if not tools_after:
@@ -40,13 +40,17 @@ def plan(body):
             return (f"Your system disk has {cols[3]} free of {cols[1]} ({cols[4]} used). "
                     "That is plenty; nothing to clean up."), None
         return "I could not read the disk usage.", None
-    if "light" in asked and "theme" in asked:
+    if "photocraft" in asked:
+        # Two changes, each asked for: patina's artcraft bundle brings the ArtCraft
+        # Launcher, and the launcher installs PhotoCraft once the user picks it.
         if not tools_after:
-            return "patina switches the mode itself; I will ask it to.", (
-                "bash", {"command": "patina theme mode light", "description": "Switch patina to its light mode"})
-        out = content(tools_after[-1]).strip().splitlines()
-        said = out[-1] if out else ""
-        return (f"Done. {said}. `patina theme mode dark` switches back, or ask me.").replace("..", "."), None
+            return "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.", (
+                "bash", {"command": "patina install --bundles artcraft",
+                         "description": "Install patina's artcraft bundle"})
+        if len(tools_after) == 1:
+            return "Installed. Now the launcher:", (
+                "bash", {"command": "setsid -f artcraft-launcher", "description": "Open the ArtCraft Launcher"})
+        return "The launcher is open: pick PhotoCraft there, and it keeps it up to date.", None
     return "I can answer questions, change settings once you allow it, and run commands for you.", None
 
 

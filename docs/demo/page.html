@@ -160,8 +160,8 @@ button.ctl.primary { background: var(--green); color: #000; border-color: var(--
         <ol id="log"></ol>
       </section>
       <div class="notes">
-        <p>Set up as a patina desktop would have it: opencode with patina's permissions from <code>defaults/apps.yaml</code>, so the read-only <code>df</code> runs freely and the theme switch waits for an answer.</p>
-        <p>The model is a scripted stand-in on localhost; a real install talks to Nemotron 3.5 Bolt E4B or Ministral 3 through Ollama. The disk figures are this sandbox's real output; <code>patina</code> was a stand-in that only prints.</p>
+        <p>Set up as a patina desktop would have it: opencode with patina's permissions from <code>defaults/apps.yaml</code>, so the read-only <code>df</code> runs freely and both steps of the install wait for an answer.</p>
+        <p>The model is a scripted stand-in on localhost; a real install talks to Nemotron 3.5 Bolt E4B or Ministral 3 through Ollama. The disk figures are this sandbox's real output; <code>patina</code> and the ArtCraft Launcher were stand-ins: the one prints what the install prints, the other does nothing.</p>
       </div>
     </div>
   </div>
@@ -211,10 +211,11 @@ TIMELINE.forEach((e, i) => {
     const ans = e.matches.find((m) => m.id === "answer");
     let caption = "The answer grows as the agent works; KRunner asks again whenever it changes";
     if (ans && ans.text === "Thinking…") caption = "The agent is thinking";
+    else if (perm && steps.some((s) => s.asked)) caption = "The next command <b>asks again</b>: Allow once covers one command";
     else if (perm) caption = "The agent wants to run a command that changes something. It <b>asks first</b>";
     else if (ans && ans.text.includes("› bash df")) caption = ans.subtext.startsWith("Working") ? "A read-only command, <b>df</b>, runs without asking" : "Done. Copy puts the answer on the clipboard; Open in terminal continues there";
-    if (ans && !ans.subtext.startsWith("Working") && ans.text.includes("switches back")) caption = "Done. The theme switch ran because you allowed it, once";
-    steps.push({ e, matches: e.matches, caption, log: `Match(<em>"ai ›"</em>) → ${e.matches.map((m) => m.id).join(", ")}` });
+    if (ans && !ans.subtext.startsWith("Working") && ans.text.includes("up to date")) caption = "Done. Both commands ran because you allowed them, each once";
+    steps.push({ e, matches: e.matches, caption, asked: Boolean(perm), log: `Match(<em>"ai ›"</em>) → ${e.matches.map((m) => m.id).join(", ")}` });
   } else if (e.kind === "pause") {
     steps.push({ e, hold: true, caption: "Nothing has run yet. The command waits for your answer", log: "(waiting for the user)" });
   }

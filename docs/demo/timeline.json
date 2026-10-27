@@ -1,12 +1,12 @@
 [
  {
-  "t": 630,
+  "t": 583,
   "kind": "start",
   "kortex": "0.1.0",
   "opencode": "1.19.4"
  },
  {
-  "t": 631,
+  "t": 583,
   "kind": "type",
   "query": "ai how full is my disk?",
   "matches": [
@@ -20,18 +20,18 @@
   ]
  },
  {
-  "t": 631,
+  "t": 583,
   "kind": "run",
   "id": "ask",
   "action": ""
  },
  {
-  "t": 12164,
+  "t": 12088,
   "kind": "reopen",
   "query": "ai ›"
  },
  {
-  "t": 12672,
+  "t": 12189,
   "kind": "view",
   "query": "ai ›",
   "matches": [
@@ -48,7 +48,7 @@
   ]
  },
  {
-  "t": 13853,
+  "t": 13104,
   "kind": "view",
   "query": "ai ›",
   "matches": [
@@ -65,7 +65,7 @@
   ]
  },
  {
-  "t": 16078,
+  "t": 15307,
   "kind": "view",
   "query": "ai ›",
   "matches": [
@@ -82,20 +82,20 @@
   ]
  },
  {
-  "t": 16078,
+  "t": 15308,
   "kind": "type",
-  "query": "ai switch to the light theme",
+  "query": "ai install photocraft",
   "matches": [
    {
     "id": "ask",
-    "text": "switch to the light theme",
+    "text": "install photocraft",
     "subtext": "Ask the agent · Enter",
     "actions": [],
     "multiline": false
    },
    {
     "id": "continue",
-    "text": "switch to the light theme",
+    "text": "install photocraft",
     "subtext": "Continue the conversation",
     "actions": [],
     "multiline": false
@@ -103,23 +103,23 @@
   ]
  },
  {
-  "t": 16078,
+  "t": 15308,
   "kind": "run",
   "id": "ask",
   "action": ""
  },
  {
-  "t": 16399,
+  "t": 15629,
   "kind": "reopen",
   "query": "ai ›"
  },
  {
-  "t": 16399,
+  "t": 15629,
   "kind": "reopen",
   "query": "ai ›"
  },
  {
-  "t": 16424,
+  "t": 15638,
   "kind": "view",
   "query": "ai ›",
   "matches": [
@@ -136,13 +136,13 @@
   ]
  },
  {
-  "t": 17649,
+  "t": 17619,
   "kind": "view",
   "query": "ai ›",
   "matches": [
    {
     "id": "permission",
-    "text": "Allow bash: patina theme mode light",
+    "text": "Allow bash: patina install --bundles artcraft",
     "subtext": "The agent asks before it does this",
     "actions": [
      "allow-once",
@@ -153,7 +153,7 @@
    },
    {
     "id": "answer",
-    "text": "patina switches the mode itself; I will ask it to.\n› bash patina theme mode light",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft",
     "subtext": "Working… · Copy · Open in terminal",
     "actions": [
      "copy",
@@ -164,29 +164,29 @@
   ]
  },
  {
-  "t": 19149,
+  "t": 19119,
   "kind": "pause",
   "what": "nothing has run yet"
  },
  {
-  "t": 19156,
+  "t": 19129,
   "kind": "run",
   "id": "permission",
   "action": "allow-once"
  },
  {
-  "t": 19462,
+  "t": 19434,
   "kind": "reopen",
   "query": "ai ›"
  },
  {
-  "t": 19468,
+  "t": 19443,
   "kind": "view",
   "query": "ai ›",
   "matches": [
    {
     "id": "answer",
-    "text": "patina switches the mode itself; I will ask it to.\n› bash patina theme mode light",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft",
     "subtext": "Working… · Copy · Open in terminal",
     "actions": [
      "copy",
@@ -197,13 +197,79 @@
   ]
  },
  {
-  "t": 21500,
+  "t": 19762,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "permission",
+    "text": "Allow bash: setsid -f artcraft-launcher",
+    "subtext": "The agent asks before it does this",
+    "actions": [
+     "allow-once",
+     "allow-always",
+     "deny"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft\nInstalled. Now the launcher:\n› bash setsid -f artcraft-launcher",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 21262,
+  "kind": "pause",
+  "what": "nothing has run yet"
+ },
+ {
+  "t": 21274,
+  "kind": "run",
+  "id": "permission",
+  "action": "allow-once"
+ },
+ {
+  "t": 21581,
+  "kind": "reopen",
+  "query": "ai ›"
+ },
+ {
+  "t": 21581,
+  "kind": "reopen",
+  "query": "ai ›"
+ },
+ {
+  "t": 21587,
   "kind": "view",
   "query": "ai ›",
   "matches": [
    {
     "id": "answer",
-    "text": "patina switches the mode itself; I will ask it to.\n› bash patina theme mode light\nDone. patina: aurora is in its light mode now. `patina theme mode dark` switches back, or ask me.",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft\nInstalled. Now the launcher:\n› bash setsid -f artcraft-launcher",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 23158,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft\nInstalled. Now the launcher:\n› bash setsid -f artcraft-launcher\nThe launcher is open: pick PhotoCraft there, and it keeps it up to date.",
     "subtext": "Copy · Open in terminal",
     "actions": [
      "copy",
@@ -214,7 +280,7 @@
   ]
  },
  {
-  "t": 21504,
+  "t": 23161,
   "kind": "type",
   "query": "ai",
   "matches": [
@@ -227,7 +293,7 @@
    },
    {
     "id": "session",
-    "text": "switch to the light theme",
+    "text": "install photocraft",
     "subtext": "Continue this conversation · just now",
     "actions": [],
     "multiline": false
