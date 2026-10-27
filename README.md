@@ -13,7 +13,7 @@ agent; the agent itself is [opencode](https://opencode.ai), running on your mach
 
 Status: first version, 0.1.0. It passes its tests against a real `opencode serve`
 (1.19) but has not yet run inside a Plasma session; that run is what "First release,
-done when" below asks for. kortex comes from [patina](https://github.com/patina21/patina),
+done when" below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
 which asks for the agent at install time, but it works on any Plasma 6 desktop that has
 opencode.
 
@@ -24,7 +24,7 @@ model it can use, and Python's D-Bus bindings:
 
 ```sh
 sudo apt install python3-dbus python3-gi     # Debian and Ubuntu
-git clone https://github.com/patina21/kortex && cd kortex
+git clone https://github.com/patina-os/kortex && cd kortex
 ./install.sh                                 # per user, under ~/.local/share; no root
 ```
 
