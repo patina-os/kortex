@@ -1,5 +1,11 @@
 # kortex
 
+![kortex in KRunner: a question answered, then a theme switch that waits for Allow once](docs/demo/kortex-demo.gif)
+
+<sub>A replay of a real run of kortex 0.1.0 with opencode 1.19.4 and a scripted model:
+kortex answered over D-Bus what you see, the panel is drawn for the replay. How it is
+made: [`docs/demo/`](docs/demo/).</sub>
+
 An AI agent in KDE Plasma's command palette. Press Meta+Space, type `ai` and what you
 want, and the agent answers right there in KRunner: it explains, changes settings once
 you allow it, writes code and works on your servers. kortex is the palette end of the

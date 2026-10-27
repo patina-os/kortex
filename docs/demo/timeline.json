@@ -1,0 +1,244 @@
+[
+ {
+  "t": 630,
+  "kind": "start",
+  "kortex": "0.1.0",
+  "opencode": "1.19.4"
+ },
+ {
+  "t": 631,
+  "kind": "type",
+  "query": "ai how full is my disk?",
+  "matches": [
+   {
+    "id": "ask",
+    "text": "how full is my disk?",
+    "subtext": "Ask the agent · Enter",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 631,
+  "kind": "run",
+  "id": "ask",
+  "action": ""
+ },
+ {
+  "t": 12164,
+  "kind": "reopen",
+  "query": "ai ›"
+ },
+ {
+  "t": 12672,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13853,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.\n› bash df -h /",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 16078,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.\n› bash df -h /\nYour system disk has 30G free of 252G (25% used). That is plenty; nothing to clean up.",
+    "subtext": "Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 16078,
+  "kind": "type",
+  "query": "ai switch to the light theme",
+  "matches": [
+   {
+    "id": "ask",
+    "text": "switch to the light theme",
+    "subtext": "Ask the agent · Enter",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "continue",
+    "text": "switch to the light theme",
+    "subtext": "Continue the conversation",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 16078,
+  "kind": "run",
+  "id": "ask",
+  "action": ""
+ },
+ {
+  "t": 16399,
+  "kind": "reopen",
+  "query": "ai ›"
+ },
+ {
+  "t": 16399,
+  "kind": "reopen",
+  "query": "ai ›"
+ },
+ {
+  "t": 16424,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 17649,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "permission",
+    "text": "Allow bash: patina theme mode light",
+    "subtext": "The agent asks before it does this",
+    "actions": [
+     "allow-once",
+     "allow-always",
+     "deny"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "answer",
+    "text": "patina switches the mode itself; I will ask it to.\n› bash patina theme mode light",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 19149,
+  "kind": "pause",
+  "what": "nothing has run yet"
+ },
+ {
+  "t": 19156,
+  "kind": "run",
+  "id": "permission",
+  "action": "allow-once"
+ },
+ {
+  "t": 19462,
+  "kind": "reopen",
+  "query": "ai ›"
+ },
+ {
+  "t": 19468,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "patina switches the mode itself; I will ask it to.\n› bash patina theme mode light",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 21500,
+  "kind": "view",
+  "query": "ai ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "patina switches the mode itself; I will ask it to.\n› bash patina theme mode light\nDone. patina: aurora is in its light mode now. `patina theme mode dark` switches back, or ask me.",
+    "subtext": "Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 21504,
+  "kind": "type",
+  "query": "ai",
+  "matches": [
+   {
+    "id": "hint",
+    "text": "Ask the agent: type ai and your request",
+    "subtext": "ai › shows the current conversation",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "session",
+    "text": "switch to the light theme",
+    "subtext": "Continue this conversation · just now",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "session",
+    "text": "how full is my disk?",
+    "subtext": "Continue this conversation · just now",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ }
+]

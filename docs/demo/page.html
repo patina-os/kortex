@@ -1,0 +1,337 @@
+<title>kortex in KRunner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: a black desktop stage holding KRunner as patina's aurora theme draws it, the
+   replay controls and the D-Bus log beside it; one deliberate dark look, as on an OLED
+   desktop. */
+:root {
+  --ground: #000000;      /* aurora's true black */
+  --panel: #0d0e12;       /* one step above it */
+  --raised: #16181f;
+  --line: #262a35;
+  --text: #e8eaf0;
+  --muted: #8b90a1;
+  --green: #3cff9d;       /* aurora's accent */
+  --violet: #9b6bff;      /* its second colour */
+  --amber: #ffc857;       /* the permission warning */
+  --ui: "Source Sans 3", "Source Sans Pro", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  color-scheme: dark;
+}
+html { background: var(--ground); }
+body {
+  background: var(--ground); color: var(--text); font-family: var(--ui); font-size: 16px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
+header { display: grid; gap: 6px; }
+h1 { font-size: 30px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 .tri { color: var(--green); }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.provenance { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.provenance b { color: var(--text); font-weight: 500; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.stage {
+  position: relative; border-radius: 14px; overflow: hidden; min-height: 470px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 70% at 85% 120%, rgba(155, 107, 255, 0.20), transparent 60%),
+    radial-gradient(90% 60% at 10% 110%, rgba(60, 255, 157, 0.10), transparent 60%),
+    var(--ground);
+  padding: 26px clamp(10px, 4vw, 40px) 70px;
+}
+.contours { position: absolute; inset: auto 0 0 0; height: 60%; opacity: 0.35; pointer-events: none; }
+
+.krunner {
+  position: relative; max-width: 640px; margin: 0 auto; background: rgba(13, 14, 18, 0.97);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.krunner.closed { opacity: 0; transform: translateY(-8px); }
+.search { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.search svg { flex: none; color: var(--muted); }
+.field { flex: 1; min-width: 0; font-size: 18px; white-space: nowrap; overflow: hidden; }
+.field .ph { color: var(--muted); }
+.caret { display: inline-block; width: 2px; height: 1.1em; background: var(--green); vertical-align: -3px; margin-left: 1px;
+  animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.mode { flex: none; font-family: var(--mono); font-size: 11.5px; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 6px; padding: 2px 7px; }
+
+.results { list-style: none; margin: 0; padding: 6px; display: grid; gap: 2px; min-height: 60px; }
+.empty { color: var(--muted); padding: 14px 10px; font-size: 14px; }
+.match { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; padding: 10px; border-radius: 8px; }
+.match.sel { background: var(--raised); box-shadow: inset 0 0 0 1px var(--line); }
+.match .icon { width: 32px; height: 32px; grid-row: span 2; }
+.match .text { min-width: 0; overflow-wrap: anywhere; }
+.match.multi .text { white-space: pre-wrap; }
+.match .text .tool { font-family: var(--mono); font-size: 13.5px; color: var(--violet); }
+.match .sub { grid-column: 2; font-size: 13px; color: var(--muted); }
+.match.warn .text { color: var(--amber); font-weight: 600; }
+.acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.act { font: 500 12.5px var(--ui); color: var(--text); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 3px 9px; }
+.act.pressed { background: var(--green); color: #000; border-color: var(--green); }
+.match.entered { box-shadow: inset 0 0 0 2px var(--green); }
+
+.caption {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92%, 620px);
+  font-size: 15px; text-align: center; color: var(--text); background: rgba(0, 0, 0, 0.72);
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; text-wrap: balance;
+}
+.caption b { color: var(--green); font-weight: 600; }
+
+.side { display: grid; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.ctl { font: 600 14px var(--ui); color: var(--text); background: var(--raised); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+button.ctl:hover { border-color: var(--muted); }
+button.ctl:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+button.ctl.primary { background: var(--green); color: #000; border-color: var(--green); }
+.step { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.log { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.log h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.log ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; max-height: 330px; overflow-y: auto;
+  font-family: var(--mono); font-size: 12px; }
+.log li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; color: var(--muted); }
+.log li.now { color: var(--text); }
+.log li .t { text-align: right; font-variant-numeric: tabular-nums; }
+.log li .c { overflow-wrap: anywhere; }
+.log li .c em { font-style: normal; color: var(--green); }
+.notes { font-size: 14px; color: var(--muted); display: grid; gap: 6px; }
+.notes p { margin: 0; }
+.notes code, .lede code { font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .krunner { transition: none; } .caret { animation: none; } }
+/* #gif: only the stage, at the size capture.js records for the README */
+.gif body { padding: 0; }
+.gif header, .gif .side { display: none; }
+.gif .wrap, .gif .main { display: block; max-width: none; }
+.gif .stage { background: var(--ground); box-sizing: border-box; width: 880px; height: 500px; min-height: 0; border: 0; border-radius: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><span class="tri">▲</span> kortex in KRunner</h1>
+    <p class="lede">The AI agent in Plasma's search: <strong>ai</strong> and a request. This is a replay of a real run, not a screenshot: kortex answered over D-Bus exactly what you see in the panel, and the panel is drawn by this page (<code>docs/demo/</code> in the kortex repository).</p>
+    <div class="provenance" id="prov"></div>
+  </header>
+
+  <div class="main">
+    <div class="stage" aria-live="polite">
+      <svg class="contours" viewBox="0 0 800 300" preserveAspectRatio="none" aria-hidden="true">
+        <g fill="none" stroke-width="1.2">
+          <path d="M-20 290 C 150 170, 300 140, 420 160 S 700 240, 820 200" stroke="#3cff9d" opacity="0.5"/>
+          <path d="M-20 300 C 160 200, 320 175, 430 190 S 690 265, 820 230" stroke="#6fd7c8" opacity="0.45"/>
+          <path d="M-20 310 C 170 230, 330 205, 440 220 S 680 290, 820 260" stroke="#9b6bff" opacity="0.45"/>
+          <path d="M-20 320 C 180 260, 340 240, 450 250 S 670 310, 820 290" stroke="#9b6bff" opacity="0.3"/>
+        </g>
+      </svg>
+      <div class="krunner" id="krunner">
+        <div class="search">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <div class="field" id="field"></div>
+          <span class="mode" id="mode" hidden>kortex</span>
+        </div>
+        <ul class="results" id="results"></ul>
+      </div>
+      <div class="caption" id="caption"></div>
+    </div>
+
+    <div class="side">
+      <div class="controls">
+        <button class="ctl primary" id="play" type="button">Pause</button>
+        <button class="ctl" id="prev" type="button" aria-label="Previous step">◀</button>
+        <button class="ctl" id="next" type="button" aria-label="Next step">▶</button>
+        <button class="ctl" id="restart" type="button">Restart</button>
+        <span class="step" id="stepno"></span>
+      </div>
+      <section class="log">
+        <h2>What KRunner and kortex said, over D-Bus</h2>
+        <ol id="log"></ol>
+      </section>
+      <div class="notes">
+        <p>Set up as a patina desktop would have it: opencode with patina's permissions from <code>defaults/apps.yaml</code>, so the read-only <code>df</code> runs freely and the theme switch waits for an answer.</p>
+        <p>The model is a scripted stand-in on localhost; a real install talks to Nemotron 3.5 Bolt E4B or Ministral 3 through Ollama. The disk figures are this sandbox's real output; <code>patina</code> was a stand-in that only prints.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TIMELINE = __TIMELINE__;  // timeline.json, filled in by capture.js
+
+const ICONS = {
+  kortex: '<svg viewBox="0 0 64 64" class="icon" aria-hidden="true"><defs><linearGradient id="kg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3cff9d"/><stop offset="1" stop-color="#9b6bff"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="14" fill="#0b0b10" stroke="#262a35"/><path d="M32 13 L50 43 H14 Z" fill="none" stroke="url(#kg)" stroke-width="5" stroke-linejoin="round"/><path d="M18 52 H46" stroke="#e4d6ff" stroke-width="4" stroke-linecap="round"/></svg>',
+  warn: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><path d="M16 3 L30 28 H2 Z" fill="#ffc857"/><path d="M16 12 V19" stroke="#000" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23.5" r="1.8" fill="#000"/></svg>',
+  history: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="#8b90a1" stroke-width="2.4"/><path d="M16 9 V16 L21 19" fill="none" stroke="#e8eaf0" stroke-width="2.4" stroke-linecap="round"/></svg>',
+};
+const ACTION_NAMES = { "allow-once": "Allow once", "allow-always": "Always allow", deny: "Deny",
+  copy: "Copy the answer", terminal: "Open in terminal" };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const start = TIMELINE.find((e) => e.kind === "start");
+$("prov").innerHTML = `Recorded with <b>kortex ${start.kortex}</b> · <b>opencode ${start.opencode}</b> · over a private D-Bus session, the way KRunner calls a runner`;
+
+// The recording, turned into steps: each one sets the panel, a caption and the log.
+const steps = [];
+let firstRunWait = 0;
+TIMELINE.forEach((e, i) => {
+  const next = TIMELINE[i + 1];
+  if (e.kind === "type") {
+    let caption = `Meta+Space, then <b>${esc(e.query)}</b>`;
+    if (e.query === "ai") caption = "<b>ai</b> on its own lists the recent conversations";
+    else if (e.matches.length > 1) caption = `A second request: <b>Enter</b> starts a new conversation, the second match would continue the last one`;
+    steps.push({ e, type: e.query, matches: e.matches, caption,
+      log: `Match(<em>"${esc(e.query)}"</em>) → ${e.matches.length} match${e.matches.length === 1 ? "" : "es"}` });
+  } else if (e.kind === "run") {
+    const what = e.action ? `<b>${ACTION_NAMES[e.action]}</b>` : "<b>Enter</b>";
+    let caption = `${what}: kortex hands the request to the agent; KRunner closes`;
+    if (e.id === "permission") caption = `${what}: now, and only now, the command runs`;
+    if (!firstRunWait && next) { firstRunWait = next.t - e.t; caption += ` (the first time, kortex starts opencode's server: ${(firstRunWait / 1000).toFixed(0)} s in this run)`; }
+    steps.push({ e, press: e.id, action: e.action, caption, log: `Run(${e.id}, "${e.action}")` });
+  } else if (e.kind === "reopen") {
+    const prev = steps[steps.length - 1];
+    if (prev && prev.reopen) return;
+    steps.push({ e, reopen: true, query: e.query, caption: `kortex reopens KRunner on the conversation: <b>${esc(e.query)}</b>`,
+      log: `→ /App querySingleRunner(kortex, <em>"${esc(e.query)}"</em>)` });
+  } else if (e.kind === "view") {
+    const perm = e.matches.find((m) => m.id === "permission");
+    const ans = e.matches.find((m) => m.id === "answer");
+    let caption = "The answer grows as the agent works; KRunner asks again whenever it changes";
+    if (ans && ans.text === "Thinking…") caption = "The agent is thinking";
+    else if (perm) caption = "The agent wants to run a command that changes something. It <b>asks first</b>";
+    else if (ans && ans.text.includes("› bash df")) caption = ans.subtext.startsWith("Working") ? "A read-only command, <b>df</b>, runs without asking" : "Done. Copy puts the answer on the clipboard; Open in terminal continues there";
+    if (ans && !ans.subtext.startsWith("Working") && ans.text.includes("switches back")) caption = "Done. The theme switch ran because you allowed it, once";
+    steps.push({ e, matches: e.matches, caption, log: `Match(<em>"ai ›"</em>) → ${e.matches.map((m) => m.id).join(", ")}` });
+  } else if (e.kind === "pause") {
+    steps.push({ e, hold: true, caption: "Nothing has run yet. The command waits for your answer", log: "(waiting for the user)" });
+  }
+});
+
+let index = -1, playing = true, timer = null, typing = null;
+let shown = { query: "", matches: [], single: false };
+
+function renderField(text, caret) {
+  $("field").innerHTML = text ? esc(text) + (caret ? '<span class="caret"></span>' : "")
+    : '<span class="ph">Search…</span>' + (caret ? '<span class="caret"></span>' : "");
+}
+
+function matchHTML(m, i, pressed) {
+  const icon = m.id === "permission" ? ICONS.warn : m.id === "session" ? ICONS.history : ICONS.kortex;
+  let text = esc(m.text).replace(/^› (.*)$/gm, '<span class="tool">› $1</span>');
+  const acts = (i === 0 || m.id === "permission") && m.actions.length
+    ? `<div class="acts">${m.actions.map((a) => `<span class="act${pressed && pressed.action === a && pressed.id === m.id ? " pressed" : ""}">${ACTION_NAMES[a] || a}</span>`).join("")}</div>` : "";
+  const cls = ["match", i === 0 ? "sel" : "", m.multiline ? "multi" : "", m.id === "permission" ? "warn" : "",
+    pressed && !pressed.action && i === 0 ? "entered" : ""].filter(Boolean).join(" ");
+  return `<li class="${cls}">${icon}<div class="text">${text}</div>${m.subtext ? `<div class="sub">${esc(m.subtext)}</div>` : ""}${acts}</li>`;
+}
+
+function renderResults(matches, pressed) {
+  $("results").innerHTML = matches.length ? matches.map((m, i) => matchHTML(m, i, pressed)).join("")
+    : '<li class="empty">Type <b>ai</b> and a request</li>';
+}
+
+function renderLog() {
+  const items = steps.slice(0, index + 1).map((s, i) => `<li class="${i === index ? "now" : ""}"><span class="t">${(s.e.t / 1000).toFixed(1)}s</span><span class="c">${s.log}</span></li>`);
+  $("log").innerHTML = items.join("");
+  $("log").scrollTop = $("log").scrollHeight;
+  $("stepno").textContent = `${index + 1} / ${steps.length}`;
+}
+
+function apply(step, animate) {
+  clearInterval(typing);
+  const k = $("krunner");
+  $("caption").innerHTML = step.caption;
+  if (step.type !== undefined) {
+    k.classList.remove("closed");
+    shown.single = false;
+    $("mode").hidden = true;
+    renderResults([]);
+    if (!animate) { renderField(step.type, true); renderResults(step.matches); }
+    else {
+      let n = 0;
+      renderField("", true);
+      typing = setInterval(() => {
+        n += 1;
+        renderField(step.type.slice(0, n), true);
+        if (n >= step.type.length) { clearInterval(typing); renderResults(step.matches); }
+      }, 55);
+    }
+    shown = { query: step.type, matches: step.matches, single: false };
+  } else if (step.press) {
+    renderResults(shown.matches, { id: step.press, action: step.action });
+    if (animate) setTimeout(() => k.classList.add("closed"), 650); else k.classList.add("closed");
+  } else if (step.reopen) {
+    k.classList.remove("closed");
+    renderField(step.query, true);
+    $("mode").hidden = false;
+    renderResults(shown.matches.filter(() => false));
+    shown.query = step.query;
+  } else if (step.matches) {
+    k.classList.remove("closed");
+    renderField("ai ›", true);
+    $("mode").hidden = false;
+    renderResults(step.matches);
+    shown.matches = step.matches;
+  }
+  renderLog();
+}
+
+function durationOf(step) {
+  if (step.type !== undefined) return step.type.length * 55 + 1900;
+  if (step.press) return 1500;
+  if (step.hold) return 2600;
+  if (step.reopen) return 1100;
+  const text = (step.matches || []).map((m) => m.text).join(" ");
+  return Math.min(4200, 1600 + text.length * 14);
+}
+
+function go(to, animate) {
+  index = Math.max(0, Math.min(steps.length - 1, to));
+  // Rebuild what the panel shows up to this step without animation, then play this one.
+  if (!animate) { for (let i = 0; i < index; i++) apply(steps[i], false); }
+  apply(steps[index], animate);
+}
+
+function schedule() {
+  clearTimeout(timer);
+  if (!playing) return;
+  timer = setTimeout(() => {
+    if (index >= steps.length - 1) { playing = false; updatePlay(); document.body.dataset.done = "1"; return; }
+    go(index + 1, true);
+    schedule();
+  }, durationOf(steps[index]));
+}
+
+function updatePlay() { $("play").textContent = playing ? "Pause" : (index >= steps.length - 1 ? "Replay" : "Play"); }
+
+$("play").addEventListener("click", () => {
+  if (!playing && index >= steps.length - 1) { go(0, true); }
+  playing = !playing; updatePlay(); schedule();
+});
+$("next").addEventListener("click", () => { playing = false; updatePlay(); clearTimeout(timer); go(index + 1, false); });
+$("prev").addEventListener("click", () => { playing = false; updatePlay(); clearTimeout(timer); go(index - 1, false); });
+$("restart").addEventListener("click", () => { playing = true; updatePlay(); go(0, true); schedule(); });
+
+const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const capture = location.hash === "#gif";
+if (capture) document.documentElement.classList.add("gif");
+// At rest the page shows the most telling moment: the agent asking before it acts.
+const askIndex = steps.findIndex((s) => s.matches && s.matches.some((m) => m.id === "permission"));
+if (reduce && !capture) { playing = false; go(askIndex, false); }
+else { go(0, true); }
+updatePlay();
+schedule();
+</script>
