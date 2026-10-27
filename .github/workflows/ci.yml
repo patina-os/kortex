@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-unit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: shellcheck
+        run: shellcheck install.sh uninstall.sh
+      - name: ruff
+        run: pipx run ruff check kortex.py tests/
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+
+  end-to-end:
+    # kortex through D-Bus as KRunner calls it, against a real `opencode serve` and a
+    # test model on localhost (tests/e2e.py).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: python3-dbus, python3-gi and the D-Bus daemon
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q python3-dbus python3-gi dbus
+      - name: opencode
+        run: npm install --global --prefix "$HOME/.local" opencode-ai
+      - name: End-to-end
+        run: KORTEX_OPENCODE="$HOME/.local/bin/opencode" /usr/bin/python3 tests/e2e.py

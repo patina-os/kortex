@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name=kortex
+Comment=The AI agent: ai and your request
+Type=Service
+Icon=kortex
+X-KDE-PluginInfo-Author=patina
+X-KDE-PluginInfo-Name=kortex
+X-KDE-PluginInfo-Version=0.1.0
+X-KDE-PluginInfo-License=GPL-3.0-or-later
+X-KDE-PluginInfo-Website=https://github.com/patina21/kortex
+X-KDE-PluginInfo-EnabledByDefault=true
+X-Plasma-API=DBus2
+X-Plasma-DBusRunner-Service=io.github.patina21.kortex
+X-Plasma-DBusRunner-Path=/runner
+X-Plasma-Request-Actions-Once=true
+X-Plasma-Runner-Syntaxes=ai :q:,ai,ai ›
+X-Plasma-Runner-Syntax-Descriptions=Asks the AI agent :q: and shows its answer,Lists the recent conversations,Shows the current conversation
