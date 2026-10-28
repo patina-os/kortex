@@ -11,9 +11,9 @@ want, and the agent answers right there in KRunner: it explains, changes setting
 you allow it, writes code and works on your servers. kortex is the palette end of the
 agent; the agent itself is [opencode](https://opencode.ai), running on your machine.
 
-Status: first version, 0.1.0. It passes its tests against a real `opencode serve`
-(1.19) but has not yet run inside a Plasma session; that run is what "First release,
-done when" below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
+Status: 0.1.1, the first version with its minimal icon. It passes its tests against a
+real `opencode serve` (1.19) but has not yet run inside a Plasma session; that run is
+what "First release, done when" below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
 which asks for the agent at install time, but it works on any Plasma 6 desktop that has
 opencode.
 

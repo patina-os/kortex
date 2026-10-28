@@ -27,7 +27,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 SERVICE = "io.github.patina21.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
