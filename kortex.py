@@ -13,6 +13,7 @@ a quiet quarter of an hour.
 """
 
 import base64
+import http.client
 import json
 import os
 import secrets
@@ -22,6 +23,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -34,6 +36,9 @@ IFACE = "org.kde.krunner1"
 RUNNER_ID = "kortex"  # X-KDE-PluginInfo-Name in kortex.desktop
 TRIGGER = "ai"
 VIEW = "ai ›"  # the query that shows the current conversation
+# KRunner asks again only for a query that differs from the one it shows, so a refresh
+# puts an invisible word joiner after the marker, or takes it away again.
+JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
@@ -50,6 +55,10 @@ ACTIONS = [
     ("terminal", "Open in terminal", "utilities-terminal"),
 ]
 REPLIES = {"allow-once": "once", "allow-always": "always", "deny": "reject"}
+# opencode 1.19 answers GET /permission with a 400 for the whole list while one request in
+# it lacks an optional field (a webfetch without a timeout). kortex then takes the requests
+# from opencode's event stream; one it did not see there is shown as waiting, unanswerable.
+UNREADABLE = {"id": "unreadable", "permission": "a request kortex cannot show"}
 
 
 def log(*words):
@@ -92,6 +101,21 @@ def find_opencode():
     return found
 
 
+def note_event(asked, line):
+    """Keep `asked`, the pending permission requests by id, current with one line of
+    opencode's event stream (`data: {"type": ..., "properties": ...}`)."""
+    if not line.startswith("data:"):
+        return
+    try:
+        event = json.loads(line[5:])
+        if event["type"] == "permission.asked":
+            asked[event["properties"]["id"]] = event["properties"]
+        elif event["type"] == "permission.replied":
+            asked.pop(event["properties"]["requestID"], None)
+    except (ValueError, LookupError, TypeError):
+        pass  # not an event kortex follows
+
+
 def free_port():
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -108,6 +132,9 @@ class Opencode:
         self.process = None
         # Never through a proxy: the server is on this machine.
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self.asked = {}  # permission requests from the event stream, by id; under self.lock
+        self.lock = threading.Lock()
+        self.listened = None  # the server the event stream is followed for
 
     @classmethod
     def from_environment(cls):
@@ -119,8 +146,13 @@ class Opencode:
     def owned(self):
         return self.process is not None
 
+    def stopped(self):
+        """True when the server kortex started has exited since."""
+        return self.process is not None and self.process.poll() is not None
+
     def start(self):
         if self.url and (self.process is None or self.process.poll() is None):
+            self.listen()
             return
         command = find_opencode()
         port = free_port()
@@ -142,7 +174,10 @@ class Opencode:
             if self.process.poll() is not None:
                 raise OpencodeError(f"opencode serve exited; see {state_dir() / 'opencode.log'}")
             try:
-                self.request("GET", "/global/health", start=False)
+                # opencode leaves the first connection it accepts while it starts
+                # unanswered; a short wait per try moves on to the next one.
+                self.request("GET", "/global/health", start=False, timeout=1)
+                self.listen()
                 return
             except OpencodeError:
                 time.sleep(0.2)
@@ -158,22 +193,51 @@ class Opencode:
             self.process.kill()
         self.process = None
         self.url = None
+        self.listened = None  # a new server may get the same port
+        with self.lock:
+            self.asked.clear()
 
-    def request(self, method, path, body=None, start=True):
+    def listen(self):
+        """Follow the event stream of the server in use, in a thread of its own."""
+        if self.listened != self.url:
+            self.listened = self.url
+            threading.Thread(target=self.follow, args=(self.url,), daemon=True).start()
+
+    def follow(self, url):
+        """The thread: read the stream while `url` is the server in use; no GLib or D-Bus
+        here, only the requests under the lock."""
+        req = urllib.request.Request(url + "/event")
+        self.authorize(req)
+        while self.url == url:
+            try:
+                with self.opener.open(req, timeout=60) as response:
+                    for raw in response:
+                        if self.url != url:
+                            break
+                        with self.lock:
+                            note_event(self.asked, raw.decode("utf-8", "replace"))
+            except (OSError, http.client.HTTPException):
+                pass  # the server stopped or restarts; try again while it is the one in use
+            time.sleep(1)
+
+    def authorize(self, req):
+        if self.password:
+            token = base64.b64encode(f"opencode:{self.password}".encode()).decode()
+            req.add_header("Authorization", "Basic " + token)
+
+    def request(self, method, path, body=None, start=True, timeout=10):
         if start:
             self.start()
         data = None if body is None else json.dumps(body).encode()
         req = urllib.request.Request(self.url + path, data=data, method=method)
         req.add_header("Content-Type", "application/json")
-        if self.password:
-            token = base64.b64encode(f"opencode:{self.password}".encode()).decode()
-            req.add_header("Authorization", "Basic " + token)
+        self.authorize(req)
         try:
-            with self.opener.open(req, timeout=10) as response:
+            with self.opener.open(req, timeout=timeout) as response:
                 raw = response.read()
-        except (urllib.error.URLError, OSError) as e:
+            return json.loads(raw) if raw else None
+        except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as e:
             raise OpencodeError(f"{method} {path}: {e}") from e
-        return json.loads(raw) if raw else None
 
     def new_session(self, title):
         return self.request("POST", "/session", {"title": title})["id"]
@@ -190,7 +254,16 @@ class Opencode:
         return status.get("type", "idle"), status.get("message", "")
 
     def permissions(self, session):
-        return [p for p in self.request("GET", "/permission") if p.get("sessionID") == session]
+        try:
+            found = self.request("GET", "/permission")
+        except OpencodeError as e:
+            if not (isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 400):
+                raise
+            with self.lock:
+                found = list(self.asked.values())
+            # A request of another conversation the stream did show explains the 400.
+            return [p for p in found if p.get("sessionID") == session] or ([] if found else [UNREADABLE])
+        return [p for p in found if p.get("sessionID") == session]
 
     def reply(self, request_id, reply):
         self.request("POST", f"/permission/{request_id}/reply", {"reply": reply})
@@ -207,7 +280,7 @@ class Opencode:
 def parse(query):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
     follow-up, or (None, "") for a query that is not kortex's."""
-    q = query.strip()
+    q = query.replace(JOINER, "").strip()
     if q.startswith(VIEW):
         return "view", q[len(VIEW):].strip()
     if q.lower() == TRIGGER:
@@ -261,10 +334,14 @@ def view(state):
     lines, error = answer_of(state["messages"])
     matches = []
     for p in state["permissions"]:
+        if p["id"] == UNREADABLE["id"]:
+            matches.append(match("stuck", "The agent waits for an answer kortex cannot show (an opencode bug)",
+                                 "dialog-warning", 1.0, "Asked before kortex was listening; it clears when opencode restarts"))
+            continue
         what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
         matches.append(match(
             "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {what}", "dialog-warning", 1.0,
-            "The agent asks before it does this", ["allow-once", "allow-always", "deny"]))
+            "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
     if error:
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
     status, retry = state["status"]
@@ -426,8 +503,8 @@ class Kortex:
     def tick(self):
         """Every REFRESH_MS: while KRunner shows the conversation and it changed, show
         it again; while it is closed, notify of a new permission request."""
-        if not self.session or not self.opencode.url:
-            return
+        if not self.session or not self.opencode.url or self.opencode.stopped():
+            return  # a stopped server starts again on the next request from KRunner, not from here
         try:
             state = self.snapshot()
         except OpencodeError as e:
@@ -436,7 +513,9 @@ class Kortex:
         if self.viewing:
             if repr(state) != self.signature:
                 self.signature = repr(state)
-                self.desktop.query(self.view_query)  # KRunner asks again and gets the news
+                q = self.view_query
+                q = q.replace(JOINER, "") if JOINER in q else VIEW + JOINER + q[len(VIEW):]
+                self.desktop.query(q)  # a query that differs, so KRunner asks again and gets the news
             return
         for p in state["permissions"]:
             if p["id"] not in self.notified:
@@ -563,7 +642,10 @@ def main():
     Runner(name, OBJECT_PATH)
 
     def tick():
-        kortex.tick()
+        try:
+            kortex.tick()
+        except Exception as e:  # noqa: BLE001 - a timer that raises is never called again
+            log(f"tick: {e!r}")
         if kortex.idle():
             log("quiet for a while; stopping")
             loop.quit()

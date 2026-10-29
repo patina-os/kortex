@@ -78,15 +78,19 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   /session/status` for the answer, `GET /permission` for what the agent asks to do and
   `POST /permission/:id/reply` with `once`, `always` or `reject` for the three actions.
   It reads those few calls when KRunner asks or every 0.7 s while the conversation is
-  on screen; no event stream to keep open. opencode reads its own configuration, so
+  on screen. It also follows `GET /event` for the requests alone, since opencode 1.19
+  cannot list a web fetch that has no timeout. opencode reads its own configuration, so
   the model, the provider and the permissions are the user's (patina writes them at
   install time). `KORTEX_OPENCODE_URL` (and `KORTEX_OPENCODE_PASSWORD`) point kortex
   at a server that runs already instead.
 - **Answers in a palette that pulls.** KRunner asks for matches; it is not told about
   new ones. While the conversation is on screen and changes, kortex runs the query
   again through KRunner's own D-Bus method (`org.kde.krunner /App querySingleRunner`)
-  with the marker `ai ›`, so KRunner asks again and gets the news. The marker is the
-  only thing kortex adds to the query line, and a follow-up typed after it is kept.
+  with the marker `ai ›`, so KRunner asks again and gets the news. KRunner asks only
+  for a query that differs from the one it shows, so each refresh puts an invisible
+  word joiner (U+2060) after the marker or takes it away again. The marker and that
+  character are all kortex adds to the query line, and a follow-up typed after it is
+  kept.
 - **Open in terminal** runs the terminal Plasma names (`TerminalApplication` in
   `kdeglobals`, else konsole) with `opencode attach <server> --session <id>`, the
   password in the environment, not on the command line, so nothing is lost when a
@@ -103,7 +107,9 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 - Local first. kortex itself sends nothing anywhere; where the request goes is
   opencode's configuration. With Ollama, nothing leaves the machine.
 - No action without a yes. kortex never answers a permission request on its own, and
-  "Always" is opencode's own rule, visible and removable in its configuration.
+  "Always" is opencode's own rule, visible and removable in its configuration. A
+  request opencode cannot list (1.19 fails the whole list while a web fetch without a
+  timeout waits) comes from its event stream and is answered like any other.
 - Python 3, with `python3-dbus` and `python3-gi` from Debian's archive: one readable
   program, no build step.
 - Small and boring: one program, one desktop file for KRunner, one D-Bus service file.

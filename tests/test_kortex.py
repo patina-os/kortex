@@ -43,6 +43,9 @@ class FakeOpencode:
         self.pending = []
         self.fail = None
 
+    def stopped(self):
+        return False
+
     def check(self):
         if self.fail:
             raise kortex.OpencodeError(self.fail)
@@ -114,6 +117,49 @@ PERMISSION = {"id": "per_1", "sessionID": "ses_1", "permission": "bash",
               "patterns": ["patina theme mode light"], "metadata": {}, "always": []}
 
 
+FETCH = {"id": "per_9", "sessionID": "ses_1", "permission": "webfetch", "patterns": ["https://example.org/"],
+         "metadata": {"url": "https://example.org/", "format": "text"}, "always": ["*"]}
+
+
+def event(kind, properties):
+    return "data: " + kortex.json.dumps({"id": "evt_1", "type": kind, "properties": properties}) + "\n"
+
+
+class Events(unittest.TestCase):
+    def test_asked_then_replied(self):
+        asked = {}
+        for line in [event("server.connected", {}), "\n", event("permission.asked", FETCH), ": comment\n"]:
+            kortex.note_event(asked, line)
+        self.assertEqual(asked, {"per_9": FETCH})
+        kortex.note_event(asked, event("permission.replied", {"sessionID": "ses_1", "requestID": "per_9", "reply": "once"}))
+        self.assertEqual(asked, {})
+
+    def test_noise_is_ignored(self):
+        asked = {"per_9": FETCH}
+        for line in ["data: {not json\n", "data: []\n", "data: null\n", event("server.heartbeat", {}),
+                     event("permission.asked", {"sessionID": "ses_1"}), event("permission.replied", {})]:
+            kortex.note_event(asked, line)
+        self.assertEqual(asked, {"per_9": FETCH})
+
+    def test_follow_reads_the_stream_until_the_server_changes(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+        lines = [event("permission.asked", FETCH).encode(), b"\n"]
+
+        class Stream:
+            def __enter__(self):
+                return iter(lines)
+
+            def __exit__(self, *_):
+                oc.url = None  # the server stopped
+
+        with mock.patch.object(oc.opener, "open", return_value=Stream()) as opened, \
+                mock.patch.object(kortex.time, "sleep"):
+            oc.follow("http://127.0.0.1:1")
+        self.assertEqual(opened.call_args[0][0].full_url, "http://127.0.0.1:1/event")
+        self.assertTrue(opened.call_args[0][0].get_header("Authorization").startswith("Basic "))
+        self.assertEqual(oc.asked, {"per_9": FETCH})
+
+
 class Parse(unittest.TestCase):
     def test_kinds(self):
         self.assertEqual(kortex.parse("ai why is my wifi slow"), ("ask", "why is my wifi slow"))
@@ -149,6 +195,7 @@ class View(unittest.TestCase):
         self.assertEqual([m[0] for m in matches], ["permission" + SEP + "per_1", "answer"])
         self.assertEqual(matches[0][1], "Allow bash: patina theme mode light")
         self.assertEqual(matches[0][4]["actions"], ["allow-once", "allow-always", "deny"])
+        self.assertTrue(matches[0][4]["multiline"])  # a long command is shown whole
         self.assertEqual(matches[1][1], "Switching.")
         self.assertTrue(matches[1][4]["multiline"])
         self.assertTrue(matches[1][4]["subtext"].startswith("Working…"))
@@ -207,6 +254,33 @@ class Runner(unittest.TestCase):
         k.run("permission" + SEP + "per_3", "allow-always")
         self.assertEqual(oc.replies, [("per_1", "once"), ("per_2", "reject"), ("per_3", "always")])
 
+    def test_unreadable_permission_is_shown_but_not_answered(self):
+        k, oc, desk, _ = new()
+        k.run("ask" + SEP + "x", "")
+        oc.pending = [dict(kortex.UNREADABLE, sessionID="ses_1")]
+        stuck = [m for m in k.match("ai ›") if m[0] == "stuck"]
+        self.assertEqual(len(stuck), 1)
+        self.assertEqual(stuck[0][4]["actions"], [])
+        k.run("stuck", "")
+        self.assertEqual((desk.launched, oc.replies), ([], []))
+
+    def test_permissions_400_come_from_the_event_stream(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+
+        def fail(code):
+            def request(*_args, **_kwargs):
+                cause = kortex.urllib.error.HTTPError("http://127.0.0.1:1/permission", code, "x", {}, None)
+                raise kortex.OpencodeError(f"GET /permission: {cause}") from cause
+            return request
+
+        with mock.patch.object(oc, "request", fail(400)):
+            self.assertEqual(oc.permissions("ses_1"), [kortex.UNREADABLE])
+            oc.asked = {"per_9": FETCH}
+            self.assertEqual(oc.permissions("ses_1"), [FETCH])
+            self.assertEqual(oc.permissions("ses_2"), [])  # the 400 is ses_1's request
+        with mock.patch.object(oc, "request", fail(500)), self.assertRaises(kortex.OpencodeError):
+            oc.permissions("ses_1")
+
     def test_copy_and_terminal(self):
         k, oc, desk, _ = new()
         k.run("ask" + SEP + "x", "")
@@ -256,8 +330,14 @@ class Runner(unittest.TestCase):
         self.assertEqual(len(desk.queries), before)
         oc.history = [user("x"), assistant(text("hel"))]
         k.tick()
-        self.assertEqual(desk.queries[-1], "ai ›")
+        # KRunner asks again only for a query that differs from the one it shows
+        self.assertNotEqual(desk.queries[-1], "ai ›")
+        self.assertEqual(kortex.parse(desk.queries[-1]), ("view", ""))
         self.assertEqual(len(desk.queries), before + 1)
+        k.match(desk.queries[-1])
+        oc.history = [user("x"), assistant(text("hello"))]
+        k.tick()
+        self.assertEqual(desk.queries[-1], "ai ›")
 
     def test_tick_notifies_when_closed(self):
         k, oc, desk, _clock = new()

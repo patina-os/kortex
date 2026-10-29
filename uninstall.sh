@@ -10,7 +10,7 @@ service=io.github.patina21.kortex
 pkill -f "$data/kortex/kortex.py" 2> /dev/null || true
 rm -f "$data/krunner/dbusplugins/kortex.desktop" "$data/dbus-1/services/$service.service" \
   "$data/icons/hicolor/scalable/apps/kortex.svg"
-rm -rf "$data/kortex"
+rm -rf "$data/kortex" "${XDG_STATE_HOME:-$HOME/.local/state}/kortex"
 if command -v kquitapp6 > /dev/null; then
   kquitapp6 krunner 2> /dev/null || true
 fi
