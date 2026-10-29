@@ -25,7 +25,7 @@ repo = demo.parent.parent
 sys.path.insert(0, str(demo))
 import demo_llm
 
-SERVICE = "io.github.patina21.kortex"
+SERVICE = "io.github.patina_os.kortex"
 SEP = "\x1f"
 OPENCODE = os.environ.get("KORTEX_OPENCODE") or shutil.which("opencode")
 MODEL = "nemotron-3.5-bolt:e4b"  # the name the scripted model answers under

@@ -5,10 +5,11 @@
 set -euo pipefail
 
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
-service=io.github.patina21.kortex
+service=io.github.patina_os.kortex
 
 pkill -f "$data/kortex/kortex.py" 2> /dev/null || true
 rm -f "$data/krunner/dbusplugins/kortex.desktop" "$data/dbus-1/services/$service.service" \
+  "$data/dbus-1/services/io.github.patina21.kortex.service" \
   "$data/icons/hicolor/scalable/apps/kortex.svg"
 rm -rf "$data/kortex" "${XDG_STATE_HOME:-$HOME/.local/state}/kortex"
 if command -v kquitapp6 > /dev/null; then

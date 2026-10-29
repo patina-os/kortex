@@ -11,9 +11,12 @@ want, and the agent answers right there in KRunner: it explains, changes setting
 you allow it, writes code and works on your servers. kortex is the palette end of the
 agent; the agent itself is [opencode](https://opencode.ai), running on your machine.
 
-Status: 0.1.1, the first version with its minimal icon. It passes its tests against a
-real `opencode serve` (1.19) but has not yet run inside a Plasma session; that run is
-what "First release, done when" below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
+Status: 0.1.2. The answer now grows on screen in a real KRunner, requests opencode
+cannot list are answered from its event stream, and the first `ai` after a pause takes
+about 3 s instead of 12; the D-Bus name is `io.github.patina_os.kortex`. It passes its
+tests against a real `opencode serve` (1.19) and a real KRunner on Debian 13, but has
+not yet run inside a full Plasma session; that run is what "First release, done when"
+below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
 which asks for the agent at install time, but it works on any Plasma 6 desktop that has
 opencode.
 
@@ -105,7 +108,12 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 
 - Free software: GPL-3.0-or-later, like patina.
 - Local first. kortex itself sends nothing anywhere; where the request goes is
-  opencode's configuration. With Ollama, nothing leaves the machine.
+  opencode's configuration. With Ollama, requests and answers stay on the machine, but
+  two things around them do not: opencode fetches its list of models from
+  `models.opencode.ai` whenever its server starts (`OPENCODE_DISABLE_MODELS_FETCH=1`
+  stops that), and on its first prompt it fetches the provider's package from npm.
+  KRunner also keeps its last queries, `ai` requests included, in
+  `~/.local/share/krunnerstaterc`.
 - No action without a yes. kortex never answers a permission request on its own, and
   "Always" is opencode's own rule, visible and removable in its configuration. A
   request opencode cannot list (1.19 fails the whole list while a web fetch without a

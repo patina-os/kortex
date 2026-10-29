@@ -28,7 +28,7 @@ here = Path(__file__).resolve().parent
 sys.path.insert(0, str(here))
 import mock_llm
 
-SERVICE = "io.github.patina21.kortex"
+SERVICE = "io.github.patina_os.kortex"
 SEP = "\x1f"
 BUS_CONFIG = """<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
