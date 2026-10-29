@@ -260,8 +260,14 @@ class Runner(unittest.TestCase):
         self.assertEqual(len(desk.queries), before)
         oc.history = [user("x"), assistant(text("hel"))]
         k.tick()
-        self.assertEqual(desk.queries[-1], "ai ›")
+        # KRunner asks again only for a query that differs from the one it shows
+        self.assertNotEqual(desk.queries[-1], "ai ›")
+        self.assertEqual(kortex.parse(desk.queries[-1]), ("view", ""))
         self.assertEqual(len(desk.queries), before + 1)
+        k.match(desk.queries[-1])
+        oc.history = [user("x"), assistant(text("hello"))]
+        k.tick()
+        self.assertEqual(desk.queries[-1], "ai ›")
 
     def test_tick_notifies_when_closed(self):
         k, oc, desk, _clock = new()

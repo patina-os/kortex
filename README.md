@@ -85,8 +85,11 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 - **Answers in a palette that pulls.** KRunner asks for matches; it is not told about
   new ones. While the conversation is on screen and changes, kortex runs the query
   again through KRunner's own D-Bus method (`org.kde.krunner /App querySingleRunner`)
-  with the marker `ai ›`, so KRunner asks again and gets the news. The marker is the
-  only thing kortex adds to the query line, and a follow-up typed after it is kept.
+  with the marker `ai ›`, so KRunner asks again and gets the news. KRunner asks only
+  for a query that differs from the one it shows, so each refresh puts an invisible
+  word joiner (U+2060) after the marker or takes it away again. The marker and that
+  character are all kortex adds to the query line, and a follow-up typed after it is
+  kept.
 - **Open in terminal** runs the terminal Plasma names (`TerminalApplication` in
   `kdeglobals`, else konsole) with `opencode attach <server> --session <id>`, the
   password in the environment, not on the command line, so nothing is lost when a

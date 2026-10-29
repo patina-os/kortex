@@ -35,6 +35,9 @@ IFACE = "org.kde.krunner1"
 RUNNER_ID = "kortex"  # X-KDE-PluginInfo-Name in kortex.desktop
 TRIGGER = "ai"
 VIEW = "ai ›"  # the query that shows the current conversation
+# KRunner asks again only for a query that differs from the one it shows, so a refresh
+# puts an invisible word joiner after the marker, or takes it away again.
+JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
@@ -214,7 +217,7 @@ class Opencode:
 def parse(query):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
     follow-up, or (None, "") for a query that is not kortex's."""
-    q = query.strip()
+    q = query.replace(JOINER, "").strip()
     if q.startswith(VIEW):
         return "view", q[len(VIEW):].strip()
     if q.lower() == TRIGGER:
@@ -443,7 +446,9 @@ class Kortex:
         if self.viewing:
             if repr(state) != self.signature:
                 self.signature = repr(state)
-                self.desktop.query(self.view_query)  # KRunner asks again and gets the news
+                q = self.view_query
+                q = q.replace(JOINER, "") if JOINER in q else VIEW + JOINER + q[len(VIEW):]
+                self.desktop.query(q)  # a query that differs, so KRunner asks again and gets the news
             return
         for p in state["permissions"]:
             if p["id"] not in self.notified:
