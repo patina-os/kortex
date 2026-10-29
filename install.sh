@@ -20,7 +20,7 @@ install -D -m 0755 "$here/kortex.py" "$data/kortex/kortex.py"
 install -D -m 0644 "$here/kortex.desktop" "$data/krunner/dbusplugins/kortex.desktop"
 install -D -m 0644 "$here/kortex.svg" "$data/icons/hicolor/scalable/apps/kortex.svg"
 mkdir -p "$data/dbus-1/services"
-printf '[D-BUS Service]\nName=%s\nExec=/usr/bin/python3 %s\n' "$service" "$data/kortex/kortex.py" \
+printf '[D-BUS Service]\nName=%s\nExec=/usr/bin/python3 "%s"\n' "$service" "$data/kortex/kortex.py" \
   > "$data/dbus-1/services/$service.service"
 
 # A running kortex keeps the old program until it stops; KRunner reads its plugins at start.

@@ -13,6 +13,7 @@ a quiet quarter of an hour.
 """
 
 import base64
+import http.client
 import json
 import os
 import secrets
@@ -119,6 +120,10 @@ class Opencode:
     def owned(self):
         return self.process is not None
 
+    def stopped(self):
+        """True when the server kortex started has exited since."""
+        return self.process is not None and self.process.poll() is not None
+
     def start(self):
         if self.url and (self.process is None or self.process.poll() is None):
             return
@@ -142,7 +147,9 @@ class Opencode:
             if self.process.poll() is not None:
                 raise OpencodeError(f"opencode serve exited; see {state_dir() / 'opencode.log'}")
             try:
-                self.request("GET", "/global/health", start=False)
+                # opencode leaves the first connection it accepts while it starts
+                # unanswered; a short wait per try moves on to the next one.
+                self.request("GET", "/global/health", start=False, timeout=1)
                 return
             except OpencodeError:
                 time.sleep(0.2)
@@ -159,7 +166,7 @@ class Opencode:
         self.process = None
         self.url = None
 
-    def request(self, method, path, body=None, start=True):
+    def request(self, method, path, body=None, start=True, timeout=10):
         if start:
             self.start()
         data = None if body is None else json.dumps(body).encode()
@@ -169,11 +176,11 @@ class Opencode:
             token = base64.b64encode(f"opencode:{self.password}".encode()).decode()
             req.add_header("Authorization", "Basic " + token)
         try:
-            with self.opener.open(req, timeout=10) as response:
+            with self.opener.open(req, timeout=timeout) as response:
                 raw = response.read()
-        except (urllib.error.URLError, OSError) as e:
+            return json.loads(raw) if raw else None
+        except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as e:
             raise OpencodeError(f"{method} {path}: {e}") from e
-        return json.loads(raw) if raw else None
 
     def new_session(self, title):
         return self.request("POST", "/session", {"title": title})["id"]
@@ -264,7 +271,7 @@ def view(state):
         what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
         matches.append(match(
             "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {what}", "dialog-warning", 1.0,
-            "The agent asks before it does this", ["allow-once", "allow-always", "deny"]))
+            "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
     if error:
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
     status, retry = state["status"]
@@ -426,8 +433,8 @@ class Kortex:
     def tick(self):
         """Every REFRESH_MS: while KRunner shows the conversation and it changed, show
         it again; while it is closed, notify of a new permission request."""
-        if not self.session or not self.opencode.url:
-            return
+        if not self.session or not self.opencode.url or self.opencode.stopped():
+            return  # a stopped server starts again on the next request from KRunner, not from here
         try:
             state = self.snapshot()
         except OpencodeError as e:
@@ -563,7 +570,10 @@ def main():
     Runner(name, OBJECT_PATH)
 
     def tick():
-        kortex.tick()
+        try:
+            kortex.tick()
+        except Exception as e:  # noqa: BLE001 - a timer that raises is never called again
+            log(f"tick: {e!r}")
         if kortex.idle():
             log("quiet for a while; stopping")
             loop.quit()

@@ -49,6 +49,14 @@ def wait_for(what, check, timeout=120):
     raise AssertionError(f"timed out waiting for {what}")
 
 
+def running(pid):
+    """True while the process runs (a zombie has stopped)."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    except OSError:
+        return False
+
+
 def main():
     opencode = os.environ.get("KORTEX_OPENCODE") or shutil.which("opencode")
     if not opencode:
@@ -89,6 +97,7 @@ def main():
     assert krunner.stdout.readline().strip() == "ready"
     bus = dbus.bus.BusConnection(address)
     pid = None
+    servers = []
     try:
         k = dbus.Interface(bus.get_object(SERVICE, "/runner"), "org.kde.krunner1")  # activates kortex
         daemon = dbus.Interface(bus.get_object("org.freedesktop.DBus", "/org/freedesktop/DBus"), "org.freedesktop.DBus")
@@ -140,13 +149,16 @@ def main():
         assert oct(password.stat().st_mode & 0o777) == "0o600"
     finally:
         if pid:
+            # kortex's children: the opencode serve it started, which must stop with it
+            servers = subprocess.run(["pgrep", "-P", str(pid)], capture_output=True, text=True,
+                                     check=False).stdout.split()
             os.kill(pid, signal.SIGTERM)
             wait_for("kortex to stop", lambda: not bus.name_has_owner(SERVICE), 15)
         krunner.terminate()
         bus_daemon.terminate()
         model.shutdown()
-    leftover = subprocess.run(["pgrep", "-f", f"opencode serve.*{home}"], capture_output=True, check=False).stdout
-    assert not leftover
+    assert servers, "kortex started no opencode serve"
+    assert not [p for p in servers if running(p)], f"opencode serve outlived kortex: {servers}"
     shutil.rmtree(home, ignore_errors=True)
     print("e2e: passed")
 

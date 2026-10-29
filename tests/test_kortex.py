@@ -43,6 +43,9 @@ class FakeOpencode:
         self.pending = []
         self.fail = None
 
+    def stopped(self):
+        return False
+
     def check(self):
         if self.fail:
             raise kortex.OpencodeError(self.fail)
@@ -149,6 +152,7 @@ class View(unittest.TestCase):
         self.assertEqual([m[0] for m in matches], ["permission" + SEP + "per_1", "answer"])
         self.assertEqual(matches[0][1], "Allow bash: patina theme mode light")
         self.assertEqual(matches[0][4]["actions"], ["allow-once", "allow-always", "deny"])
+        self.assertTrue(matches[0][4]["multiline"])  # a long command is shown whole
         self.assertEqual(matches[1][1], "Switching.")
         self.assertTrue(matches[1][4]["multiline"])
         self.assertTrue(matches[1][4]["subtext"].startswith("Working…"))
