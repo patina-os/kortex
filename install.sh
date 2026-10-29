@@ -6,7 +6,7 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
-service=io.github.patina21.kortex
+service=io.github.patina_os.kortex
 
 if ! python3 -c 'import dbus, gi' 2> /dev/null; then
   echo "kortex: python3-dbus and python3-gi are missing; on Debian: sudo apt install python3-dbus python3-gi" >&2
@@ -22,6 +22,8 @@ install -D -m 0644 "$here/kortex.svg" "$data/icons/hicolor/scalable/apps/kortex.
 mkdir -p "$data/dbus-1/services"
 printf '[D-BUS Service]\nName=%s\nExec=/usr/bin/python3 "%s"\n' "$service" "$data/kortex/kortex.py" \
   > "$data/dbus-1/services/$service.service"
+# The name before 0.1.2, from the project's first account.
+rm -f "$data/dbus-1/services/io.github.patina21.kortex.service"
 
 # A running kortex keeps the old program until it stops; KRunner reads its plugins at start.
 dbus-send --session --dest=org.freedesktop.DBus --type=method_call /org/freedesktop/DBus \
