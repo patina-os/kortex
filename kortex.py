@@ -54,6 +54,11 @@ ACTIONS = [
     ("terminal", "Open in terminal", "utilities-terminal"),
 ]
 REPLIES = {"allow-once": "once", "allow-always": "always", "deny": "reject"}
+# opencode 1.19 answers GET /permission with a 400 for the whole list while one request in
+# it lacks an optional field (a webfetch without a timeout), so kortex cannot see what is
+# asked; it shows that something waits, to be answered in opencode's own terminal.
+UNREADABLE = {"id": "unreadable", "permission": "a request kortex cannot show",
+              "patterns": ["answer it in the terminal (an opencode bug)"]}
 
 
 def log(*words):
@@ -200,7 +205,13 @@ class Opencode:
         return status.get("type", "idle"), status.get("message", "")
 
     def permissions(self, session):
-        return [p for p in self.request("GET", "/permission") if p.get("sessionID") == session]
+        try:
+            found = self.request("GET", "/permission")
+        except OpencodeError as e:
+            if isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 400:
+                return [UNREADABLE]
+            raise
+        return [p for p in found if p.get("sessionID") == session]
 
     def reply(self, request_id, reply):
         self.request("POST", f"/permission/{request_id}/reply", {"reply": reply})
@@ -271,6 +282,10 @@ def view(state):
     lines, error = answer_of(state["messages"])
     matches = []
     for p in state["permissions"]:
+        if p["id"] == UNREADABLE["id"]:
+            matches.append(match("stuck", "The agent asks first, but kortex cannot show what (an opencode bug)",
+                                 "dialog-warning", 1.0, "Answer it in the terminal · Enter", ["terminal"], True))
+            continue
         what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
         matches.append(match(
             "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {what}", "dialog-warning", 1.0,
@@ -406,8 +421,8 @@ class Kortex:
                 if action in REPLIES:
                     self.opencode.reply(arg, REPLIES[action])
                 self.reopen(self.view_query)
-            elif kind == "answer" and self.session:
-                if action == "terminal":
+            elif kind in ("answer", "stuck") and self.session:
+                if action == "terminal" or kind == "stuck":
                     self.desktop.launch(
                         terminal_command(self.opencode.url, self.session, self.desktop.terminal()),
                         {"OPENCODE_SERVER_PASSWORD": self.opencode.password or ""})

@@ -106,7 +106,9 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 - Local first. kortex itself sends nothing anywhere; where the request goes is
   opencode's configuration. With Ollama, nothing leaves the machine.
 - No action without a yes. kortex never answers a permission request on its own, and
-  "Always" is opencode's own rule, visible and removable in its configuration.
+  "Always" is opencode's own rule, visible and removable in its configuration. When
+  opencode cannot list a request (1.19 fails the whole list while a web fetch without a
+  timeout waits), kortex says that the agent waits and opens the terminal to answer it.
 - Python 3, with `python3-dbus` and `python3-gi` from Debian's archive: one readable
   program, no build step.
 - Small and boring: one program, one desktop file for KRunner, one D-Bus service file.

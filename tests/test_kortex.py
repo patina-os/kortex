@@ -211,6 +211,32 @@ class Runner(unittest.TestCase):
         k.run("permission" + SEP + "per_3", "allow-always")
         self.assertEqual(oc.replies, [("per_1", "once"), ("per_2", "reject"), ("per_3", "always")])
 
+    def test_unreadable_permission_points_to_the_terminal(self):
+        k, oc, desk, _ = new()
+        k.run("ask" + SEP + "x", "")
+        oc.pending = [dict(kortex.UNREADABLE, sessionID="ses_1")]
+        stuck = [m for m in k.match("ai ›") if m[0] == "stuck"]
+        self.assertEqual(len(stuck), 1)
+        self.assertEqual(stuck[0][4]["actions"], ["terminal"])
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
+            k.run("stuck", "")  # Enter opens the terminal, where the request can be answered
+        self.assertEqual(desk.launched[0][0][-2:], ["--session", "ses_1"])
+        self.assertEqual(oc.replies, [])
+
+    def test_permissions_400_is_unreadable(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+
+        def fail(code):
+            def request(*_args, **_kwargs):
+                cause = kortex.urllib.error.HTTPError("http://127.0.0.1:1/permission", code, "x", {}, None)
+                raise kortex.OpencodeError(f"GET /permission: {cause}") from cause
+            return request
+
+        with mock.patch.object(oc, "request", fail(400)):
+            self.assertEqual(oc.permissions("ses_1"), [kortex.UNREADABLE])
+        with mock.patch.object(oc, "request", fail(500)), self.assertRaises(kortex.OpencodeError):
+            oc.permissions("ses_1")
+
     def test_copy_and_terminal(self):
         k, oc, desk, _ = new()
         k.run("ask" + SEP + "x", "")
