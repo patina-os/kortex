@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 TOOL_COMMAND = "touch kortex-proof"
 DONE = "Done. kortex-proof is in your home directory."
 HELLO = "Hello from the test model."
+TOOLS_SEEN = []  # the tool names of each chat request, in order
 
 
 def content(message):
@@ -48,6 +49,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        TOOLS_SEEN.append([t.get("function", {}).get("name") for t in body.get("tools", [])])
         kind, value = reply_for(body)
         if not body.get("stream"):
             message = {"role": "assistant", "content": value} if kind == "text" else {

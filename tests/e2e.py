@@ -5,7 +5,9 @@ A private session bus that starts kortex by D-Bus activation, as install.sh sets
 a stand-in for KRunner's application object, a test model on
 localhost (tests/mock_llm.py) and opencode configured to use it. Then, through D-Bus as
 KRunner would: ask for a file, see the agent ask before it runs the command, check that
-nothing ran, allow it once, see the file and the answer. Needs opencode (KORTEX_OPENCODE
+nothing ran, allow it once, see the file and the answer; then connect an MCP server
+(tests/mock_mcp.py) in opencode's configuration while the conversation runs and see the
+model get its tool on the next request. Needs opencode (KORTEX_OPENCODE
 or on PATH), python3-dbus and python3-gi; opencode fetches its provider package from
 npm on first use, so it needs the network once.
 
@@ -144,6 +146,17 @@ def main():
         listed = k.Match("ai", timeout=30)
         assert any(str(m[0]).startswith("session" + SEP) for m in listed), listed
         print("e2e: ai lists the conversation")
+
+        # A service connected while the server runs, as `patina ai connect` does it: the
+        # running opencode does not read its configuration again, kortex adds it.
+        settings = json.loads((config / "opencode.json").read_text())
+        settings["mcp"] = {"probe": {"type": "local", "command": [sys.executable, str(here / "mock_mcp.py")]}}
+        (config / "opencode.json").write_text(json.dumps(settings))
+        asked_before = len(mock_llm.TOOLS_SEEN)
+        k.Run("continue" + SEP + "and now?", "", timeout=60)
+        tools = wait_for("the next model request", lambda: mock_llm.TOOLS_SEEN[asked_before:], 60)[0]
+        assert "probe_ping" in tools, tools
+        print("e2e: an MCP server connected mid-conversation reaches the model:", "probe_ping")
         k.Teardown()
         password = (home / ".config/kortex/password")
         assert oct(password.stat().st_mode & 0o777) == "0o600"
