@@ -9,23 +9,26 @@ made: [`docs/demo/`](docs/demo/).</sub>
 An AI agent in KDE Plasma's command palette. Press Meta+Space, type `ai` and what you
 want, and the agent answers right there in KRunner: it explains, changes settings once
 you allow it, writes code and works on your servers. kortex is the palette end of the
-agent; the agent itself is [opencode](https://opencode.ai), running on your machine.
+agent; the agent itself is [opencode](https://opencode.ai) or
+[Hermes Agent](https://github.com/NousResearch/hermes-agent), running on your machine.
 
-Status: 0.1.3. A service connected while kortex runs (an MCP server added to opencode's
-configuration, as `patina ai connect` does) reaches the running agent at once. Since
-0.1.2 the answer grows on screen in a real KRunner, requests opencode cannot list are
-answered from its event stream, and the first `ai` after a pause takes about 3 s
-instead of 12; the D-Bus name is `io.github.patina_os.kortex`. It passes its
-tests against a real `opencode serve` (1.19) and a real KRunner on Debian 13, but has
-not yet run inside a full Plasma session; that run is what "First release, done when"
-below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
-which asks for the agent at install time, but it works on any Plasma 6 desktop that has
-opencode.
+Status: 0.2.0. Hermes Agent is the second agent kortex talks to, next to opencode. A
+service connected while kortex runs (an MCP server added to the agent's configuration,
+as `patina ai connect` does) reaches opencode's running agent at once, and Hermes' next
+conversation. Since 0.1.2 the answer grows on screen in a real KRunner, requests
+opencode cannot list are answered from its event stream, and the first `ai` after a
+pause takes about 3 s instead of 12; the D-Bus name is `io.github.patina_os.kortex`. It
+passes its tests against a real `opencode serve` (1.19), a real Hermes gateway
+(v2026.9.24) and a real KRunner on Debian 13, but has not yet run inside a full Plasma
+session; that run is what "First release, done when" below asks for. kortex comes from
+[patina](https://github.com/patina-os/patina), which asks for the agent at install
+time, but it works on any Plasma 6 desktop that has opencode or Hermes.
 
 ## Install
 
-Needs Plasma 6, opencode (`npm install -g opencode-ai`, or patina's AI step) with a
-model it can use, and Python's D-Bus bindings:
+Needs Plasma 6, an agent with a model it can use (opencode: `npm install -g
+opencode-ai`; Hermes Agent: its installer; or patina's AI step), and Python's D-Bus
+bindings:
 
 ```sh
 sudo apt install python3-dbus python3-gi     # Debian and Ubuntu
@@ -34,7 +37,8 @@ git clone https://github.com/patina-os/kortex && cd kortex
 ```
 
 Then open KRunner (Meta+Space or Alt+Space) and type `ai` and your request.
-`./uninstall.sh` removes it again.
+`./uninstall.sh` removes it again. kortex talks to opencode; for Hermes, write `hermes`
+into `~/.config/kortex/agent` (patina does), or set `KORTEX_AGENT=hermes`.
 
 ## What it does
 
@@ -96,12 +100,30 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   word joiner (U+2060) after the marker or takes it away again. The marker and that
   character are all kortex adds to the query line, and a follow-up typed after it is
   kept.
+- **Hermes Agent as the agent.** With `hermes` in `~/.config/kortex/agent`, kortex
+  starts `hermes gateway run` with its API server on 127.0.0.1 (`API_SERVER_KEY`, the
+  same generated password, `API_SERVER_PORT`, a free port) and stops it with itself.
+  `POST /api/sessions` makes a conversation, `POST /v1/runs` sends the request, `GET
+  /api/sessions/:id/messages` and `GET /v1/runs/:id` give the answer and whether it is
+  done, and each run's event stream (`GET /v1/runs/:id/events`) brings its approval
+  requests, answered with `POST /v1/runs/:id/approval` (`once`, `always`, `deny`).
+  Hermes asks first only before a command it counts as dangerous (deleting a folder,
+  formatting a disk, piping a download into a shell, root through `sudo -A`), not
+  before every change as opencode does: it edits files, deletes a single file, stops a
+  process or installs an app from Flathub without asking. With `approvals.mode: manual`
+  (patina sets it) no second model decides which commands to let through. A request
+  left unanswered is denied after Hermes' timeout (five minutes). Hermes' own extras, messaging and its scheduler, run in that gateway only
+  when you set them up (`hermes setup`). Open in terminal runs `hermes --resume`.
 - **Services.** opencode reads its MCP servers (`mcp` in `opencode.json`) when its
   server starts, not again. When the file changes while kortex's server runs, kortex
   adds the servers that are new and enabled through `POST /mcp`, before the next
   request and while a conversation is on screen, so a service connected
   mid-conversation is there for the agent's next step. A server changed or removed
-  takes effect at the server's next start, after a quiet quarter of an hour.
+  takes effect at the server's next start, after a quiet quarter of an hour. Hermes
+  reads its own (`mcp_servers` in `~/.hermes/config.yaml`) when its gateway starts, and
+  keeps a conversation's tools as they were when it began: when the file changed,
+  kortex stops the gateway it started once no run is busy, and the next request starts
+  it again, so the service is there from the next conversation on.
 - **Open in terminal** runs the terminal Plasma names (`TerminalApplication` in
   `kdeglobals`, else konsole) with `opencode attach <server> --session <id>`, the
   password in the environment, not on the command line, so nothing is lost when a
@@ -111,8 +133,10 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   session bus that starts kortex by D-Bus activation, a real `opencode serve`, and a
   test model on localhost that asks to run a command. It checks that nothing runs
   before Allow once, and that it runs after; then it connects an MCP server
-  (`tests/mock_mcp.py`) in opencode's configuration mid-conversation and checks that
-  the model gets its tool on the next request. CI runs both.
+  (`tests/mock_mcp.py`) in the agent's configuration while kortex runs and checks that
+  the model gets its tool on the next request. `python3 tests/e2e.py hermes` does the
+  same against a real Hermes gateway, with a folder to remove, since Hermes asks first
+  only before what it counts as dangerous. CI runs all three.
 
 ## Rules
 
@@ -145,9 +169,9 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   selection steady enough to read a growing answer, or whether kortex should reopen it
   only when the answer is complete, with a "thinking" match before it. To try on Plasma
   6.3 (Debian 13) and the current Plasma.
-- **Other agents.** The opencode API is the only backend at first. Another agent (Goose,
-  for example) would be a second small adapter behind the same three calls: send,
-  follow, answer a permission.
+- **Other agents.** opencode and Hermes are the two backends, each a small adapter
+  behind the same calls: send, follow, answer a permission. A third (Goose, for
+  example) would be another.
 
 ## How it reaches users
 

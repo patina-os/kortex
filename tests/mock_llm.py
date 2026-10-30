@@ -1,16 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """A model for the end-to-end test: an OpenAI-compatible chat endpoint with fixed
-replies. A request that mentions a file gets a bash tool call that creates it; once the
-tool has run, or for any other request, it answers in text."""
+replies. A request that mentions a file gets a bash tool call that creates it
+(opencode); one that asks to remove something gets a terminal tool call that deletes
+kortex-proof (Hermes, which asks first only before what it counts as dangerous). Once
+the tool has run, or for any other request, it answers in text."""
 
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOOL_COMMAND = "touch kortex-proof"
+REMOVE_COMMAND = "rm -r kortex-proof"
 DONE = "Done. kortex-proof is in your home directory."
 HELLO = "Hello from the test model."
-TOOLS_SEEN = []  # the tool names of each chat request, in order
+TOOLS_SEEN = []  # the tools of each chat request as JSON text, in order: names, descriptions
 
 
 def content(message):
@@ -21,14 +24,18 @@ def content(message):
 
 
 def reply_for(body):
-    """("text", words) or ("tool", arguments) for a chat request."""
+    """("text", words) or ("tool", (name, arguments)) for a chat request."""
     messages = body.get("messages", [])
     last_user = max((i for i, m in enumerate(messages) if m.get("role") == "user"), default=-1)
     after = messages[last_user + 1:]
+    asked = content(messages[last_user]).lower() if last_user >= 0 else ""
+    tools = {t.get("function", {}).get("name") for t in body.get("tools") or []}
     if any(m.get("role") == "tool" for m in after):
         return "text", DONE
-    if body.get("tools") and "file" in content(messages[last_user]).lower():
-        return "tool", {"command": TOOL_COMMAND, "description": "Create the file kortex-proof"}
+    if "terminal" in tools and "remove" in asked:
+        return "tool", ("terminal", {"command": REMOVE_COMMAND})
+    if tools and "file" in asked:
+        return "tool", ("bash", {"command": TOOL_COMMAND, "description": "Create the file kortex-proof"})
     return "text", HELLO
 
 
@@ -49,13 +56,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
-        TOOLS_SEEN.append([t.get("function", {}).get("name") for t in body.get("tools", [])])
+        TOOLS_SEEN.append(json.dumps(body.get("tools") or []) if body.get("tools") else "")
         kind, value = reply_for(body)
+        call = None if kind == "text" else {"id": "call_1", "type": "function",
+                                            "function": {"name": value[0], "arguments": json.dumps(value[1])}}
         if not body.get("stream"):
             message = {"role": "assistant", "content": value} if kind == "text" else {
-                "role": "assistant", "content": None,
-                "tool_calls": [{"id": "call_1", "type": "function",
-                                "function": {"name": "bash", "arguments": json.dumps(value)}}]}
+                "role": "assistant", "content": None, "tool_calls": [call]}
             self.send(200, {"id": "chatcmpl-test", "object": "chat.completion", "created": 0, "model": "mock",
                             "choices": [{"index": 0, "message": message,
                                          "finish_reason": "stop" if kind == "text" else "tool_calls"}],
@@ -70,8 +77,7 @@ class Handler(BaseHTTPRequestHandler):
             events += [chunk({"content": w + (" " if i < len(words) - 1 else "")}) for i, w in enumerate(words)]
             events.append(chunk({}, "stop"))
         else:
-            events.append(chunk({"tool_calls": [{"index": 0, "id": "call_1", "type": "function",
-                                                 "function": {"name": "bash", "arguments": json.dumps(value)}}]}))
+            events.append(chunk({"tool_calls": [dict(call, index=0)]}))
             events.append(chunk({}, "tool_calls"))
         for e in events:
             self.wfile.write(b"data: " + json.dumps(e).encode() + b"\n\n")

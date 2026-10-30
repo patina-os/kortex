@@ -50,9 +50,11 @@ class FakeOpencode:
     def add_services(self):
         self.services_added += 1
 
+    attach = kortex.Opencode.attach  # the real command, with this fake's url and password
+
     def check(self):
         if self.fail:
-            raise kortex.OpencodeError(self.fail)
+            raise kortex.AgentError(self.fail)
 
     def new_session(self, title):
         self.check()
@@ -274,7 +276,7 @@ class Runner(unittest.TestCase):
         def fail(code):
             def request(*_args, **_kwargs):
                 cause = kortex.urllib.error.HTTPError("http://127.0.0.1:1/permission", code, "x", {}, None)
-                raise kortex.OpencodeError(f"GET /permission: {cause}") from cause
+                raise kortex.AgentError(f"GET /permission: {cause}") from cause
             return request
 
         with mock.patch.object(oc, "request", fail(400)):
@@ -282,7 +284,7 @@ class Runner(unittest.TestCase):
             oc.asked = {"per_9": FETCH}
             self.assertEqual(oc.permissions("ses_1"), [FETCH])
             self.assertEqual(oc.permissions("ses_2"), [])  # the 400 is ses_1's request
-        with mock.patch.object(oc, "request", fail(500)), self.assertRaises(kortex.OpencodeError):
+        with mock.patch.object(oc, "request", fail(500)), self.assertRaises(kortex.AgentError):
             oc.permissions("ses_1")
 
     def test_copy_and_terminal(self):
@@ -424,6 +426,115 @@ class Services(unittest.TestCase):
         self.assertEqual(oc.asked, [("ses_1", "file a ticket")])
 
 
+def hermes_event(**fields):
+    return "data: " + kortex.json.dumps(fields) + "\n"
+
+
+class HermesBackend(unittest.TestCase):
+    """Hermes Agent's API server: its events, messages and approvals in kortex's terms."""
+
+    def setUp(self):
+        self.h = kortex.Hermes("http://127.0.0.1:8642", "key")
+        self.calls = []
+        self.answers = {}
+
+        def request(method, path, body=None, start=True, timeout=10):
+            self.calls.append((method, path, body))
+            return self.answers.get(path, {})
+        self.h.request = request
+
+    def test_approval_requests_come_and_go_with_the_stream(self):
+        asked = {}
+        request = hermes_event(event="approval.request", request_id="req_1", command="rm -r old-photos",
+                               description="recursive delete", choices=["once", "session", "always", "deny"])
+        self.assertFalse(kortex.note_hermes_event(asked, request, "ses_1", "run_1"))
+        self.assertEqual(asked["req_1"], {"id": "req_1", "sessionID": "ses_1", "run": "run_1",
+                                          "permission": "recursive delete", "patterns": ["rm -r old-photos"]})
+        kortex.note_hermes_event(asked, hermes_event(event="approval.responded", request_id="req_1"), "ses_1", "run_1")
+        self.assertEqual(asked, {})
+        self.assertFalse(kortex.note_hermes_event(asked, ": keepalive\n", "ses_1", "run_1"))
+        self.assertFalse(kortex.note_hermes_event(asked, "data: {not json\n", "ses_1", "run_1"))
+        self.assertTrue(kortex.note_hermes_event(asked, hermes_event(event="run.completed"), "ses_1", "run_1"))
+
+    def test_messages_read_like_opencode_s(self):
+        found = [
+            {"role": "user", "content": "remove old-photos"},
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"id": "c1", "function": {"name": "terminal", "arguments": '{"command": "rm -r old-photos"}'}},
+                {"id": "c2", "function": {"name": "read_file", "arguments": '{"path": "notes.txt"}'}},
+                {"id": "c3", "function": {"name": "terminal", "arguments": '{"command": "ls"}'}}]},
+            {"role": "tool", "tool_call_id": "c1", "content": '{"output": "", "exit_code": 0, "error": null}'},
+            {"role": "tool", "tool_call_id": "c2", "content": '{"error": "no such file"}'},
+            {"role": "assistant", "content": "Removed it."},
+        ]
+        messages = kortex.hermes_messages(found, {"status": "running"})
+        lines, error = kortex.answer_of(messages)
+        self.assertEqual(lines, ["› terminal rm -r old-photos", "› read_file notes.txt (failed)", "› terminal ls", "Removed it."])
+        self.assertEqual(error, "")
+        self.assertEqual(messages[1]["parts"][2]["state"]["status"], "running")  # no result yet
+
+    def test_a_failed_run_shows_its_error(self):
+        messages = kortex.hermes_messages([{"role": "user", "content": "x"}], {"status": "failed", "error": "model unreachable"})
+        self.assertEqual(kortex.answer_of(messages), ([], "model unreachable"))
+
+    def test_permission_shows_what_hermes_counts_as_dangerous(self):
+        self.h.asked["req_1"] = {"id": "req_1", "sessionID": "ses_1", "run": "run_1",
+                                 "permission": "recursive delete", "patterns": ["rm -r old-photos"]}
+        shown = kortex.view({"messages": [], "status": ("busy", ""), "permissions": self.h.permissions("ses_1")})
+        self.assertEqual(shown[0][1], "Allow recursive delete: rm -r old-photos")
+        self.assertEqual(self.h.permissions("ses_2"), [])
+
+    def test_replies_use_hermes_words_and_its_run(self):
+        self.h.asked["req_1"] = {"id": "req_1", "sessionID": "ses_1", "run": "run_1", "permission": "x", "patterns": []}
+        self.h.reply("req_1", "reject")
+        self.assertEqual(self.calls, [("POST", "/v1/runs/run_1/approval", {"request_id": "req_1", "choice": "deny"})])
+        self.assertEqual(self.h.asked, {})
+        self.h.reply("req_9", "once")  # already answered elsewhere: nothing to send
+        self.assertEqual(len(self.calls), 1)
+
+    def test_status_follows_the_last_run(self):
+        self.assertEqual(self.h.status("ses_1"), ("idle", ""))
+        self.h.runs["ses_1"] = "run_1"
+        self.answers["/v1/runs/run_1"] = {"status": "waiting_for_approval"}
+        self.assertEqual(self.h.status("ses_1"), ("busy", ""))
+        self.answers["/v1/runs/run_1"] = {"status": "completed"}
+        self.assertEqual(self.h.status("ses_1"), ("idle", ""))
+
+    def test_a_run_the_gateway_does_not_know_is_done(self):
+        self.h.runs["ses_1"] = "run_old"
+
+        def gone(method, path, body=None, start=True, timeout=10):
+            try:
+                raise kortex.urllib.error.HTTPError(path, 404, "not found", {}, None)
+            except kortex.urllib.error.HTTPError as e:
+                raise kortex.AgentError("GET " + path) from e
+        with mock.patch.object(self.h, "request", gone):
+            self.assertEqual(self.h.status("ses_1"), ("idle", ""))
+        self.h.process = mock.Mock()
+        self.h.stop()
+        self.assertEqual(self.h.runs, {})
+
+    def test_sessions_newest_first(self):
+        self.answers["/api/sessions?limit=5"] = {"data": [
+            {"id": "a", "title": "Old", "last_active": 100.0}, {"id": "b", "title": "New", "last_active": 200.5}]}
+        self.assertEqual(self.h.sessions(5), [{"id": "b", "title": "New", "time": {"updated": 200500}},
+                                              {"id": "a", "title": "Old", "time": {"updated": 100000}}])
+
+    def test_terminal_resumes_the_conversation(self):
+        with mock.patch.object(kortex, "find_hermes", return_value="/home/u/.local/bin/hermes"):
+            self.assertEqual(self.h.attach("ses_1"), (["/home/u/.local/bin/hermes", "--resume", "ses_1"], {}))
+
+    def test_agent_is_chosen_by_file_or_environment(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": d}):
+            os.environ.pop("KORTEX_AGENT", None)
+            self.assertEqual(kortex.agent_name(), "opencode")
+            (Path(d) / "kortex").mkdir()
+            (Path(d) / "kortex" / "agent").write_text("hermes\n")
+            self.assertEqual(kortex.agent_name(), "hermes")
+            os.environ["KORTEX_AGENT"] = "opencode"
+            self.assertEqual(kortex.agent_name(), "opencode")
+
+
 class Files(unittest.TestCase):
     def test_password_is_private_and_stable(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": d}):
@@ -434,7 +545,8 @@ class Files(unittest.TestCase):
 
     def test_kitty_takes_the_program_as_is(self):
         with mock.patch.object(kortex, "find_opencode", return_value="opencode"):
-            self.assertEqual(kortex.terminal_command("u", "s", "kitty --single-instance"),
+            attach = ["opencode", "attach", "u", "--session", "s"]
+            self.assertEqual(kortex.terminal_command(attach, "kitty --single-instance"),
                              ["kitty", "--single-instance", "opencode", "attach", "u", "--session", "s"])
 
 
