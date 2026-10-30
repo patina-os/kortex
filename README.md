@@ -63,6 +63,13 @@ Meta+Space   ai why is my wifi slow
 - Copy puts the answer on the clipboard; Open in terminal continues the same session in
   opencode's own interface, for longer work such as code.
 - `ai` alone lists the recent conversations to continue.
+- Plasma's start menu searches with KRunner's runners too, but shows neither a long
+  answer nor a match's actions. There any search of three letters or more ends with
+  "Ask the agent: …" (search, ask, fix), below what Plasma finds; Enter sends it and
+  opens the conversation in KRunner, as `ai` and a request does, and `ai ›` opens it
+  there too. kortex tells the start menu (plasmashell) from KRunner by who calls it
+  over D-Bus, so KRunner still sees kortex only for `ai`. Nothing reaches the agent
+  before Enter.
 - The words come from what you type, the rest from the agent: kortex adds no prompt of
   its own beyond the session title, so the agent's instructions (patina's
   `defaults/agent.md`, or the user's own `AGENTS.md`) decide how it behaves.

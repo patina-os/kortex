@@ -228,6 +228,32 @@ class Runner(unittest.TestCase):
         k, *_ = new()
         self.assertEqual(k.match("konsole"), [])
 
+    def test_the_start_menu_offers_any_search_to_the_agent(self):
+        k, oc, desk, _ = new()
+        oc.fail = "down"  # offering it needs no server
+        self.assertEqual(k.config(menu=True), {"MinLetterCount": 3})
+        self.assertIn("MatchRegex", k.config())
+        [m] = k.match("fix my wifi ", menu=True)
+        self.assertEqual(m[0], "ask" + SEP + "fix my wifi")
+        self.assertEqual(m[1], "Ask the agent: fix my wifi")
+        self.assertEqual(m[4]["category"], kortex.CATEGORY_LOWEST)
+        self.assertEqual(k.match("ai hello", menu=True)[0][0], "ask" + SEP + "hello")
+        oc.fail = None
+        k.run(m[0], "")
+        self.assertEqual(oc.asked, [("ses_1", "fix my wifi")])
+        self.assertEqual(desk.queries, ["ai ›"])
+
+    def test_the_start_menu_opens_the_conversation_in_the_palette(self):
+        k, oc, desk, _ = new()
+        self.assertEqual([m[0] for m in k.match("ai ›", menu=True)], ["hint"])
+        k.run("ask" + SEP + "x", "")
+        oc.pending = [PERMISSION]
+        ids = [m[0] for m in k.match("ai › and y", menu=True)]
+        self.assertEqual(ids, ["continue" + SEP + "and y", "show"])  # no permission it cannot answer
+        self.assertFalse(k.viewing)
+        k.run("show", "")
+        self.assertEqual(desk.queries, ["ai ›", "ai ›"])
+
     def test_ask_then_view(self):
         k, oc, desk, _ = new()
         k.run("ask" + SEP + "switch to the light theme", "")
