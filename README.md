@@ -11,9 +11,11 @@ want, and the agent answers right there in KRunner: it explains, changes setting
 you allow it, writes code and works on your servers. kortex is the palette end of the
 agent; the agent itself is [opencode](https://opencode.ai), running on your machine.
 
-Status: 0.1.2. The answer now grows on screen in a real KRunner, requests opencode
-cannot list are answered from its event stream, and the first `ai` after a pause takes
-about 3 s instead of 12; the D-Bus name is `io.github.patina_os.kortex`. It passes its
+Status: 0.1.3. A service connected while kortex runs (an MCP server added to opencode's
+configuration, as `patina ai connect` does) reaches the running agent at once. Since
+0.1.2 the answer grows on screen in a real KRunner, requests opencode cannot list are
+answered from its event stream, and the first `ai` after a pause takes about 3 s
+instead of 12; the D-Bus name is `io.github.patina_os.kortex`. It passes its
 tests against a real `opencode serve` (1.19) and a real KRunner on Debian 13, but has
 not yet run inside a full Plasma session; that run is what "First release, done when"
 below asks for. kortex comes from [patina](https://github.com/patina-os/patina),
@@ -94,6 +96,12 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   word joiner (U+2060) after the marker or takes it away again. The marker and that
   character are all kortex adds to the query line, and a follow-up typed after it is
   kept.
+- **Services.** opencode reads its MCP servers (`mcp` in `opencode.json`) when its
+  server starts, not again. When the file changes while kortex's server runs, kortex
+  adds the servers that are new and enabled through `POST /mcp`, before the next
+  request and while a conversation is on screen, so a service connected
+  mid-conversation is there for the agent's next step. A server changed or removed
+  takes effect at the server's next start, after a quiet quarter of an hour.
 - **Open in terminal** runs the terminal Plasma names (`TerminalApplication` in
   `kdeglobals`, else konsole) with `opencode attach <server> --session <id>`, the
   password in the environment, not on the command line, so nothing is lost when a
@@ -102,7 +110,9 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   with opencode faked; `python3 tests/e2e.py` runs it as KRunner would: a private
   session bus that starts kortex by D-Bus activation, a real `opencode serve`, and a
   test model on localhost that asks to run a command. It checks that nothing runs
-  before Allow once, and that it runs after. CI runs both.
+  before Allow once, and that it runs after; then it connects an MCP server
+  (`tests/mock_mcp.py`) in opencode's configuration mid-conversation and checks that
+  the model gets its tool on the next request. CI runs both.
 
 ## Rules
 
@@ -118,6 +128,10 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   "Always" is opencode's own rule, visible and removable in its configuration. A
   request opencode cannot list (1.19 fails the whole list while a web fetch without a
   timeout waits) comes from its event stream and is answered like any other.
+- Root through a dialog. The agent has no terminal, so `sudo` cannot ask for a
+  password there. patina sets the session's `SUDO_ASKPASS` to a password dialog in the
+  theme's colours and tells the agent to run `sudo -A`; on another desktop, point
+  `SUDO_ASKPASS` at a dialog of your own (`ksshaskpass`, for one) for the same.
 - Python 3, with `python3-dbus` and `python3-gi` from Debian's archive: one readable
   program, no build step.
 - Small and boring: one program, one desktop file for KRunner, one D-Bus service file.

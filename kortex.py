@@ -29,7 +29,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
@@ -75,6 +75,21 @@ def config_dir():
 
 def state_dir():
     return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "kortex"
+
+
+def opencode_config():
+    """opencode's own configuration file, where its MCP servers (`mcp`) are."""
+    given = os.environ.get("OPENCODE_CONFIG")
+    if given:
+        return Path(given)
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "opencode" / "opencode.json"
+
+
+def mtime(path):
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return None
 
 
 def server_password():
@@ -135,6 +150,7 @@ class Opencode:
         self.asked = {}  # permission requests from the event stream, by id; under self.lock
         self.lock = threading.Lock()
         self.listened = None  # the server the event stream is followed for
+        self.config_seen = None  # opencode_config()'s mtime as the server in use read it
 
     @classmethod
     def from_environment(cls):
@@ -156,6 +172,7 @@ class Opencode:
             return
         command = find_opencode()
         port = free_port()
+        self.config_seen = mtime(opencode_config())  # the new server reads it as it is now
         state_dir().mkdir(parents=True, exist_ok=True)
         log(f"starting {command} serve on 127.0.0.1:{port}")
         with open(state_dir() / "opencode.log", "ab") as output:
@@ -196,6 +213,26 @@ class Opencode:
         self.listened = None  # a new server may get the same port
         with self.lock:
             self.asked.clear()
+
+    def add_services(self):
+        """MCP servers added to opencode's configuration since its server started, added
+        to the running server (POST /mcp), which does not read its configuration again: a
+        service connected mid-conversation (`patina ai connect`) is there at once. One
+        changed or removed waits for the next start."""
+        path = opencode_config()
+        now = mtime(path)
+        if self.url is None or now == self.config_seen:
+            return
+        self.config_seen = now
+        try:
+            wanted = json.loads(path.read_text()).get("mcp") or {}
+            running = self.request("GET", "/mcp", start=False) or {}
+            for name, config in wanted.items():
+                if name not in running and isinstance(config, dict) and config.get("enabled", True):
+                    log(f"adding the MCP server {name} to the running agent")
+                    self.request("POST", "/mcp", {"name": name, "config": config}, start=False)
+        except (OSError, ValueError, AttributeError, OpencodeError) as e:
+            log(f"MCP servers of {path} not added: {e}")  # opencode reports its own file's problems
 
     def listen(self):
         """Follow the event stream of the server in use, in a thread of its own."""
@@ -464,6 +501,7 @@ class Kortex:
                 self.problem = ""
                 if kind == "ask" or not self.session:
                     self.session = self.opencode.new_session(arg[:60])
+                self.opencode.add_services()
                 self.opencode.ask(self.session, arg)
                 self.reopen(VIEW)
             elif kind == "session":
@@ -505,6 +543,7 @@ class Kortex:
         it again; while it is closed, notify of a new permission request."""
         if not self.session or not self.opencode.url or self.opencode.stopped():
             return  # a stopped server starts again on the next request from KRunner, not from here
+        self.opencode.add_services()
         try:
             state = self.snapshot()
         except OpencodeError as e:

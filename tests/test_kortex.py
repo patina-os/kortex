@@ -42,9 +42,13 @@ class FakeOpencode:
         self.state = ("idle", "")
         self.pending = []
         self.fail = None
+        self.services_added = 0
 
     def stopped(self):
         return False
+
+    def add_services(self):
+        self.services_added += 1
 
     def check(self):
         if self.fail:
@@ -356,6 +360,68 @@ class Runner(unittest.TestCase):
         k.session = "ses_1"
         oc.state = ("busy", "")
         self.assertFalse(k.idle())
+
+
+class Services(unittest.TestCase):
+    """MCP servers added to opencode's configuration reach the running server."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": self.dir.name})
+        self.env.start()
+        self.config = Path(self.dir.name) / "opencode" / "opencode.json"
+        self.config.parent.mkdir()
+        self.config.write_text('{"model": "ollama/qwen3.5"}')
+        self.oc = kortex.Opencode("http://127.0.0.1:4096", None)
+        self.oc.config_seen = kortex.mtime(self.config)  # as a server kortex started read it
+        self.calls = []
+        self.running = {}
+
+        def request(method, path, body=None, start=True, timeout=10):
+            self.calls.append((method, path, body))
+            return self.running if method == "GET" else {}
+        self.oc.request = request
+
+    def tearDown(self):
+        self.env.stop()
+        self.dir.cleanup()
+
+    def write(self, mcp):
+        self.config.write_text(kortex.json.dumps({"model": "ollama/qwen3.5", "mcp": mcp}))
+        os.utime(self.config, ns=(self.oc.config_seen + 10**9,) * 2)
+
+    def test_nothing_changed_asks_nothing(self):
+        self.oc.add_services()
+        self.assertEqual(self.calls, [])
+
+    def test_a_new_server_is_added_and_others_are_left(self):
+        linear = {"type": "remote", "url": "https://mcp.linear.app/mcp"}
+        self.running = {"notion": {"status": "connected"}}
+        self.write({"linear": linear, "notion": {"type": "remote", "url": "https://mcp.notion.com/mcp"},
+                    "github": {"type": "remote", "url": "https://api.githubcopilot.com/mcp/", "enabled": False}})
+        self.oc.add_services()
+        self.assertEqual(self.calls, [("GET", "/mcp", None), ("POST", "/mcp", {"name": "linear", "config": linear})])
+        self.calls.clear()
+        self.oc.add_services()  # once per change of the file
+        self.assertEqual(self.calls, [])
+
+    def test_a_file_opencode_reads_but_json_does_not_is_left_alone(self):
+        self.config.write_text('{"mcp": {} // a comment\n}')
+        os.utime(self.config, ns=(self.oc.config_seen + 10**9,) * 2)
+        self.oc.add_services()
+        self.assertEqual(self.calls, [])
+
+    def test_no_server_yet_waits_for_its_start(self):
+        self.oc.url = None
+        self.write({"linear": {"type": "remote", "url": "https://mcp.linear.app/mcp"}})
+        self.oc.add_services()
+        self.assertEqual(self.calls, [])
+
+    def test_runner_adds_services_before_it_asks(self):
+        k, oc, _, _ = new()
+        k.run("ask" + SEP + "file a ticket", "")
+        self.assertEqual(oc.services_added, 1)
+        self.assertEqual(oc.asked, [("ses_1", "file a ticket")])
 
 
 class Files(unittest.TestCase):
