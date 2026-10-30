@@ -5,7 +5,9 @@
 A KRunner D-Bus runner (org.kde.krunner1). In KRunner, `ai <request>` asks the agent,
 `ai` alone lists the recent conversations and `ai ›` shows the current one: the
 answer as it grows, and every action the agent wants to take as a match of its own
-with Allow once, Always and Deny. The agent is opencode or Hermes Agent
+with Allow once, Always and Deny. Plasma's start menu searches with the same runners
+but shows neither the answer nor those actions, so there any search ends with "Ask the
+agent", and the conversation opens in KRunner. The agent is opencode or Hermes Agent
 (~/.config/kortex/agent, KORTEX_AGENT): kortex starts its server (`opencode serve`,
 `hermes gateway run`) on 127.0.0.1 when it is first needed and talks to its HTTP API.
 
@@ -30,7 +32,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
@@ -46,6 +48,7 @@ MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
 CATEGORY_RELEVANCE = 100  # KRunner::QueryMatch::CategoryRelevance::Highest
+CATEGORY_LOWEST = 0  # ::Lowest, for "Ask the agent" below what the start menu finds
 
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
 ACTIONS = [
@@ -571,8 +574,10 @@ def shorten(text):
     return text if len(text) <= MAX_ANSWER else "…" + text[-MAX_ANSWER:]
 
 
-def match(match_id, text, icon=ICON, relevance=1.0, subtext="", actions=(), multiline=False):
-    return (match_id, text, icon, relevance, {"subtext": subtext, "actions": list(actions), "multiline": multiline})
+def match(match_id, text, icon=ICON, relevance=1.0, subtext="", actions=(), multiline=False,
+          category=CATEGORY_RELEVANCE):
+    return (match_id, text, icon, relevance,
+            {"subtext": subtext, "actions": list(actions), "multiline": multiline, "category": category})
 
 
 def view(state):
@@ -643,19 +648,25 @@ class Kortex:
         self.problem = ""
         self.last_activity = now()
 
-    def config(self):
+    def config(self, menu=False):
+        # Each program that searches asks for this once: the start menu (`menu`) sends
+        # every query, so any search there can go to the agent; KRunner only `ai` ones.
+        if menu:
+            return {"MinLetterCount": 3}
         return {"MatchRegex": r"(?i)^ai(\s|$)", "MinLetterCount": 2}
 
-    def match(self, query):
+    def match(self, query, menu=False):
         kind, text = parse(query)
         if kind is None:
-            return []
+            return [self.anything(query)] if menu and query.strip() else []
         self.last_activity = self.now()
         try:
             if kind == "ask":
                 return self.ask_matches(text)
             if kind == "list":
                 return self.list_matches()
+            if menu:
+                return self.menu_view_matches(text)
             self.view_query = query.strip()
             return self.view_matches(text)
         except AgentError as e:
@@ -681,6 +692,22 @@ class Kortex:
     def hint(self):
         return match("hint", "Ask the agent: type ai and your request", ICON, 1.0,
                      "ai › shows the current conversation")
+
+    def anything(self, query):
+        """Any search in the start menu, offered to the agent below what Plasma finds."""
+        text = query.strip()
+        return match("ask" + SEP + text, "Ask the agent: " + text, ICON, 0.1,
+                     "Search, ask, fix · the agent answers in the command palette", category=CATEGORY_LOWEST)
+
+    def menu_view_matches(self, followup):
+        """`ai ›` in the start menu, which shows neither the answer nor its actions: the
+        conversation opens in KRunner instead."""
+        matches = []
+        if followup:
+            matches.append(match("continue" + SEP + followup, followup, ICON, 1.0, "Continue the conversation · Enter"))
+        if self.session:
+            matches.append(match("show", "The current conversation", ICON, 0.9, "Opens in the command palette · Enter"))
+        return matches or [self.hint()]
 
     def view_matches(self, followup):
         self.viewing = True
@@ -715,6 +742,8 @@ class Kortex:
                 self.reopen(VIEW)
             elif kind == "session":
                 self.session = arg
+                self.reopen(VIEW)
+            elif kind == "show":
                 self.reopen(VIEW)
             elif kind == "permission":
                 if action in REPLIES:
@@ -853,21 +882,30 @@ def main():
             "actions": dbus.Array(props["actions"], signature="s"),
             "multiline": dbus.Boolean(props["multiline"]),
         }, signature="sv")
-        return dbus.Struct((match_id, text, icon, dbus.Int32(CATEGORY_RELEVANCE), dbus.Double(relevance), properties),
+        return dbus.Struct((match_id, text, icon, dbus.Int32(props["category"]), dbus.Double(relevance), properties),
                            signature="sssida{sv}")
 
+    def from_menu(sender):
+        """True when plasmashell calls, which runs the start menu (Kickoff, and Plasma's other
+        launchers); KRunner and everything else get the command palette's matches."""
+        try:
+            return sender == bus.get_name_owner("org.kde.plasmashell")
+        except dbus.DBusException:
+            return False
+
     class Runner(dbus.service.Object):
-        @dbus.service.method(IFACE, out_signature="a{sv}")
-        def Config(self):
-            return dbus.Dictionary(kortex.config(), signature="sv")
+        @dbus.service.method(IFACE, out_signature="a{sv}", sender_keyword="sender")
+        def Config(self, sender=None):
+            return dbus.Dictionary(kortex.config(from_menu(sender)), signature="sv")
 
         @dbus.service.method(IFACE, out_signature="a(sss)")
         def Actions(self):
             return ACTIONS
 
-        @dbus.service.method(IFACE, in_signature="s", out_signature="a(sssida{sv})")
-        def Match(self, query):
-            return dbus.Array([to_dbus(m) for m in kortex.match(str(query))], signature="(sssida{sv})")
+        @dbus.service.method(IFACE, in_signature="s", out_signature="a(sssida{sv})", sender_keyword="sender")
+        def Match(self, query, sender=None):
+            return dbus.Array([to_dbus(m) for m in kortex.match(str(query), from_menu(sender))],
+                              signature="(sssida{sv})")
 
         @dbus.service.method(IFACE, in_signature="ss")
         def Run(self, match_id, action_id):
