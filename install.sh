@@ -12,8 +12,9 @@ if ! python3 -c 'import dbus, gi' 2> /dev/null; then
   echo "kortex: python3-dbus and python3-gi are missing; on Debian: sudo apt install python3-dbus python3-gi" >&2
   exit 1
 fi
-if ! command -v opencode > /dev/null && [[ ! -x "$HOME/.local/bin/opencode" && ! -x "$HOME/.opencode/bin/opencode" ]]; then
-  echo "kortex: opencode is not installed yet (https://opencode.ai); kortex needs it to answer" >&2
+if ! command -v opencode > /dev/null && [[ ! -x "$HOME/.local/bin/opencode" && ! -x "$HOME/.opencode/bin/opencode" ]] &&
+  ! command -v hermes > /dev/null && [[ ! -x "$HOME/.local/bin/hermes" ]]; then
+  echo "kortex: neither opencode (https://opencode.ai) nor Hermes Agent is installed yet; kortex needs one to answer" >&2
 fi
 
 install -D -m 0755 "$here/kortex.py" "$data/kortex/kortex.py"

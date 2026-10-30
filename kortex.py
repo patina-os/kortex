@@ -5,8 +5,9 @@
 A KRunner D-Bus runner (org.kde.krunner1). In KRunner, `ai <request>` asks the agent,
 `ai` alone lists the recent conversations and `ai ›` shows the current one: the
 answer as it grows, and every action the agent wants to take as a match of its own
-with Allow once, Always and Deny. The agent is opencode: kortex starts `opencode
-serve` on 127.0.0.1 when it is first needed and talks to its HTTP API.
+with Allow once, Always and Deny. The agent is opencode or Hermes Agent
+(~/.config/kortex/agent, KORTEX_AGENT): kortex starts its server (`opencode serve`,
+`hermes gateway run`) on 127.0.0.1 when it is first needed and talks to its HTTP API.
 
 D-Bus activation starts kortex (see install.sh); it stops itself and the server after
 a quiet quarter of an hour.
@@ -29,7 +30,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.1.3"
+VERSION = "0.2.0"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
@@ -55,6 +56,7 @@ ACTIONS = [
     ("terminal", "Open in terminal", "utilities-terminal"),
 ]
 REPLIES = {"allow-once": "once", "allow-always": "always", "deny": "reject"}
+HERMES_CHOICES = {"once": "once", "always": "always", "reject": "deny"}  # Hermes' words for them
 # opencode 1.19 answers GET /permission with a 400 for the whole list while one request in
 # it lacks an optional field (a webfetch without a timeout). kortex then takes the requests
 # from opencode's event stream; one it did not see there is shown as waiting, unanswerable.
@@ -65,8 +67,8 @@ def log(*words):
     print("kortex:", *words, file=sys.stderr, flush=True)
 
 
-class OpencodeError(Exception):
-    """opencode is missing, did not start, or did not answer."""
+class AgentError(Exception):
+    """The agent is missing, did not start, or did not answer."""
 
 
 def config_dir():
@@ -83,6 +85,22 @@ def opencode_config():
     if given:
         return Path(given)
     return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "opencode" / "opencode.json"
+
+
+def hermes_config():
+    """Hermes' own configuration file, where its MCP servers (`mcp_servers`) are."""
+    return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / "config.yaml"
+
+
+def agent_name():
+    """The agent kortex talks to: KORTEX_AGENT, else ~/.config/kortex/agent, else opencode."""
+    given = os.environ.get("KORTEX_AGENT")
+    if not given:
+        try:
+            given = (config_dir() / "agent").read_text().strip()
+        except OSError:
+            given = ""
+    return "hermes" if given == "hermes" else "opencode"
 
 
 def mtime(path):
@@ -112,7 +130,21 @@ def find_opencode():
     path = os.pathsep.join([os.environ.get("PATH", ""), str(home / ".local/bin"), str(home / ".opencode/bin")])
     found = shutil.which("opencode", path=path)
     if not found:
-        raise OpencodeError("opencode is not installed (https://opencode.ai)")
+        raise AgentError("opencode is not installed (https://opencode.ai)")
+    return found
+
+
+def find_hermes():
+    """hermes on PATH, or where its installer links it; KORTEX_HERMES overrides."""
+    given = os.environ.get("KORTEX_HERMES")
+    if given:
+        return given
+    home = Path.home()
+    path = os.pathsep.join([os.environ.get("PATH", ""), str(home / ".local/bin"),
+                            str(home / ".hermes/hermes-agent/venv/bin")])
+    found = shutil.which("hermes", path=path)
+    if not found:
+        raise AgentError("Hermes Agent is not installed (https://hermes-agent.nousresearch.com)")
     return found
 
 
@@ -137,9 +169,9 @@ def free_port():
         return s.getsockname()[1]
 
 
-class Opencode:
-    """opencode's HTTP server. Started by kortex on first use unless KORTEX_OPENCODE_URL
-    names one that runs already; then that one is used and never stopped."""
+class Server:
+    """An agent's HTTP server on this machine, started by kortex on first use and stopped
+    with it; or one the environment names that runs already, which kortex never stops."""
 
     def __init__(self, url=None, password=None):
         self.url = url
@@ -147,17 +179,10 @@ class Opencode:
         self.process = None
         # Never through a proxy: the server is on this machine.
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        self.asked = {}  # permission requests from the event stream, by id; under self.lock
+        self.asked = {}  # permission requests from an event stream, by id; under self.lock
         self.lock = threading.Lock()
         self.listened = None  # the server the event stream is followed for
-        self.config_seen = None  # opencode_config()'s mtime as the server in use read it
-
-    @classmethod
-    def from_environment(cls):
-        url = os.environ.get("KORTEX_OPENCODE_URL")
-        if url:
-            return cls(url.rstrip("/"), os.environ.get("KORTEX_OPENCODE_PASSWORD"))
-        return cls(None, server_password())
+        self.config_seen = None  # the agent's configuration's mtime as the server in use read it
 
     def owned(self):
         return self.process is not None
@@ -166,39 +191,26 @@ class Opencode:
         """True when the server kortex started has exited since."""
         return self.process is not None and self.process.poll() is not None
 
-    def start(self):
-        if self.url and (self.process is None or self.process.poll() is None):
-            self.listen()
-            return
-        command = find_opencode()
-        port = free_port()
-        self.config_seen = mtime(opencode_config())  # the new server reads it as it is now
+    def launch(self, command, env, log_name, health, wait=30):
+        """Start the server and wait until `health` answers."""
         state_dir().mkdir(parents=True, exist_ok=True)
-        log(f"starting {command} serve on 127.0.0.1:{port}")
-        with open(state_dir() / "opencode.log", "ab") as output:
+        log(f"starting {' '.join(command)}")
+        with open(state_dir() / log_name, "ab") as output:
             self.process = subprocess.Popen(
-                [command, "serve", "--hostname", "127.0.0.1", "--port", str(port)],
-                cwd=Path.home(),
-                env=dict(os.environ, OPENCODE_SERVER_PASSWORD=self.password),
-                stdin=subprocess.DEVNULL,
-                stdout=output,
-                stderr=output,
-                start_new_session=True,
-            )
-        self.url = f"http://127.0.0.1:{port}"
-        deadline = time.monotonic() + 30
+                command, cwd=Path.home(), env=dict(os.environ, **env), stdin=subprocess.DEVNULL,
+                stdout=output, stderr=output, start_new_session=True)
+        deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                raise OpencodeError(f"opencode serve exited; see {state_dir() / 'opencode.log'}")
+                raise AgentError(f"{command[0]} exited; see {state_dir() / log_name}")
             try:
                 # opencode leaves the first connection it accepts while it starts
                 # unanswered; a short wait per try moves on to the next one.
-                self.request("GET", "/global/health", start=False, timeout=1)
-                self.listen()
+                self.request("GET", health, start=False, timeout=1)
                 return
-            except OpencodeError:
+            except AgentError:
                 time.sleep(0.2)
-        raise OpencodeError("opencode serve did not answer within 30 seconds")
+        raise AgentError(f"{command[0]} did not answer within {wait} seconds")
 
     def stop(self):
         if self.process is None:
@@ -213,6 +225,44 @@ class Opencode:
         self.listened = None  # a new server may get the same port
         with self.lock:
             self.asked.clear()
+
+    def request(self, method, path, body=None, start=True, timeout=10):
+        if start:
+            self.start()
+        data = None if body is None else json.dumps(body).encode()
+        req = urllib.request.Request(self.url + path, data=data, method=method)
+        req.add_header("Content-Type", "application/json")
+        self.authorize(req)
+        try:
+            with self.opener.open(req, timeout=timeout) as response:
+                raw = response.read()
+            return json.loads(raw) if raw else None
+        except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as e:
+            raise AgentError(f"{method} {path}: {e}") from e
+
+
+class Opencode(Server):
+    """opencode's HTTP server (`opencode serve`). KORTEX_OPENCODE_URL names one that runs
+    already."""
+
+    @classmethod
+    def from_environment(cls):
+        url = os.environ.get("KORTEX_OPENCODE_URL")
+        if url:
+            return cls(url.rstrip("/"), os.environ.get("KORTEX_OPENCODE_PASSWORD"))
+        return cls(None, server_password())
+
+    def start(self):
+        if self.url and (self.process is None or self.process.poll() is None):
+            self.listen()
+            return
+        command = find_opencode()
+        port = free_port()
+        self.config_seen = mtime(opencode_config())  # the new server reads it as it is now
+        self.url = f"http://127.0.0.1:{port}"
+        self.launch([command, "serve", "--hostname", "127.0.0.1", "--port", str(port)],
+                    {"OPENCODE_SERVER_PASSWORD": self.password}, "opencode.log", "/global/health")
+        self.listen()
 
     def add_services(self):
         """MCP servers added to opencode's configuration since its server started, added
@@ -231,7 +281,7 @@ class Opencode:
                 if name not in running and isinstance(config, dict) and config.get("enabled", True):
                     log(f"adding the MCP server {name} to the running agent")
                     self.request("POST", "/mcp", {"name": name, "config": config}, start=False)
-        except (OSError, ValueError, AttributeError, OpencodeError) as e:
+        except (OSError, ValueError, AttributeError, AgentError) as e:
             log(f"MCP servers of {path} not added: {e}")  # opencode reports its own file's problems
 
     def listen(self):
@@ -262,19 +312,10 @@ class Opencode:
             token = base64.b64encode(f"opencode:{self.password}".encode()).decode()
             req.add_header("Authorization", "Basic " + token)
 
-    def request(self, method, path, body=None, start=True, timeout=10):
-        if start:
-            self.start()
-        data = None if body is None else json.dumps(body).encode()
-        req = urllib.request.Request(self.url + path, data=data, method=method)
-        req.add_header("Content-Type", "application/json")
-        self.authorize(req)
-        try:
-            with self.opener.open(req, timeout=timeout) as response:
-                raw = response.read()
-            return json.loads(raw) if raw else None
-        except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as e:
-            raise OpencodeError(f"{method} {path}: {e}") from e
+    def attach(self, session):
+        """The command, and its environment, that continues a session in opencode's own
+        interface; the password goes in the environment, not on the command line."""
+        return [find_opencode(), "attach", self.url, "--session", session], {"OPENCODE_SERVER_PASSWORD": self.password or ""}
 
     def new_session(self, title):
         return self.request("POST", "/session", {"title": title})["id"]
@@ -293,7 +334,7 @@ class Opencode:
     def permissions(self, session):
         try:
             found = self.request("GET", "/permission")
-        except OpencodeError as e:
+        except AgentError as e:
             if not (isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 400):
                 raise
             with self.lock:
@@ -309,6 +350,174 @@ class Opencode:
         found = self.request("GET", f"/session?roots=true&limit={limit}")
         found.sort(key=lambda s: s.get("time", {}).get("updated", 0), reverse=True)
         return found[:limit]
+
+
+class Hermes(Server):
+    """Hermes Agent's API server (`hermes gateway run`, its API server switched on by a
+    key in the environment). KORTEX_HERMES_URL and KORTEX_HERMES_KEY name one that runs
+    already. Hermes asks before a command it counts as dangerous, not before every
+    change; the request comes on the run's event stream."""
+
+    DONE = ("completed", "failed", "cancelled", "interrupted", "stopped")
+
+    def __init__(self, url=None, password=None):
+        super().__init__(url, password)
+        self.runs = {}  # the last run of each conversation, by session id
+
+    @classmethod
+    def from_environment(cls):
+        url = os.environ.get("KORTEX_HERMES_URL")
+        if url:
+            return cls(url.rstrip("/"), os.environ.get("KORTEX_HERMES_KEY"))
+        return cls(None, server_password())
+
+    def start(self):
+        if self.url and (self.process is None or self.process.poll() is None):
+            return
+        command = find_hermes()
+        port = free_port()
+        self.config_seen = mtime(hermes_config())
+        self.url = f"http://127.0.0.1:{port}"
+        self.launch([command, "gateway", "run"],
+                    {"API_SERVER_KEY": self.password, "API_SERVER_PORT": str(port), "API_SERVER_HOST": "127.0.0.1"},
+                    "hermes.log", "/health", wait=60)
+
+    def authorize(self, req):
+        if self.password:
+            req.add_header("Authorization", "Bearer " + self.password)
+
+    def attach(self, session):
+        return [find_hermes(), "--resume", session], {}
+
+    def stop(self):
+        super().stop()
+        self.runs.clear()  # a new gateway knows none of them
+
+    def add_services(self):
+        """Hermes reads its MCP servers (`mcp_servers` in config.yaml) when its gateway
+        starts. When the file changed since, the gateway kortex started stops once no run
+        is busy, and the next request starts it again with them; the conversations stay."""
+        now = mtime(hermes_config())
+        if not self.owned() or self.url is None or now == self.config_seen:
+            return
+        if any(self.status(session)[0] == "busy" for session in list(self.runs)):
+            return
+        log("Hermes' configuration changed; restarting its gateway for the next request")
+        self.stop()
+
+    def follow(self, run, session):
+        """The thread: keep the approval requests of one run, from its event stream."""
+        req = urllib.request.Request(f"{self.url}/v1/runs/{run}/events")
+        self.authorize(req)
+        try:
+            with self.opener.open(req, timeout=600) as response:
+                for raw in response:
+                    with self.lock:
+                        if note_hermes_event(self.asked, raw.decode("utf-8", "replace"), session, run):
+                            break
+        except (OSError, http.client.HTTPException):
+            pass  # the run ended or the server stopped; its status says which
+        with self.lock:
+            for key in [k for k, p in self.asked.items() if p["run"] == run]:
+                del self.asked[key]
+
+    def new_session(self, title):
+        return self.request("POST", "/api/sessions", {"title": title})["session"]["id"]
+
+    def ask(self, session, text):
+        run = self.request("POST", "/v1/runs", {"input": text, "session_id": session})["run_id"]
+        self.runs[session] = run
+        threading.Thread(target=self.follow, args=(run, session), daemon=True).start()
+
+    def run_state(self, session):
+        """The last run of a conversation; {} for none, or one this gateway does not know."""
+        run = self.runs.get(session)
+        if not run:
+            return {}
+        try:
+            return self.request("GET", f"/v1/runs/{run}")
+        except AgentError as e:
+            if isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 404:
+                return {}
+            raise
+
+    def messages(self, session):
+        found = self.request("GET", f"/api/sessions/{session}/messages")
+        return hermes_messages(found.get("data") or [], self.run_state(session))
+
+    def status(self, session):
+        state = self.run_state(session).get("status")
+        return ("idle", "") if state is None or state in self.DONE else ("busy", "")
+
+    def permissions(self, session):
+        with self.lock:
+            return [p for p in self.asked.values() if p["sessionID"] == session]
+
+    def reply(self, request_id, reply):
+        with self.lock:
+            asked = self.asked.pop(request_id, None)
+        if asked:
+            self.request("POST", f"/v1/runs/{asked['run']}/approval",
+                         {"request_id": request_id, "choice": HERMES_CHOICES[reply]})
+
+    def sessions(self, limit):
+        found = self.request("GET", f"/api/sessions?limit={limit}").get("data") or []
+        found = [{"id": s["id"], "title": s.get("title"),
+                  "time": {"updated": int((s.get("last_active") or s.get("started_at") or 0) * 1000)}} for s in found]
+        found.sort(key=lambda s: s["time"]["updated"], reverse=True)
+        return found[:limit]
+
+
+def note_hermes_event(asked, line, session, run):
+    """Keep `asked` current with one line of a Hermes run's event stream; True once the
+    run has ended."""
+    if not line.startswith("data:"):
+        return False
+    try:
+        event = json.loads(line[5:])
+        kind = event.get("event")
+        if kind == "approval.request":
+            asked[event["request_id"]] = {
+                "id": event["request_id"], "sessionID": session, "run": run,
+                "permission": event.get("description") or "a command", "patterns": [event.get("command", "")]}
+        elif kind == "approval.responded":
+            asked.pop(event.get("request_id"), None)
+        return kind in ("run.completed", "run.failed", "run.cancelled", "run.interrupted")
+    except (ValueError, LookupError, TypeError, AttributeError):
+        return False  # not an event kortex follows
+
+
+def hermes_messages(found, run):
+    """Hermes' messages of a conversation in the shape the palette shows (opencode's):
+    text parts, and one tool part per call with the result's status."""
+    results = {m.get("tool_call_id"): m for m in found if m.get("role") == "tool"}
+    messages = []
+    for m in found:
+        role = m.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        parts = [{"type": "text", "text": m["content"]}] if m.get("content") else []
+        for call in m.get("tool_calls") or []:
+            function = call.get("function") or {}
+            try:
+                given = json.loads(function.get("arguments") or "{}")
+            except ValueError:
+                given = {}
+            result, status = results.get(call.get("id")), "running"
+            if result is not None:
+                try:
+                    outcome = json.loads(result.get("content") or "{}")
+                except ValueError:
+                    outcome = {}
+                failed = isinstance(outcome, dict) and (outcome.get("error") or outcome.get("exit_code") not in (None, 0))
+                status = "error" if failed else "completed"
+            parts.append({"type": "tool", "tool": function.get("name", "tool"), "state": {"status": status, "input": given}})
+        messages.append({"info": {"role": role}, "parts": parts})
+    if run.get("status") == "failed":
+        error = run.get("error") or run.get("last_error") or "the run failed"
+        error = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+        messages.append({"info": {"role": "assistant", "error": {"data": {"message": error}}}, "parts": []})
+    return messages
 
 
 # ---- what the palette shows: plain functions of opencode's data ------------------------
@@ -330,7 +539,7 @@ def parse(query):
 def tool_line(part):
     state = part.get("state") or {}
     given = state.get("input") or {}
-    detail = given.get("command") or given.get("filePath") or given.get("url") or state.get("title") or ""
+    detail = given.get("command") or given.get("filePath") or given.get("path") or given.get("url") or state.get("title") or ""
     line = f"› {part.get('tool', 'tool')} {detail}".rstrip()
     if state.get("status") == "error":
         line += " (failed)"
@@ -404,10 +613,9 @@ def ago(ms):
     return f"{minutes // (24 * 60)} days ago"
 
 
-def terminal_command(url, session, terminal):
-    """The terminal command that continues a session in opencode's own interface."""
+def terminal_command(attach, terminal):
+    """The terminal command that runs `attach`, the agent's own interface on a session."""
     words = shlex.split(terminal) or ["konsole"]
-    attach = [find_opencode(), "attach", url, "--session", session]
     if Path(words[0]).name.startswith("kitty"):
         return words + attach  # kitty takes the program as it is
     return words + ["-e"] + attach
@@ -418,11 +626,12 @@ def terminal_command(url, session, terminal):
 
 class Kortex:
     """What KRunner's calls do, without D-Bus: the D-Bus service in main() forwards to
-    it, and the tests drive it directly. `desktop` reopens KRunner with a query, copies,
-    starts programs and notifies; `now` is a clock."""
+    it, and the tests drive it directly. `agent` is the agent's server (Opencode or
+    Hermes); `desktop` reopens KRunner with a query, copies, starts programs and
+    notifies; `now` is a clock."""
 
-    def __init__(self, opencode, desktop, now=time.monotonic):
-        self.opencode = opencode
+    def __init__(self, agent, desktop, now=time.monotonic):
+        self.agent = agent
         self.desktop = desktop
         self.now = now
         self.session = None  # the conversation `ai ›` shows
@@ -449,7 +658,7 @@ class Kortex:
                 return self.list_matches()
             self.view_query = query.strip()
             return self.view_matches(text)
-        except OpencodeError as e:
+        except AgentError as e:
             log(e)
             return [match("problem", "The agent is not reachable", "dialog-error", 1.0, str(e))]
 
@@ -463,7 +672,7 @@ class Kortex:
 
     def list_matches(self):
         matches = []
-        for i, s in enumerate(self.opencode.sessions(5)):
+        for i, s in enumerate(self.agent.sessions(5)):
             matches.append(match(
                 "session" + SEP + s["id"], s.get("title") or "Conversation", "view-history", 0.8 - i * 0.1,
                 "Continue this conversation · " + ago(s.get("time", {}).get("updated", 0))))
@@ -488,9 +697,9 @@ class Kortex:
 
     def snapshot(self):
         return {
-            "messages": self.opencode.messages(self.session),
-            "status": self.opencode.status(self.session),
-            "permissions": self.opencode.permissions(self.session),
+            "messages": self.agent.messages(self.session),
+            "status": self.agent.status(self.session),
+            "permissions": self.agent.permissions(self.session),
         }
 
     def run(self, match_id, action):
@@ -500,26 +709,25 @@ class Kortex:
             if kind in ("ask", "continue"):
                 self.problem = ""
                 if kind == "ask" or not self.session:
-                    self.session = self.opencode.new_session(arg[:60])
-                self.opencode.add_services()
-                self.opencode.ask(self.session, arg)
+                    self.session = self.agent.new_session(arg[:60])
+                self.agent.add_services()
+                self.agent.ask(self.session, arg)
                 self.reopen(VIEW)
             elif kind == "session":
                 self.session = arg
                 self.reopen(VIEW)
             elif kind == "permission":
                 if action in REPLIES:
-                    self.opencode.reply(arg, REPLIES[action])
+                    self.agent.reply(arg, REPLIES[action])
                 self.reopen(self.view_query)
             elif kind == "answer" and self.session:
                 if action == "terminal":
-                    self.desktop.launch(
-                        terminal_command(self.opencode.url, self.session, self.desktop.terminal()),
-                        {"OPENCODE_SERVER_PASSWORD": self.opencode.password or ""})
+                    attach, env = self.agent.attach(self.session)
+                    self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env)
                 else:
-                    lines, error = answer_of(self.opencode.messages(self.session))
+                    lines, error = answer_of(self.agent.messages(self.session))
                     self.desktop.copy("\n".join(lines) or error)
-        except OpencodeError as e:
+        except AgentError as e:
             log(e)
             self.problem = str(e)
             self.reopen(VIEW)
@@ -541,12 +749,12 @@ class Kortex:
     def tick(self):
         """Every REFRESH_MS: while KRunner shows the conversation and it changed, show
         it again; while it is closed, notify of a new permission request."""
-        if not self.session or not self.opencode.url or self.opencode.stopped():
+        if not self.session or not self.agent.url or self.agent.stopped():
             return  # a stopped server starts again on the next request from KRunner, not from here
-        self.opencode.add_services()
+        self.agent.add_services()
         try:
             state = self.snapshot()
-        except OpencodeError as e:
+        except AgentError as e:
             log(e)
             return
         if self.viewing:
@@ -566,11 +774,11 @@ class Kortex:
         """True when kortex may stop: nothing asked for a while and no request running."""
         if self.now() - self.last_activity < IDLE_EXIT:
             return False
-        if self.session and self.opencode.url:
+        if self.session and self.agent.url:
             try:
-                if self.opencode.status(self.session)[0] != "idle":
+                if self.agent.status(self.session)[0] != "idle":
                     return False
-            except OpencodeError:
+            except AgentError:
                 pass
         return True
 
@@ -635,8 +843,8 @@ def main():
                 dbus.Dictionary({}, signature="sv"), dbus.Int32(-1),
                 dbus_interface="org.freedesktop.Notifications", reply_handler=ignore, error_handler=logged)
 
-    opencode = Opencode.from_environment()
-    kortex = Kortex(opencode, Desktop())
+    agent = Hermes.from_environment() if agent_name() == "hermes" else Opencode.from_environment()
+    kortex = Kortex(agent, Desktop())
 
     def to_dbus(m):
         match_id, text, icon, relevance, props = m
@@ -697,7 +905,7 @@ def main():
     try:
         loop.run()
     finally:
-        opencode.stop()
+        agent.stop()
     return 0
 
 

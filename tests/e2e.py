@@ -6,12 +6,14 @@ a stand-in for KRunner's application object, a test model on
 localhost (tests/mock_llm.py) and opencode configured to use it. Then, through D-Bus as
 KRunner would: ask for a file, see the agent ask before it runs the command, check that
 nothing ran, allow it once, see the file and the answer; then connect an MCP server
-(tests/mock_mcp.py) in opencode's configuration while the conversation runs and see the
-model get its tool on the next request. Needs opencode (KORTEX_OPENCODE
-or on PATH), python3-dbus and python3-gi; opencode fetches its provider package from
-npm on first use, so it needs the network once.
+(tests/mock_mcp.py) in the agent's configuration while the conversation runs and see the
+model get its tool on the next request. The agent is opencode (KORTEX_OPENCODE or on
+PATH) or Hermes (KORTEX_HERMES or on PATH): with Hermes, the request removes a folder,
+since it asks first only before what it counts as dangerous. Needs python3-dbus and
+python3-gi; opencode fetches its provider package from npm on first use, so it needs
+the network once.
 
-    python3 tests/e2e.py
+    python3 tests/e2e.py [opencode|hermes]
 """
 
 import json
@@ -59,15 +61,26 @@ def running(pid):
         return False
 
 
-def main():
-    opencode = os.environ.get("KORTEX_OPENCODE") or shutil.which("opencode")
-    if not opencode:
-        sys.exit("e2e: opencode is not installed; set KORTEX_OPENCODE")
-    home = Path(tempfile.mkdtemp(prefix="kortex-e2e-"))
+def hermes_config(port, mcp=""):
+    """Hermes' config.yaml: the test model, and manual approvals (no second model decides)."""
+    return (f"model:\n  default: mock\n  provider: custom\n  base_url: http://127.0.0.1:{port}/v1\n"
+            f"  api_key: test\napprovals:\n  mode: manual\n{mcp}")
+
+
+def main(agent):
+    program = os.environ.get(f"KORTEX_{agent.upper()}") or shutil.which(agent)
+    if not program:
+        sys.exit(f"e2e: {agent} is not installed; set KORTEX_{agent.upper()}")
+    # Short: Hermes keeps a Unix socket under its home, and those paths are limited.
+    home = Path(tempfile.mkdtemp(prefix="kortex-e2e-", dir="/tmp"))
     model = mock_llm.serve()
     port = model.server_address[1]
     config = home / ".config/opencode"
     config.mkdir(parents=True)
+    (home / ".hermes").mkdir()
+    (home / ".hermes/config.yaml").write_text(hermes_config(port))
+    (home / ".config/kortex").mkdir(parents=True)
+    (home / ".config/kortex/agent").write_text(agent + "\n")  # as patina writes it
     (config / "opencode.json").write_text(json.dumps({
         "$schema": "https://opencode.ai/config.json",
         "autoupdate": False,
@@ -81,8 +94,10 @@ def main():
     }))
     env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(home / ".config"),
                XDG_DATA_HOME=str(home / ".local/share"), XDG_STATE_HOME=str(home / ".local/state"),
-               XDG_CACHE_HOME=str(home / ".cache"), KORTEX_OPENCODE=opencode, NO_PROXY="127.0.0.1,localhost")
-    env.pop("KORTEX_OPENCODE_URL", None)
+               XDG_CACHE_HOME=str(home / ".cache"), HERMES_HOME=str(home / ".hermes"),
+               NO_PROXY="127.0.0.1,localhost", **{f"KORTEX_{agent.upper()}": program})
+    for name in ("KORTEX_OPENCODE_URL", "KORTEX_HERMES_URL", "KORTEX_AGENT"):
+        env.pop(name, None)
     services = home / "dbus-services"
     services.mkdir()
     (services / f"{SERVICE}.service").write_text(
@@ -111,7 +126,12 @@ def main():
         assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal"]
         assert list(k.Match("firefox")) == []
 
-        request = "make the file kortex-proof"
+        proof = home / "kortex-proof"
+        if agent == "hermes":
+            request, command, asks = "remove the folder kortex-proof", mock_llm.REMOVE_COMMAND, "recursive delete"
+            proof.mkdir()
+        else:
+            request, command, asks = "make the file kortex-proof", mock_llm.TOOL_COMMAND, "bash"
         matches = k.Match("ai " + request)
         assert str(matches[0][0]) == "ask" + SEP + request, matches
         print("e2e: ask match ok")
@@ -125,14 +145,15 @@ def main():
                 if str(m[0]).startswith("permission" + SEP):
                     return m
         asked = wait_for("the agent to ask first", permission)
-        assert str(asked[1]) == f"Allow bash: {mock_llm.TOOL_COMMAND}", asked[1]
+        assert str(asked[1]) == f"Allow {asks}: {command}", asked[1]
         assert list(asked[5]["actions"]) == ["allow-once", "allow-always", "deny"]
         time.sleep(1)
-        assert not (home / "kortex-proof").exists(), "the command ran before it was allowed"
+        ran = (lambda: not proof.exists()) if agent == "hermes" else proof.exists
+        assert not ran(), "the command ran before it was allowed"
         print("e2e: the agent asks first, and nothing ran:", str(asked[1]))
 
         k.Run(str(asked[0]), "allow-once", timeout=30)
-        wait_for("the command to run", lambda: (home / "kortex-proof").exists(), 60)
+        wait_for("the command to run", ran, 60)
 
         def answer():
             for m in k.Match("ai ›", timeout=30):
@@ -148,15 +169,29 @@ def main():
         print("e2e: ai lists the conversation")
 
         # A service connected while the server runs, as `patina ai connect` does it: the
-        # running opencode does not read its configuration again, kortex adds it.
-        settings = json.loads((config / "opencode.json").read_text())
-        settings["mcp"] = {"probe": {"type": "local", "command": [sys.executable, str(here / "mock_mcp.py")]}}
-        (config / "opencode.json").write_text(json.dumps(settings))
+        # running agent does not read its configuration again; kortex adds it to opencode,
+        # and starts Hermes' gateway again for the next request. Hermes lists an MCP tool in
+        # its tool_search bridge rather than as a tool of its own, so the tool's name is
+        # looked for anywhere in what the model gets.
+        probe = [sys.executable, str(here / "mock_mcp.py")]
+        if agent == "hermes":
+            (home / ".hermes/config.yaml").write_text(hermes_config(port, (
+                f"mcp_servers:\n  probe:\n    command: {probe[0]}\n    args: [{probe[1]}]\n")))
+            tool = "mcp__probe__ping"
+        else:
+            settings = json.loads((config / "opencode.json").read_text())
+            settings["mcp"] = {"probe": {"type": "local", "command": probe}}
+            (config / "opencode.json").write_text(json.dumps(settings))
+            tool = "probe_ping"
         asked_before = len(mock_llm.TOOLS_SEEN)
-        k.Run("continue" + SEP + "and now?", "", timeout=60)
-        tools = wait_for("the next model request", lambda: mock_llm.TOOLS_SEEN[asked_before:], 60)[0]
-        assert "probe_ping" in tools, tools
-        print("e2e: an MCP server connected mid-conversation reaches the model:", "probe_ping")
+        # Hermes keeps a conversation's tools as they were when it began, so a service
+        # reaches the next conversation; opencode's reaches the one going on.
+        k.Run(("ask" if agent == "hermes" else "continue") + SEP + "and now?", "", timeout=90)
+        # Hermes may still send a request of its own from before the restart (its work
+        # after an answer), so the check is that a request after the change has the tool.
+        wait_for(f"a model request with {tool}",
+                 lambda: any(tool in t for t in mock_llm.TOOLS_SEEN[asked_before:]), 120)
+        print("e2e: an MCP server connected while kortex runs reaches the model:", tool)
         k.Teardown()
         password = (home / ".config/kortex/password")
         assert oct(password.stat().st_mode & 0o777) == "0o600"
@@ -170,11 +205,11 @@ def main():
         krunner.terminate()
         bus_daemon.terminate()
         model.shutdown()
-    assert servers, "kortex started no opencode serve"
-    assert not [p for p in servers if running(p)], f"opencode serve outlived kortex: {servers}"
+    assert servers, f"kortex started no {agent} server"
+    assert not [p for p in servers if running(p)], f"the {agent} server outlived kortex: {servers}"
     shutil.rmtree(home, ignore_errors=True)
     print("e2e: passed")
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if sys.argv[1:] else "opencode")
