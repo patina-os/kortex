@@ -911,7 +911,8 @@ def main():
                 dbus.Dictionary({}, signature="sv"), dbus.Int32(-1),
                 dbus_interface="org.freedesktop.Notifications", reply_handler=ignore, error_handler=logged)
 
-    agent = Hermes.from_environment() if agent_name() == "hermes" else Opencode.from_environment()
+    chosen = agent_name()
+    agent = Hermes.from_environment() if chosen == "hermes" else Opencode.from_environment()
     kortex = Kortex(agent, Desktop())
 
     def to_dbus(m):
@@ -972,6 +973,9 @@ def main():
             log(f"tick: {e!r}")
         if kortex.idle():
             log("quiet for a while; stopping")
+            loop.quit()
+        elif agent_name() != chosen:  # `patina ai on hermes`, say: D-Bus starts a kortex for it
+            log(f"the agent is {agent_name()} now; stopping")
             loop.quit()
         return True
 

@@ -38,7 +38,8 @@ git clone https://github.com/patina-os/kortex && cd kortex
 
 Then open KRunner (Meta+Space or Alt+Space) and type `ai` and your request.
 `./uninstall.sh` removes it again. kortex talks to opencode; for Hermes, write `hermes`
-into `~/.config/kortex/agent` (patina does), or set `KORTEX_AGENT=hermes`.
+into `~/.config/kortex/agent` (patina does), or set `KORTEX_AGENT=hermes`. A kortex that
+runs stops when the file names the other agent, and D-Bus starts one for it.
 
 ## What it does
 
