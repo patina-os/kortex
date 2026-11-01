@@ -145,7 +145,7 @@ def main(agent):
                 if str(m[0]).startswith("permission" + SEP):
                     return m
         asked = wait_for("the agent to ask first", permission)
-        assert str(asked[1]) == f"Allow {asks}: {command}", asked[1]
+        assert str(asked[1]).split("<br>")[0] == f"Allow {asks}: {command}", asked[1]
         assert list(asked[5]["actions"]) == ["allow-once", "allow-always", "deny"]
         time.sleep(1)
         ran = (lambda: not proof.exists()) if agent == "hermes" else proof.exists

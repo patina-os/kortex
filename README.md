@@ -12,8 +12,10 @@ you allow it, writes code and works on your servers. kortex is the palette end o
 agent; the agent itself is [opencode](https://opencode.ai) or
 [Hermes Agent](https://github.com/NousResearch/hermes-agent), running on your machine.
 
-Status: 0.2.0. Hermes Agent is the second agent kortex talks to, next to opencode. A
-service connected while kortex runs (an MCP server added to the agent's configuration,
+Status: 0.3.1. The Allow row shows the whole command as it will run, and what Always
+would let through. Since 0.3.0 any search in Plasma's start menu ends with "Ask the
+agent: …", which opens the conversation in KRunner; since 0.2.0 Hermes Agent is the
+second agent kortex talks to, next to opencode. A service connected while kortex runs (an MCP server added to the agent's configuration,
 as `patina ai connect` does) reaches opencode's running agent at once, and Hermes' next
 conversation. Since 0.1.2 the answer grows on screen in a real KRunner, requests
 opencode cannot list are answered from its event stream, and the first `ai` after a
@@ -38,7 +40,8 @@ git clone https://github.com/patina-os/kortex && cd kortex
 
 Then open KRunner (Meta+Space or Alt+Space) and type `ai` and your request.
 `./uninstall.sh` removes it again. kortex talks to opencode; for Hermes, write `hermes`
-into `~/.config/kortex/agent` (patina does), or set `KORTEX_AGENT=hermes`.
+into `~/.config/kortex/agent` (patina does), or set `KORTEX_AGENT=hermes`. A kortex that
+runs stops when the file names the other agent, and D-Bus starts one for it.
 
 ## What it does
 
@@ -56,8 +59,8 @@ Meta+Space   ai why is my wifi slow
   multi-line match. With a conversation going, a second match continues it instead of
   starting a new one; so does typing after the marker (`ai › and in dark mode?`).
 - Every action the agent wants to take that its permissions put on `ask` (changing a
-  file, running a command, reaching a server) shows as its own match with three
-  actions: Allow once, Always, Deny. Nothing runs before you choose; Enter alone on
+  file, running a command, reaching a server) shows as its own match, with the whole
+  command as it will run, and three actions: Allow once, Always, Deny. Nothing runs before you choose; Enter alone on
   such a match answers nothing. While KRunner is closed, a request for permission
   comes as a notification.
 - Copy puts the answer on the clipboard; Open in terminal continues the same session in
@@ -123,7 +126,8 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   when you set them up (`hermes setup`). Open in terminal runs `hermes --resume`.
 - **Services.** opencode reads its MCP servers (`mcp` in `opencode.json`) when its
   server starts, not again. When the file changes while kortex's server runs, kortex
-  adds the servers that are new and enabled through `POST /mcp`, before the next
+  adds the servers that are new and enabled through `POST /mcp`, their `{file:...}` and
+  `{env:...}` filled in as opencode fills them in its file (a token file), before the next
   request and while a conversation is on screen, so a service connected
   mid-conversation is there for the agent's next step. A server changed or removed
   takes effect at the server's next start, after a quiet quarter of an hour. Hermes
@@ -156,9 +160,11 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   KRunner also keeps its last queries, `ai` requests included, in
   `~/.local/share/krunnerstaterc`.
 - No action without a yes. kortex never answers a permission request on its own, and
-  "Always" is opencode's own rule, visible and removable in its configuration. A
-  request opencode cannot list (1.19 fails the whole list while a web fetch without a
-  timeout waits) comes from its event stream and is answered like any other.
+  "Always" is opencode's own rule, which the Allow row spells out (`Always allows: sh *`
+  lets any script through): it holds for every conversation until opencode's server
+  stops, after a quiet quarter of an hour, and is not written into its configuration.
+  A request opencode cannot list (1.19 fails the whole list while a web fetch without
+  a timeout waits) comes from its event stream and is answered like any other.
 - Root through a dialog. The agent has no terminal, so `sudo` cannot ask for a
   password there. patina sets the session's `SUDO_ASKPASS` to a password dialog in the
   theme's colours and tells the agent to run `sudo -A`; on another desktop, point

@@ -7,8 +7,9 @@ set -euo pipefail
 here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 data="${XDG_DATA_HOME:-$HOME/.local/share}"
 service=io.github.patina_os.kortex
+python=/usr/bin/python3   # the one D-Bus starts kortex with, and the one that needs the bindings
 
-if ! python3 -c 'import dbus, gi' 2> /dev/null; then
+if ! "$python" -c 'import dbus, gi' 2> /dev/null; then
   echo "kortex: python3-dbus and python3-gi are missing; on Debian: sudo apt install python3-dbus python3-gi" >&2
   exit 1
 fi
@@ -20,9 +21,9 @@ fi
 install -D -m 0755 "$here/kortex.py" "$data/kortex/kortex.py"
 install -D -m 0644 "$here/kortex.desktop" "$data/krunner/dbusplugins/kortex.desktop"
 install -D -m 0644 "$here/kortex.svg" "$data/icons/hicolor/scalable/apps/kortex.svg"
-mkdir -p "$data/dbus-1/services"
-printf '[D-BUS Service]\nName=%s\nExec=/usr/bin/python3 "%s"\n' "$service" "$data/kortex/kortex.py" \
-  > "$data/dbus-1/services/$service.service"
+# Its mode set, not left to the umask: whoever can write it runs a program as this user.
+printf '[D-BUS Service]\nName=%s\nExec=%s "%s"\n' "$service" "$python" "$data/kortex/kortex.py" |
+  install -D -m 0644 /dev/stdin "$data/dbus-1/services/$service.service"
 # The name before 0.1.2, from the project's first account.
 rm -f "$data/dbus-1/services/io.github.patina21.kortex.service"
 

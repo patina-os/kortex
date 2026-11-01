@@ -16,9 +16,11 @@ a quiet quarter of an hour.
 """
 
 import base64
+import html
 import http.client
 import json
 import os
+import re
 import secrets
 import shlex
 import shutil
@@ -32,7 +34,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
@@ -53,7 +55,7 @@ CATEGORY_LOWEST = 0  # ::Lowest, for "Ask the agent" below what the start menu f
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
 ACTIONS = [
     ("allow-once", "Allow once", "dialog-ok-apply"),
-    ("allow-always", "Always allow", "dialog-ok"),
+    ("allow-always", "Always allow", "media-playlist-repeat"),  # not a second check mark
     ("deny", "Deny", "dialog-cancel"),
     ("copy", "Copy the answer", "edit-copy"),
     ("terminal", "Open in terminal", "utilities-terminal"),
@@ -104,6 +106,16 @@ def agent_name():
         except OSError:
             given = ""
     return "hermes" if given == "hermes" else "opencode"
+
+
+def fill_placeholders(text, base):
+    """opencode's placeholders in a piece of its configuration, filled as opencode fills
+    them when it reads its file: {env:NAME} and {file:path} (~/ or relative to `base`),
+    the file's content trimmed; `text` is JSON and stays JSON."""
+    def file(m):
+        return json.dumps((base / Path(m.group(1)).expanduser()).read_text().strip())[1:-1]
+    text = re.sub(r"\{env:([^}]+)\}", lambda m: json.dumps(os.environ.get(m.group(1), ""))[1:-1], text)
+    return re.sub(r"\{file:([^}]+)\}", file, text)
 
 
 def mtime(path):
@@ -271,7 +283,8 @@ class Opencode(Server):
         """MCP servers added to opencode's configuration since its server started, added
         to the running server (POST /mcp), which does not read its configuration again: a
         service connected mid-conversation (`patina ai connect`) is there at once. One
-        changed or removed waits for the next start."""
+        changed or removed waits for the next start. opencode fills {file:...} and {env:...}
+        only in what it reads from its file, so kortex fills them in what it sends."""
         path = opencode_config()
         now = mtime(path)
         if self.url is None or now == self.config_seen:
@@ -283,6 +296,7 @@ class Opencode(Server):
             for name, config in wanted.items():
                 if name not in running and isinstance(config, dict) and config.get("enabled", True):
                     log(f"adding the MCP server {name} to the running agent")
+                    config = json.loads(fill_placeholders(json.dumps(config), path.parent))
                     self.request("POST", "/mcp", {"name": name, "config": config}, start=False)
         except (OSError, ValueError, AttributeError, AgentError) as e:
             log(f"MCP servers of {path} not added: {e}")  # opencode reports its own file's problems
@@ -576,8 +590,21 @@ def shorten(text):
 
 def match(match_id, text, icon=ICON, relevance=1.0, subtext="", actions=(), multiline=False,
           category=CATEGORY_RELEVANCE):
+    """One match. KRunner shows a multiline one as styled text (HTML), where `<x ...>`
+    would vanish and a line break would be a space, so its text goes as escaped HTML."""
+    if multiline:
+        text = html.escape(text, quote=False).replace("\n", "<br>")
     return (match_id, text, icon, relevance,
             {"subtext": subtext, "actions": list(actions), "multiline": multiline, "category": category})
+
+
+def asked_for(p):
+    """What a permission request would do: opencode's whole command for bash (its
+    patterns are the command cut at pipes, `&&` and `;`), else the patterns."""
+    command = (p.get("metadata") or {}).get("command")
+    if isinstance(command, str) and command.strip():
+        return command
+    return ", ".join(p.get("patterns") or []) or p.get("permission", "")
 
 
 def view(state):
@@ -589,9 +616,12 @@ def view(state):
             matches.append(match("stuck", "The agent waits for an answer kortex cannot show (an opencode bug)",
                                  "dialog-warning", 1.0, "Asked before kortex was listening; it clears when opencode restarts"))
             continue
-        what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
+        kind = p.get("permission", "this")
+        text = f"Allow {kind}: {asked_for(p)}"
+        if p.get("always"):  # opencode's rule for Always: `sh *` lets any script through
+            text += "\nAlways allows: " + ("any " + kind if p["always"] == ["*"] else ", ".join(p["always"]))
         matches.append(match(
-            "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {what}", "dialog-warning", 1.0,
+            "permission" + SEP + p["id"], text, "dialog-warning", 1.0,
             "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
     if error:
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
@@ -729,7 +759,7 @@ class Kortex:
             "permissions": self.agent.permissions(self.session),
         }
 
-    def run(self, match_id, action):
+    def run(self, match_id, action, menu=False):
         kind, _, arg = match_id.partition(SEP)
         self.last_activity = self.now()
         try:
@@ -739,16 +769,16 @@ class Kortex:
                     self.session = self.agent.new_session(arg[:60])
                 self.agent.add_services()
                 self.agent.ask(self.session, arg)
-                self.reopen(VIEW)
+                self.reopen(VIEW, menu)
             elif kind == "session":
                 self.session = arg
-                self.reopen(VIEW)
+                self.reopen(VIEW, menu)
             elif kind == "show":
-                self.reopen(VIEW)
+                self.reopen(VIEW, menu)
             elif kind == "permission":
                 if action in REPLIES:
                     self.agent.reply(arg, REPLIES[action])
-                self.reopen(self.view_query)
+                self.reopen(self.view_query, menu)
             elif kind == "answer" and self.session:
                 if action == "terminal":
                     attach, env = self.agent.attach(self.session)
@@ -759,16 +789,20 @@ class Kortex:
         except AgentError as e:
             log(e)
             self.problem = str(e)
-            self.reopen(VIEW)
+            self.reopen(VIEW, menu)
 
-    def reopen(self, query):
-        """After a run, which closes KRunner: open it again on the conversation."""
-        self.closing_at = self.now()
+    def reopen(self, query, menu=False):
+        """After a run, which closes KRunner, or the start menu (`menu`): open KRunner
+        on the conversation. Only a run in KRunner is followed by KRunner's teardown."""
+        self.closing_at = None if menu else self.now()
         self.desktop.query(query)
 
-    def teardown(self):
-        # The one teardown right after a run is the closing that run caused, which
-        # `reopen` undoes; any other means the user closed KRunner.
+    def teardown(self, menu=False):
+        # The start menu's teardown ends its search, never the conversation, which it
+        # does not show. KRunner's one right after a run in it is the closing that run
+        # caused, which `reopen` undoes; any other means the user closed KRunner.
+        if menu:
+            return
         if self.closing_at is not None and self.now() - self.closing_at < 1.5:
             self.closing_at = None
             return
@@ -796,8 +830,9 @@ class Kortex:
         for p in state["permissions"]:
             if p["id"] not in self.notified:
                 self.notified.add(p["id"])
-                what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
-                self.desktop.notify("The agent asks first", f"{p.get('permission', '')}: {what}\nOpen it with: ai ›")
+                # The body is markup to the notification server, as a multiline match is to KRunner.
+                what = html.escape(f"{p.get('permission', '')}: {asked_for(p)}", quote=False)
+                self.desktop.notify("The agent asks first", f"{what}\nOpen it with: ai ›")
 
     def idle(self):
         """True when kortex may stop: nothing asked for a while and no request running."""
@@ -824,6 +859,10 @@ def main():
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     loop = GLib.MainLoop()
+    # When the session bus goes away (a session that ends without a signal for kortex),
+    # libdbus would end kortex on the spot and leave the agent's server running.
+    bus.set_exit_on_disconnect(False)
+    bus.call_on_disconnection(lambda _bus: loop.quit())
 
     def ignore(*_):
         pass
@@ -872,7 +911,8 @@ def main():
                 dbus.Dictionary({}, signature="sv"), dbus.Int32(-1),
                 dbus_interface="org.freedesktop.Notifications", reply_handler=ignore, error_handler=logged)
 
-    agent = Hermes.from_environment() if agent_name() == "hermes" else Opencode.from_environment()
+    chosen = agent_name()
+    agent = Hermes.from_environment() if chosen == "hermes" else Opencode.from_environment()
     kortex = Kortex(agent, Desktop())
 
     def to_dbus(m):
@@ -907,13 +947,13 @@ def main():
             return dbus.Array([to_dbus(m) for m in kortex.match(str(query), from_menu(sender))],
                               signature="(sssida{sv})")
 
-        @dbus.service.method(IFACE, in_signature="ss")
-        def Run(self, match_id, action_id):
-            kortex.run(str(match_id), str(action_id))
+        @dbus.service.method(IFACE, in_signature="ss", sender_keyword="sender")
+        def Run(self, match_id, action_id, sender=None):
+            kortex.run(str(match_id), str(action_id), from_menu(sender))
 
-        @dbus.service.method(IFACE)
-        def Teardown(self):
-            kortex.teardown()
+        @dbus.service.method(IFACE, sender_keyword="sender")
+        def Teardown(self, sender=None):
+            kortex.teardown(from_menu(sender))
 
         @dbus.service.method(IFACE, in_signature="s")
         def SetActivationToken(self, token):
@@ -933,6 +973,9 @@ def main():
             log(f"tick: {e!r}")
         if kortex.idle():
             log("quiet for a while; stopping")
+            loop.quit()
+        elif agent_name() != chosen:  # `patina ai on hermes`, say: D-Bus starts a kortex for it
+            log(f"the agent is {agent_name()} now; stopping")
             loop.quit()
         return True
 
