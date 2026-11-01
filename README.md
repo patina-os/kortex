@@ -156,9 +156,11 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   KRunner also keeps its last queries, `ai` requests included, in
   `~/.local/share/krunnerstaterc`.
 - No action without a yes. kortex never answers a permission request on its own, and
-  "Always" is opencode's own rule, visible and removable in its configuration. A
-  request opencode cannot list (1.19 fails the whole list while a web fetch without a
-  timeout waits) comes from its event stream and is answered like any other.
+  "Always" is opencode's own rule, which the Allow row spells out (`Always allows: sh *`
+  lets any script through): it holds for every conversation until opencode's server
+  stops, after a quiet quarter of an hour, and is not written into its configuration.
+  A request opencode cannot list (1.19 fails the whole list while a web fetch without
+  a timeout waits) comes from its event stream and is answered like any other.
 - Root through a dialog. The agent has no terminal, so `sudo` cannot ask for a
   password there. patina sets the session's `SUDO_ASKPASS` to a password dialog in the
   theme's colours and tells the agent to run `sudo -A`; on another desktop, point

@@ -54,7 +54,7 @@ CATEGORY_LOWEST = 0  # ::Lowest, for "Ask the agent" below what the start menu f
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
 ACTIONS = [
     ("allow-once", "Allow once", "dialog-ok-apply"),
-    ("allow-always", "Always allow", "dialog-ok"),
+    ("allow-always", "Always allow", "media-playlist-repeat"),  # not a second check mark
     ("deny", "Deny", "dialog-cancel"),
     ("copy", "Copy the answer", "edit-copy"),
     ("terminal", "Open in terminal", "utilities-terminal"),
@@ -603,8 +603,12 @@ def view(state):
             matches.append(match("stuck", "The agent waits for an answer kortex cannot show (an opencode bug)",
                                  "dialog-warning", 1.0, "Asked before kortex was listening; it clears when opencode restarts"))
             continue
+        kind = p.get("permission", "this")
+        text = f"Allow {kind}: {asked_for(p)}"
+        if p.get("always"):  # opencode's rule for Always: `sh *` lets any script through
+            text += "\nAlways allows: " + ("any " + kind if p["always"] == ["*"] else ", ".join(p["always"]))
         matches.append(match(
-            "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {asked_for(p)}", "dialog-warning", 1.0,
+            "permission" + SEP + p["id"], text, "dialog-warning", 1.0,
             "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
     if error:
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))

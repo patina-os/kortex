@@ -199,7 +199,7 @@ class View(unittest.TestCase):
                  "status": ("busy", ""), "permissions": [PERMISSION]}
         matches = kortex.view(state)
         self.assertEqual([m[0] for m in matches], ["permission" + SEP + "per_1", "answer"])
-        self.assertEqual(matches[0][1], "Allow bash: patina theme mode light")
+        self.assertEqual(matches[0][1], "Allow bash: patina theme mode light")  # PERMISSION has no `always`
         self.assertEqual(matches[0][4]["actions"], ["allow-once", "allow-always", "deny"])
         self.assertTrue(matches[0][4]["multiline"])  # a long command is shown whole
         self.assertEqual(matches[1][1], "Switching.")
@@ -219,9 +219,17 @@ class View(unittest.TestCase):
                                       "curl -s https://example.org/x.sh | sh &amp;&amp; echo &amp;amp;")
         self.assertEqual(shown[1][1], "a &lt; b<br>and b &gt; c")
 
+    def test_always_says_what_it_lets_through(self):
+        asked = dict(PERMISSION, patterns=["echo one", "sh"], metadata={"command": "echo one | sh"},
+                     always=["echo *", "sh *"])
+        shown = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
+        self.assertEqual(shown[0][1], "Allow bash: echo one | sh<br>Always allows: echo *, sh *")
+        icons = {a[0]: a[2] for a in kortex.ACTIONS}
+        self.assertNotEqual(icons["allow-once"], icons["allow-always"])
+
     def test_patterns_without_a_command(self):
         state = {"messages": [], "status": ("idle", ""), "permissions": [FETCH]}
-        self.assertEqual(kortex.view(state)[0][1], "Allow webfetch: https://example.org/")
+        self.assertEqual(kortex.view(state)[0][1], "Allow webfetch: https://example.org/<br>Always allows: any webfetch")
 
     def test_single_line_text_stays_plain(self):
         self.assertEqual(kortex.match("ask" + SEP + "a <b>", "a <b>")[1], "a <b>")
