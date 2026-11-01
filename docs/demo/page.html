@@ -180,6 +180,8 @@ const ACTION_NAMES = { "allow-once": "Allow once", "allow-always": "Always allow
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// kortex sends a multiline match as KRunner reads it, styled text: escaped, <br> for a new line.
+const plain = (s) => s.replace(/<br>/g, "\n").replace(/&(lt|gt|amp);/g, (_, e) => ({ lt: "<", gt: ">", amp: "&" }[e]));
 
 const start = TIMELINE.find((e) => e.kind === "start");
 $("prov").innerHTML = `Recorded with <b>kortex ${start.kortex}</b> · <b>opencode ${start.opencode}</b> · over a private D-Bus session, the way KRunner calls a runner`;
@@ -231,7 +233,7 @@ function renderField(text, caret) {
 
 function matchHTML(m, i, pressed) {
   const icon = m.id === "permission" ? ICONS.warn : m.id === "session" ? ICONS.history : ICONS.kortex;
-  let text = esc(m.text).replace(/^› (.*)$/gm, '<span class="tool">› $1</span>');
+  let text = esc(m.multiline ? plain(m.text) : m.text).replace(/^› (.*)$/gm, '<span class="tool">› $1</span>');
   const acts = (i === 0 || m.id === "permission") && m.actions.length
     ? `<div class="acts">${m.actions.map((a) => `<span class="act${pressed && pressed.action === a && pressed.id === m.id ? " pressed" : ""}">${ACTION_NAMES[a] || a}</span>`).join("")}</div>` : "";
   const cls = ["match", i === 0 ? "sel" : "", m.multiline ? "multi" : "", m.id === "permission" ? "warn" : "",
