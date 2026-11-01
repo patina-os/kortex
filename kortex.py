@@ -759,7 +759,7 @@ class Kortex:
             "permissions": self.agent.permissions(self.session),
         }
 
-    def run(self, match_id, action):
+    def run(self, match_id, action, menu=False):
         kind, _, arg = match_id.partition(SEP)
         self.last_activity = self.now()
         try:
@@ -769,16 +769,16 @@ class Kortex:
                     self.session = self.agent.new_session(arg[:60])
                 self.agent.add_services()
                 self.agent.ask(self.session, arg)
-                self.reopen(VIEW)
+                self.reopen(VIEW, menu)
             elif kind == "session":
                 self.session = arg
-                self.reopen(VIEW)
+                self.reopen(VIEW, menu)
             elif kind == "show":
-                self.reopen(VIEW)
+                self.reopen(VIEW, menu)
             elif kind == "permission":
                 if action in REPLIES:
                     self.agent.reply(arg, REPLIES[action])
-                self.reopen(self.view_query)
+                self.reopen(self.view_query, menu)
             elif kind == "answer" and self.session:
                 if action == "terminal":
                     attach, env = self.agent.attach(self.session)
@@ -789,16 +789,20 @@ class Kortex:
         except AgentError as e:
             log(e)
             self.problem = str(e)
-            self.reopen(VIEW)
+            self.reopen(VIEW, menu)
 
-    def reopen(self, query):
-        """After a run, which closes KRunner: open it again on the conversation."""
-        self.closing_at = self.now()
+    def reopen(self, query, menu=False):
+        """After a run, which closes KRunner, or the start menu (`menu`): open KRunner
+        on the conversation. Only a run in KRunner is followed by KRunner's teardown."""
+        self.closing_at = None if menu else self.now()
         self.desktop.query(query)
 
-    def teardown(self):
-        # The one teardown right after a run is the closing that run caused, which
-        # `reopen` undoes; any other means the user closed KRunner.
+    def teardown(self, menu=False):
+        # The start menu's teardown ends its search, never the conversation, which it
+        # does not show. KRunner's one right after a run in it is the closing that run
+        # caused, which `reopen` undoes; any other means the user closed KRunner.
+        if menu:
+            return
         if self.closing_at is not None and self.now() - self.closing_at < 1.5:
             self.closing_at = None
             return
@@ -938,13 +942,13 @@ def main():
             return dbus.Array([to_dbus(m) for m in kortex.match(str(query), from_menu(sender))],
                               signature="(sssida{sv})")
 
-        @dbus.service.method(IFACE, in_signature="ss")
-        def Run(self, match_id, action_id):
-            kortex.run(str(match_id), str(action_id))
+        @dbus.service.method(IFACE, in_signature="ss", sender_keyword="sender")
+        def Run(self, match_id, action_id, sender=None):
+            kortex.run(str(match_id), str(action_id), from_menu(sender))
 
-        @dbus.service.method(IFACE)
-        def Teardown(self):
-            kortex.teardown()
+        @dbus.service.method(IFACE, sender_keyword="sender")
+        def Teardown(self, sender=None):
+            kortex.teardown(from_menu(sender))
 
         @dbus.service.method(IFACE, in_signature="s")
         def SetActivationToken(self, token):

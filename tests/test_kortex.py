@@ -379,6 +379,31 @@ class Runner(unittest.TestCase):
         k.teardown()  # the user closed it
         self.assertFalse(k.viewing)
 
+    def test_krunner_closed_after_a_start_menu_run_stays_closed(self):
+        # The start menu's teardown may come before its run or not at all, and is not
+        # KRunner's: the user closing KRunner at once must stop the refresh.
+        k, oc, desk, clock = new()
+        k.teardown(menu=True)
+        k.run("ask" + SEP + "x", "", menu=True)
+        k.match("ai ›")
+        self.assertTrue(k.viewing)
+        clock.t += 0.5
+        k.teardown()  # the user closes KRunner
+        self.assertFalse(k.viewing)
+        oc.history = [user("x"), assistant(text("news"))]
+        k.tick()
+        self.assertEqual(desk.queries, ["ai ›"])  # not opened again
+
+    def test_the_start_menu_closing_late_keeps_the_conversation_on_screen(self):
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "x", "", menu=True)
+        k.match("ai ›")
+        clock.t += 3
+        k.teardown(menu=True)
+        oc.history = [user("x"), assistant(text("news"))]
+        k.tick()
+        self.assertEqual(len(desk.queries), 2)  # KRunner gets the news
+
     def test_tick_reopens_only_on_change(self):
         k, oc, desk, _clock = new()
         k.run("ask" + SEP + "x", "")
