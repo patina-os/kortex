@@ -464,6 +464,24 @@ class Services(unittest.TestCase):
         self.oc.add_services()  # once per change of the file
         self.assertEqual(self.calls, [])
 
+    def test_secrets_are_filled_in_as_opencode_fills_them(self):
+        # patina's GitHub and Nextcloud presets name a token file; POST /mcp takes the
+        # config as it is, so a placeholder sent unfilled reached the server literally.
+        token = Path(self.dir.name) / "github.token"
+        token.write_text("ghp_secret\n")
+        (self.config.parent / "nc.token").write_text("app-password")
+        self.write({"github": {"type": "remote", "url": "https://api.githubcopilot.com/mcp/",
+                               "headers": {"Authorization": "Bearer {file:" + str(token) + "}"}},
+                    "nextcloud": {"type": "local", "command": ["uvx", "nextcloud-mcp-server"],
+                                  "environment": {"NEXTCLOUD_PASSWORD": "{file:nc.token}",
+                                                  "NEXTCLOUD_HOST": "{env:KORTEX_TEST_HOST}"}}})
+        with mock.patch.dict(os.environ, {"KORTEX_TEST_HOST": "https://cloud.example.org"}):
+            self.oc.add_services()
+        posted = {body["name"]: body["config"] for method, _path, body in self.calls if method == "POST"}
+        self.assertEqual(posted["github"]["headers"]["Authorization"], "Bearer ghp_secret")
+        self.assertEqual(posted["nextcloud"]["environment"],
+                         {"NEXTCLOUD_PASSWORD": "app-password", "NEXTCLOUD_HOST": "https://cloud.example.org"})
+
     def test_a_file_opencode_reads_but_json_does_not_is_left_alone(self):
         self.config.write_text('{"mcp": {} // a comment\n}')
         os.utime(self.config, ns=(self.oc.config_seen + 10**9,) * 2)

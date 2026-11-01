@@ -20,6 +20,7 @@ import html
 import http.client
 import json
 import os
+import re
 import secrets
 import shlex
 import shutil
@@ -105,6 +106,16 @@ def agent_name():
         except OSError:
             given = ""
     return "hermes" if given == "hermes" else "opencode"
+
+
+def fill_placeholders(text, base):
+    """opencode's placeholders in a piece of its configuration, filled as opencode fills
+    them when it reads its file: {env:NAME} and {file:path} (~/ or relative to `base`),
+    the file's content trimmed; `text` is JSON and stays JSON."""
+    def file(m):
+        return json.dumps((base / Path(m.group(1)).expanduser()).read_text().strip())[1:-1]
+    text = re.sub(r"\{env:([^}]+)\}", lambda m: json.dumps(os.environ.get(m.group(1), ""))[1:-1], text)
+    return re.sub(r"\{file:([^}]+)\}", file, text)
 
 
 def mtime(path):
@@ -272,7 +283,8 @@ class Opencode(Server):
         """MCP servers added to opencode's configuration since its server started, added
         to the running server (POST /mcp), which does not read its configuration again: a
         service connected mid-conversation (`patina ai connect`) is there at once. One
-        changed or removed waits for the next start."""
+        changed or removed waits for the next start. opencode fills {file:...} and {env:...}
+        only in what it reads from its file, so kortex fills them in what it sends."""
         path = opencode_config()
         now = mtime(path)
         if self.url is None or now == self.config_seen:
@@ -284,6 +296,7 @@ class Opencode(Server):
             for name, config in wanted.items():
                 if name not in running and isinstance(config, dict) and config.get("enabled", True):
                     log(f"adding the MCP server {name} to the running agent")
+                    config = json.loads(fill_placeholders(json.dumps(config), path.parent))
                     self.request("POST", "/mcp", {"name": name, "config": config}, start=False)
         except (OSError, ValueError, AttributeError, AgentError) as e:
             log(f"MCP servers of {path} not added: {e}")  # opencode reports its own file's problems

@@ -123,7 +123,8 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   when you set them up (`hermes setup`). Open in terminal runs `hermes --resume`.
 - **Services.** opencode reads its MCP servers (`mcp` in `opencode.json`) when its
   server starts, not again. When the file changes while kortex's server runs, kortex
-  adds the servers that are new and enabled through `POST /mcp`, before the next
+  adds the servers that are new and enabled through `POST /mcp`, their `{file:...}` and
+  `{env:...}` filled in as opencode fills them in its file (a token file), before the next
   request and while a conversation is on screen, so a service connected
   mid-conversation is there for the agent's next step. A server changed or removed
   takes effect at the server's next start, after a quiet quarter of an hour. Hermes
