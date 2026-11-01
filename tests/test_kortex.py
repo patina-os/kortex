@@ -636,6 +636,13 @@ class HermesBackend(unittest.TestCase):
 
 
 class Files(unittest.TestCase):
+    def test_the_runner_metadata_names_this_kortex(self):
+        desktop = (Path(__file__).parent.parent / "kortex.desktop").read_text().splitlines()
+        self.assertIn("X-KDE-PluginInfo-Version=" + kortex.VERSION, desktop)
+        self.assertIn("X-Plasma-DBusRunner-Service=" + kortex.SERVICE, desktop)
+        self.assertIn("X-Plasma-DBusRunner-Path=" + kortex.OBJECT_PATH, desktop)
+        self.assertIn("X-KDE-PluginInfo-Name=" + kortex.RUNNER_ID, desktop)
+
     def test_password_is_private_and_stable(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": d}):
             first = kortex.server_password()
