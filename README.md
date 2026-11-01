@@ -56,8 +56,8 @@ Meta+Space   ai why is my wifi slow
   multi-line match. With a conversation going, a second match continues it instead of
   starting a new one; so does typing after the marker (`ai › and in dark mode?`).
 - Every action the agent wants to take that its permissions put on `ask` (changing a
-  file, running a command, reaching a server) shows as its own match with three
-  actions: Allow once, Always, Deny. Nothing runs before you choose; Enter alone on
+  file, running a command, reaching a server) shows as its own match, with the whole
+  command as it will run, and three actions: Allow once, Always, Deny. Nothing runs before you choose; Enter alone on
   such a match answers nothing. While KRunner is closed, a request for permission
   comes as a notification.
 - Copy puts the answer on the clipboard; Open in terminal continues the same session in

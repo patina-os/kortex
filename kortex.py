@@ -16,6 +16,7 @@ a quiet quarter of an hour.
 """
 
 import base64
+import html
 import http.client
 import json
 import os
@@ -576,8 +577,21 @@ def shorten(text):
 
 def match(match_id, text, icon=ICON, relevance=1.0, subtext="", actions=(), multiline=False,
           category=CATEGORY_RELEVANCE):
+    """One match. KRunner shows a multiline one as styled text (HTML), where `<x ...>`
+    would vanish and a line break would be a space, so its text goes as escaped HTML."""
+    if multiline:
+        text = html.escape(text, quote=False).replace("\n", "<br>")
     return (match_id, text, icon, relevance,
             {"subtext": subtext, "actions": list(actions), "multiline": multiline, "category": category})
+
+
+def asked_for(p):
+    """What a permission request would do: opencode's whole command for bash (its
+    patterns are the command cut at pipes, `&&` and `;`), else the patterns."""
+    command = (p.get("metadata") or {}).get("command")
+    if isinstance(command, str) and command.strip():
+        return command
+    return ", ".join(p.get("patterns") or []) or p.get("permission", "")
 
 
 def view(state):
@@ -589,9 +603,8 @@ def view(state):
             matches.append(match("stuck", "The agent waits for an answer kortex cannot show (an opencode bug)",
                                  "dialog-warning", 1.0, "Asked before kortex was listening; it clears when opencode restarts"))
             continue
-        what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
         matches.append(match(
-            "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {what}", "dialog-warning", 1.0,
+            "permission" + SEP + p["id"], f"Allow {p.get('permission', 'this')}: {asked_for(p)}", "dialog-warning", 1.0,
             "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
     if error:
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
@@ -796,8 +809,9 @@ class Kortex:
         for p in state["permissions"]:
             if p["id"] not in self.notified:
                 self.notified.add(p["id"])
-                what = ", ".join(p.get("patterns") or []) or p.get("permission", "")
-                self.desktop.notify("The agent asks first", f"{p.get('permission', '')}: {what}\nOpen it with: ai ›")
+                # The body is markup to the notification server, as a multiline match is to KRunner.
+                what = html.escape(f"{p.get('permission', '')}: {asked_for(p)}", quote=False)
+                self.desktop.notify("The agent asks first", f"{what}\nOpen it with: ai ›")
 
     def idle(self):
         """True when kortex may stop: nothing asked for a while and no request running."""
