@@ -859,6 +859,10 @@ def main():
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     loop = GLib.MainLoop()
+    # When the session bus goes away (a session that ends without a signal for kortex),
+    # libdbus would end kortex on the spot and leave the agent's server running.
+    bus.set_exit_on_disconnect(False)
+    bus.call_on_disconnection(lambda _bus: loop.quit())
 
     def ignore(*_):
         pass
