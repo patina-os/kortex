@@ -443,7 +443,96 @@ class Runner(unittest.TestCase):
         self.assertTrue(k.idle())
         k.session = "ses_1"
         oc.state = ("busy", "")
+        k.tick()  # kortex knows the status from its last request
         self.assertFalse(k.idle())
+
+
+class Later:
+    """The worker thread, held: requests to the agent wait until the test lets them run."""
+
+    def __init__(self):
+        self.jobs = []
+
+    def __call__(self, work, then):
+        self.jobs.append((work, then))
+
+    def run(self):
+        while self.jobs:
+            kortex.at_once(*self.jobs.pop(0))
+
+
+def held():
+    k, oc, desk, clock = new()
+    k.background = later = Later()
+    return k, oc, desk, clock, later
+
+
+class Background(unittest.TestCase):
+    """KRunner never waits for the agent: it gets what kortex knows, and the news later."""
+
+    def test_a_request_shows_a_waiting_row_until_the_agent_answers(self):
+        k, oc, desk, _clock, later = held()
+        k.run("ask" + SEP + "x", "")
+        self.assertEqual(desk.queries, ["ai ›"])  # KRunner opens on the conversation at once
+        self.assertEqual(oc.created, [])  # while nothing has reached the agent yet
+        self.assertEqual([m[0] for m in k.match("ai ›")], ["waiting"])
+        later.run()
+        self.assertEqual(oc.asked, [("ses_1", "x")])
+        oc.history = [user("x"), assistant(text("done"))]
+        k.tick()  # the request has reached the agent: KRunner asks again
+        self.assertEqual(len(desk.queries), 2)
+        for _ in range(3):  # every keystroke is a match; the agent is asked once
+            self.assertEqual([m[0] for m in k.match(desk.queries[-1])], ["waiting"])
+        self.assertEqual(len(later.jobs), 1)
+        later.run()
+        k.tick()
+        self.assertEqual(len(desk.queries), 3)
+        [answer] = k.match(desk.queries[-1])
+        self.assertEqual((answer[0], answer[1]), ("answer", "done"))
+
+    def test_ai_lists_the_conversations_once_the_agent_answers(self):
+        k, _oc, desk, _clock, later = held()
+        self.assertEqual([m[0] for m in k.match("ai")], ["hint", "waiting"])
+        later.run()
+        k.tick()
+        self.assertEqual(desk.queries, ["ai " + kortex.JOINER])  # `ai` still, as a query that differs
+        self.assertEqual([m[0] for m in k.match(desk.queries[-1])], ["hint", "session" + SEP + "ses_old"])
+        later.run()
+        k.tick()
+        self.assertEqual(len(desk.queries), 1)  # nothing new
+
+    def test_an_answered_permission_leaves_the_view_at_once(self):
+        k, oc, _desk, _clock, later = held()
+        k.run("ask" + SEP + "x", "")
+        oc.pending = [PERMISSION]
+        later.run()
+        k.match("ai ›")
+        later.run()
+        self.assertEqual(k.match("ai ›")[0][0], "permission" + SEP + "per_1")
+        k.run("permission" + SEP + "per_1", "allow-once")
+        self.assertNotIn("permission" + SEP + "per_1", [m[0] for m in k.match("ai ›")])
+        later.run()
+        self.assertEqual(oc.replies, [("per_1", "once")])
+
+    def test_not_idle_while_a_request_is_on_its_way(self):
+        k, _oc, _desk, clock, later = held()
+        k.run("ask" + SEP + "x", "")
+        clock.t += kortex.IDLE_EXIT + 1
+        self.assertFalse(k.idle())
+        later.run()
+        self.assertTrue(k.idle())
+
+    def test_a_failed_request_shows_why(self):
+        k, oc, desk, _clock, later = held()
+        oc.fail = "opencode did not answer within 30 seconds"
+        k.run("ask" + SEP + "x", "")
+        k.match("ai ›")
+        later.run()
+        k.tick()
+        self.assertEqual(len(desk.queries), 2)
+        problem = k.match(desk.queries[-1])[0]
+        self.assertEqual((problem[0], problem[4]["subtext"]), ("problem", "The request did not reach the agent"))
+        self.assertIn("30 seconds", problem[1])
 
 
 class Services(unittest.TestCase):

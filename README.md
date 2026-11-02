@@ -12,7 +12,9 @@ you allow it, writes code and works on your servers. kortex is the palette end o
 agent; the agent itself is [opencode](https://opencode.ai) or
 [Hermes Agent](https://github.com/NousResearch/hermes-agent), running on your machine.
 
-Status: 0.3.1. The Allow row shows the whole command as it will run, and what Always
+Status: 0.3.2. KRunner never waits for the agent, which can take a minute to start:
+kortex asks it from a thread of its own and shows "Waiting for the agent…" meanwhile.
+Since 0.3.1 the Allow row shows the whole command as it will run, and what Always
 would let through. Since 0.3.0 any search in Plasma's start menu ends with "Ask the
 agent: …", which opens the conversation in KRunner; since 0.2.0 Hermes Agent is the
 second agent kortex talks to, next to opencode. A service connected while kortex runs (an MCP server added to the agent's configuration,

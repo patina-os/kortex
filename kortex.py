@@ -9,7 +9,8 @@ with Allow once, Always and Deny. Plasma's start menu searches with the same run
 but shows neither the answer nor those actions, so there any search ends with "Ask the
 agent", and the conversation opens in KRunner. The agent is opencode or Hermes Agent
 (~/.config/kortex/agent, KORTEX_AGENT): kortex starts its server (`opencode serve`,
-`hermes gateway run`) on 127.0.0.1 when it is first needed and talks to its HTTP API.
+`hermes gateway run`) on 127.0.0.1 when it is first needed and talks to its HTTP API
+from a thread of its own, so KRunner never waits for the agent.
 
 D-Bus activation starts kortex (see install.sh); it stops itself and the server after
 a quiet quarter of an hour.
@@ -20,6 +21,7 @@ import html
 import http.client
 import json
 import os
+import queue
 import re
 import secrets
 import shlex
@@ -34,7 +36,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
@@ -659,24 +661,76 @@ def terminal_command(attach, terminal):
 # ---- the runner ------------------------------------------------------------------------
 
 
+def at_once(work, then):
+    """Run `work` and hand `then` its result and error: how the tests run kortex's
+    requests to the agent; main() runs them in a thread of their own."""
+    try:
+        result = work()
+    except AgentError as e:
+        then(None, e)
+    else:
+        then(result, None)
+
+
 class Kortex:
     """What KRunner's calls do, without D-Bus: the D-Bus service in main() forwards to
     it, and the tests drive it directly. `agent` is the agent's server (Opencode or
     Hermes); `desktop` reopens KRunner with a query, copies, starts programs and
-    notifies; `now` is a clock."""
+    notifies; `now` is a clock; `background(work, then)` runs requests to the agent.
 
-    def __init__(self, agent, desktop, now=time.monotonic):
+    KRunner waits for nothing here: every request to the agent goes to `background`,
+    and a match shows what the agent said last. A request still on its way, or an agent
+    that starts (Hermes can take a minute), shows as a waiting row, and the tick shows
+    KRunner again when there is news. Only `background`'s jobs call the agent, and only
+    they set `session` while a request is sent, in the order they were made."""
+
+    def __init__(self, agent, desktop, now=time.monotonic, background=at_once):
         self.agent = agent
         self.desktop = desktop
         self.now = now
+        self.background = background
         self.session = None  # the conversation `ai ›` shows
-        self.viewing = False  # KRunner shows `ai ›` right now
+        self.state = None  # (session, what the agent said of it last)
+        self.sessions = None  # the recent conversations, as the agent listed them last
+        self.down = False  # the last request found no server, or none that answered
+        self.unreachable = ""  # why the agent did not answer the last request
+        self.waiting = ""  # a request on its way to the agent
+        self.jobs = 0  # requests in the background
+        self.fetching = set()  # what is being fetched, once at a time
+        self.shown = None  # the query of kortex's matches KRunner shows, or None
         self.view_query = VIEW
-        self.closing_at = None  # when a run closed KRunner that `show` reopens
-        self.signature = None
+        self.closing_at = None  # when a run closed KRunner that `reopen` reopens
+        self.signature = None  # what KRunner was shown, to compare with what is known now
         self.notified = set()
         self.problem = ""
         self.last_activity = now()
+
+    @property
+    def viewing(self):
+        """KRunner shows `ai ›` right now."""
+        return self.shown is not None and parse(self.shown)[0] == "view"
+
+    def work(self, job, then, key=None):
+        """Run `job`, requests to the agent, in the background; `then(result, error)` gets
+        what it brought. A job with a key runs once at a time."""
+        if key in self.fetching:
+            return
+        if key:
+            self.fetching.add(key)
+        self.jobs += 1
+
+        def done(result, error):
+            self.jobs -= 1
+            self.fetching.discard(key)
+            if error:
+                log(error)
+            then(result, error)
+
+        self.background(job, done)
+
+    def failed(self, _result, error):
+        if error:
+            self.problem = str(error)
 
     def config(self, menu=False):
         # Each program that searches asks for this once: the start menu (`menu`) sends
@@ -690,18 +744,20 @@ class Kortex:
         if kind is None:
             return [self.anything(query)] if menu and query.strip() else []
         self.last_activity = self.now()
-        try:
+        if menu:
             if kind == "ask":
                 return self.ask_matches(text)
-            if kind == "list":
-                return self.list_matches()
-            if menu:
-                return self.menu_view_matches(text)
-            self.view_query = query.strip()
-            return self.view_matches(text)
-        except AgentError as e:
-            log(e)
-            return [match("problem", "The agent is not reachable", "dialog-error", 1.0, str(e))]
+            return self.list_matches(menu) if kind == "list" else self.menu_view_matches(text)
+        self.shown = query.strip() if kind != "ask" else None
+        if kind == "ask":
+            matches = self.ask_matches(text)
+        elif kind == "list":
+            matches = self.list_matches()
+        else:
+            self.view_query = self.shown
+            matches = self.view_matches(text)
+        self.signature = self.seen()
+        return matches
 
     def ask_matches(self, text):
         if not text:
@@ -711,17 +767,34 @@ class Kortex:
             matches.append(match("continue" + SEP + text, text, ICON, 0.9, "Continue the conversation"))
         return matches
 
-    def list_matches(self):
-        matches = []
-        for i, s in enumerate(self.agent.sessions(5)):
+    def list_matches(self, menu=False):
+        def listed(found, error):
+            self.unreachable = str(error) if error else ""
+            if found is not None:
+                self.sessions = found
+
+        self.work(lambda: self.agent.sessions(5), listed, "sessions")
+        if self.unreachable:
+            return [self.unreachable_match()]
+        matches = [self.hint()]
+        if self.sessions is None and not menu:  # the start menu does not show it again
+            matches.append(self.waiting_match())
+        for i, s in enumerate(self.sessions or []):
             matches.append(match(
                 "session" + SEP + s["id"], s.get("title") or "Conversation", "view-history", 0.8 - i * 0.1,
                 "Continue this conversation · " + ago(s.get("time", {}).get("updated", 0))))
-        return [self.hint()] + matches
+        return matches
 
     def hint(self):
         return match("hint", "Ask the agent: type ai and your request", ICON, 1.0,
                      "ai › shows the current conversation")
+
+    def waiting_match(self):
+        return match("waiting", "Waiting for the agent…", ICON, 0.9,
+                     "It starts with the first request, which can take a minute")
+
+    def unreachable_match(self):
+        return match("problem", "The agent is not reachable", "dialog-error", 1.0, self.unreachable)
 
     def anything(self, query):
         """Any search in the start menu, offered to the agent below what Plasma finds."""
@@ -740,56 +813,110 @@ class Kortex:
         return matches or [self.hint()]
 
     def view_matches(self, followup):
-        self.viewing = True
         matches = []
         if followup:
             matches.append(match("continue" + SEP + followup, followup, ICON, 1.0, "Continue the conversation · Enter"))
         if self.problem:
             matches.append(match("problem", self.problem, "dialog-error", 0.95, "The request did not reach the agent"))
+        if self.waiting:
+            return matches + [self.waiting_match()]
         if not self.session:
             return matches or [self.hint()]
-        state = self.snapshot()
-        self.signature = repr(state)
-        return matches + view(state)
+        self.refresh()
+        if self.unreachable:
+            return matches + [self.unreachable_match()]
+        state = self.current()
+        return matches + (view(state) if state else [self.waiting_match()])
 
-    def snapshot(self):
-        return {
-            "messages": self.agent.messages(self.session),
-            "status": self.agent.status(self.session),
-            "permissions": self.agent.permissions(self.session),
-        }
+    def current(self):
+        """What the agent said last of the conversation `ai ›` shows, or None."""
+        if self.state and self.state[0] == self.session:
+            return self.state[1]
+        return None
+
+    def seen(self):
+        """What KRunner's matches are made of, to compare with what it was shown."""
+        if self.shown is None:
+            return None
+        if parse(self.shown)[0] == "list":
+            return repr((self.sessions, self.unreachable))
+        return repr((self.session, self.current(), self.problem, self.waiting, self.unreachable))
+
+    def refresh(self, start=True):
+        """Ask the agent for the conversation in the background; the tick shows what
+        changed. A stopped server starts again for KRunner's request (`start`), not for
+        the tick's."""
+        session = self.session
+        if not session:
+            return
+
+        def fetch():
+            if not start and (not self.agent.url or self.agent.stopped()):
+                return None
+            self.agent.add_services()
+            return {
+                "messages": self.agent.messages(session),
+                "status": self.agent.status(session),
+                "permissions": self.agent.permissions(session),
+            }
+
+        def fetched(state, error):
+            self.down = error is not None or state is None
+            self.unreachable = str(error) if error else ""
+            if state is not None:
+                self.state = (session, state)
+
+        self.work(fetch, fetched, "state")
 
     def run(self, match_id, action, menu=False):
         kind, _, arg = match_id.partition(SEP)
         self.last_activity = self.now()
-        try:
-            if kind in ("ask", "continue"):
-                self.problem = ""
+        if kind in ("ask", "continue"):
+            self.problem = ""
+            self.waiting = arg
+
+            def send():
                 if kind == "ask" or not self.session:
                     self.session = self.agent.new_session(arg[:60])
                 self.agent.add_services()
                 self.agent.ask(self.session, arg)
-                self.reopen(VIEW, menu)
-            elif kind == "session":
-                self.session = arg
-                self.reopen(VIEW, menu)
-            elif kind == "show":
-                self.reopen(VIEW, menu)
-            elif kind == "permission":
-                if action in REPLIES:
-                    self.agent.reply(arg, REPLIES[action])
-                self.reopen(self.view_query, menu)
-            elif kind == "answer" and self.session:
-                if action == "terminal":
-                    attach, env = self.agent.attach(self.session)
-                    self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env)
-                else:
-                    lines, error = answer_of(self.agent.messages(self.session))
-                    self.desktop.copy("\n".join(lines) or error)
-        except AgentError as e:
-            log(e)
-            self.problem = str(e)
+
+            def sent(_result, error):
+                self.waiting = ""
+                self.failed(None, error)
+
             self.reopen(VIEW, menu)
+            self.work(send, sent)
+        elif kind == "session":
+            self.session = arg
+            self.reopen(VIEW, menu)
+        elif kind == "show":
+            self.reopen(VIEW, menu)
+        elif kind == "permission":
+            if action in REPLIES:
+                state = self.current()
+                if state:  # answered: KRunner shows it again without it
+                    state["permissions"] = [p for p in state["permissions"] if p["id"] != arg]
+                self.work(lambda: self.agent.reply(arg, REPLIES[action]), self.failed)
+            self.reopen(self.view_query, menu)
+        elif kind == "answer" and self.session:
+            session = self.session
+            if action == "terminal":
+                def opened(found, error):
+                    if found:
+                        attach, env = found
+                        self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env)
+                    self.failed(None, error)
+
+                self.work(lambda: self.agent.attach(session), opened)
+            else:
+                def read(messages, error):
+                    if messages is not None:
+                        lines, stopped = answer_of(messages)
+                        self.desktop.copy("\n".join(lines) or stopped)
+                    self.failed(None, error)
+
+                self.work(lambda: self.agent.messages(session), read)
 
     def reopen(self, query, menu=False):
         """After a run, which closes KRunner, or the start menu (`menu`): open KRunner
@@ -807,27 +934,28 @@ class Kortex:
             self.closing_at = None
             return
         self.closing_at = None
-        self.viewing = False
+        self.shown = None
 
     def tick(self):
-        """Every REFRESH_MS: while KRunner shows the conversation and it changed, show
-        it again; while it is closed, notify of a new permission request."""
-        if not self.session or not self.agent.url or self.agent.stopped():
-            return  # a stopped server starts again on the next request from KRunner, not from here
-        self.agent.add_services()
-        try:
-            state = self.snapshot()
-        except AgentError as e:
-            log(e)
+        """Every REFRESH_MS: ask the agent for news; while KRunner shows kortex's matches
+        and what they are made of changed, show them again; while it is closed, notify
+        of a new permission request."""
+        self.refresh(start=False)
+        if self.shown is not None:
+            if self.seen() != self.signature:
+                self.signature = self.seen()
+                # KRunner asks again only for a query that differs from the one it shows:
+                # an invisible word joiner goes after `ai ›` or `ai `, or away again.
+                q = self.shown
+                if JOINER in q:
+                    q = q.replace(JOINER, "")
+                elif q.startswith(VIEW):
+                    q = VIEW + JOINER + q[len(VIEW):]
+                else:
+                    q = TRIGGER + " " + JOINER
+                self.desktop.query(q)
             return
-        if self.viewing:
-            if repr(state) != self.signature:
-                self.signature = repr(state)
-                q = self.view_query
-                q = q.replace(JOINER, "") if JOINER in q else VIEW + JOINER + q[len(VIEW):]
-                self.desktop.query(q)  # a query that differs, so KRunner asks again and gets the news
-            return
-        for p in state["permissions"]:
+        for p in (self.current() or {}).get("permissions", []):
             if p["id"] not in self.notified:
                 self.notified.add(p["id"])
                 # The body is markup to the notification server, as a multiline match is to KRunner.
@@ -835,16 +963,12 @@ class Kortex:
                 self.desktop.notify("The agent asks first", f"{what}\nOpen it with: ai ›")
 
     def idle(self):
-        """True when kortex may stop: nothing asked for a while and no request running."""
-        if self.now() - self.last_activity < IDLE_EXIT:
+        """True when kortex may stop: nothing asked for a while, nothing on its way to the
+        agent and no request of the conversation running there."""
+        if self.now() - self.last_activity < IDLE_EXIT or self.jobs:
             return False
-        if self.session and self.agent.url:
-            try:
-                if self.agent.status(self.session)[0] != "idle":
-                    return False
-            except AgentError:
-                pass
-        return True
+        state = self.current()
+        return self.down or not state or state["status"][0] == "idle"
 
 
 # ---- D-Bus -----------------------------------------------------------------------------
@@ -911,9 +1035,39 @@ def main():
                 dbus.Dictionary({}, signature="sv"), dbus.Int32(-1),
                 dbus_interface="org.freedesktop.Notifications", reply_handler=ignore, error_handler=logged)
 
+    class Worker:
+        """The thread that makes every request to the agent, one after another, so the
+        D-Bus loop answers KRunner at once however long the agent takes (Hermes' gateway
+        can take a minute to start). What a request brings goes back to the loop."""
+
+        def __init__(self):
+            self.jobs = queue.SimpleQueue()
+            threading.Thread(target=self.serve, daemon=True).start()
+
+        def __call__(self, work, then):
+            self.jobs.put((work, then))
+
+        def serve(self):
+            while True:
+                work, then = self.jobs.get()
+                try:
+                    result, error = work(), None
+                except AgentError as e:
+                    result, error = None, e
+                except Exception as e:  # noqa: BLE001 - the thread must outlive any job
+                    result, error = None, AgentError(repr(e))
+                GLib.idle_add(hand_back, then, result, error)
+
+    def hand_back(then, result, error):
+        try:
+            then(result, error)
+        except Exception as e:  # noqa: BLE001 - a callback that raises would be called again
+            log(f"after a request: {e!r}")
+        return False
+
     chosen = agent_name()
     agent = Hermes.from_environment() if chosen == "hermes" else Opencode.from_environment()
-    kortex = Kortex(agent, Desktop())
+    kortex = Kortex(agent, Desktop(), background=Worker())
 
     def to_dbus(m):
         match_id, text, icon, relevance, props = m
