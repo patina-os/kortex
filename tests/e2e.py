@@ -136,7 +136,12 @@ def main(agent):
         assert str(matches[0][0]) == "ask" + SEP + request, matches
         print("e2e: ask match ok")
 
-        k.Run("ask" + SEP + request, "", timeout=60)
+        # The agent's server starts with this request (Hermes' takes up to a minute), in
+        # kortex's worker thread: KRunner's calls are answered meanwhile, at once.
+        k.Run("ask" + SEP + request, "", timeout=5)
+        waiting = k.Match("ai ›", timeout=5)
+        assert [str(m[0]) for m in waiting] == ["waiting"], waiting
+        print("e2e: KRunner gets an answer at once while the agent starts")
         wait_for("KRunner reopened on the conversation", lambda: "kortex\tai ›" in record.read_text(), 10)
         print("e2e: KRunner reopened on the conversation")
 
@@ -164,8 +169,9 @@ def main(agent):
         assert "permission" not in " ".join(str(m[0]) for m in k.Match("ai ›"))
         print("e2e: allowed once, the file is there, the answer reads:", repr(str(done[1])))
 
-        listed = k.Match("ai", timeout=30)
-        assert any(str(m[0]).startswith("session" + SEP) for m in listed), listed
+        # The first `ai` shows what kortex has; the list arrives a moment later.
+        wait_for("ai to list the conversation",
+                 lambda: any(str(m[0]).startswith("session" + SEP) for m in k.Match("ai", timeout=5)), 30)
         print("e2e: ai lists the conversation")
 
         # A service connected while the server runs, as `patina ai connect` does it: the
