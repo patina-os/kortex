@@ -36,13 +36,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
 RUNNER_ID = "kortex"  # X-KDE-PluginInfo-Name in kortex.desktop
 TRIGGER = "ai"
-VIEW = "ai ›"  # the query that shows the current conversation
+VIEW_MARK = "›"
+VIEW = TRIGGER + " " + VIEW_MARK  # the query that shows the current conversation
 # KRunner asks again only for a query that differs from the one it shows, so a refresh
 # puts an invisible word joiner after the marker, or takes it away again.
 JOINER = "\u2060"
@@ -76,6 +77,12 @@ def log(*words):
 
 class AgentError(Exception):
     """The agent is missing, did not start, or did not answer."""
+
+
+def http_status(error):
+    """The HTTP status the agent answered a failed request with, or None."""
+    cause = error.__cause__
+    return cause.code if isinstance(cause, urllib.error.HTTPError) else None
 
 
 def config_dir():
@@ -354,7 +361,7 @@ class Opencode(Server):
         try:
             found = self.request("GET", "/permission")
         except AgentError as e:
-            if not (isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 400):
+            if http_status(e) != 400:
                 raise
             with self.lock:
                 found = list(self.asked.values())
@@ -363,7 +370,11 @@ class Opencode(Server):
         return [p for p in found if p.get("sessionID") == session]
 
     def reply(self, request_id, reply):
-        self.request("POST", f"/permission/{request_id}/reply", {"reply": reply})
+        try:
+            self.request("POST", f"/permission/{request_id}/reply", {"reply": reply})
+        except AgentError as e:
+            if http_status(e) != 404:  # 404: answered already, in the terminal say
+                raise
 
     def sessions(self, limit):
         found = self.request("GET", f"/session?roots=true&limit={limit}")
@@ -456,7 +467,7 @@ class Hermes(Server):
         try:
             return self.request("GET", f"/v1/runs/{run}")
         except AgentError as e:
-            if isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 404:
+            if http_status(e) == 404:
                 return {}
             raise
 
@@ -473,11 +484,20 @@ class Hermes(Server):
             return [p for p in self.asked.values() if p["sessionID"] == session]
 
     def reply(self, request_id, reply):
+        """The request is kept until Hermes has the answer, so one that did not reach it
+        is shown again and can be answered again."""
         with self.lock:
-            asked = self.asked.pop(request_id, None)
-        if asked:
+            asked = self.asked.get(request_id)
+        if not asked:
+            return
+        try:
             self.request("POST", f"/v1/runs/{asked['run']}/approval",
                          {"request_id": request_id, "choice": HERMES_CHOICES[reply]})
+        except AgentError as e:
+            if http_status(e) != 404:  # 404: the run is over, nothing waits for the answer
+                raise
+        with self.lock:
+            self.asked.pop(request_id, None)
 
     def sessions(self, limit):
         found = self.request("GET", f"/api/sessions?limit={limit}").get("data") or []
@@ -546,13 +566,15 @@ def parse(query):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
     follow-up, or (None, "") for a query that is not kortex's."""
     q = query.replace(JOINER, "").strip()
-    if q.startswith(VIEW):
-        return "view", q[len(VIEW):].strip()
     if q.lower() == TRIGGER:
         return "list", ""
-    if q[:len(TRIGGER) + 1].lower() == TRIGGER + " ":
-        return "ask", q[len(TRIGGER) + 1:].strip()
-    return None, ""
+    # KRunner sends anything its MatchRegex lets through: `AI`, and a tab after it too.
+    if q[:len(TRIGGER)].lower() != TRIGGER or not q[len(TRIGGER)].isspace():
+        return None, ""
+    rest = q[len(TRIGGER):].strip()
+    if rest.startswith(VIEW_MARK):
+        return "view", rest[len(VIEW_MARK):].strip()
+    return "ask", rest
 
 
 def tool_line(part):
@@ -947,10 +969,11 @@ class Kortex:
                 # KRunner asks again only for a query that differs from the one it shows:
                 # an invisible word joiner goes after `ai ›` or `ai `, or away again.
                 q = self.shown
+                kind, followup = parse(q)
                 if JOINER in q:
                     q = q.replace(JOINER, "")
-                elif q.startswith(VIEW):
-                    q = VIEW + JOINER + q[len(VIEW):]
+                elif kind == "view":  # typed `AI ›` too
+                    q = VIEW + JOINER + (" " + followup if followup else "")
                 else:
                     q = TRIGGER + " " + JOINER
                 self.desktop.query(q)
