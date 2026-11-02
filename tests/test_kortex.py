@@ -176,6 +176,13 @@ class Parse(unittest.TestCase):
         self.assertEqual(kortex.parse("aircraft"), (None, ""))
         self.assertEqual(kortex.parse("firefox"), (None, ""))
 
+    def test_what_krunner_lets_through(self):
+        # MatchRegex is (?i)^ai(\s|$): capitals and a tab reach kortex too.
+        self.assertEqual(kortex.parse("AI ›"), ("view", ""))
+        self.assertEqual(kortex.parse("Ai › and y"), ("view", "and y"))
+        self.assertEqual(kortex.parse("ai\tfix my wifi"), ("ask", "fix my wifi"))
+        self.assertEqual(kortex.parse("ai\t›"), ("view", ""))
+        self.assertEqual(kortex.parse("ai ›" + kortex.JOINER), ("view", ""))
 
 
 class Answer(unittest.TestCase):
@@ -784,3 +791,12 @@ class Replies(unittest.TestCase):
             h.reply("req_2", "reject")
         sent.assert_called_once_with("POST", "/v1/runs/run_2/approval", {"request_id": "req_2", "choice": "deny"})
         self.assertEqual(h.asked, {})
+
+    def test_the_view_typed_in_capitals_is_shown_again_as_the_view(self):
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "x", "")
+        k.match("AI ›")
+        oc.history = [user("x"), assistant(text("news"))]
+        k.tick()
+        self.assertEqual(kortex.parse(desk.queries[-1]), ("view", ""))
+        self.assertEqual(desk.queries[-1], "ai ›" + kortex.JOINER)

@@ -42,7 +42,8 @@ OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
 RUNNER_ID = "kortex"  # X-KDE-PluginInfo-Name in kortex.desktop
 TRIGGER = "ai"
-VIEW = "ai ›"  # the query that shows the current conversation
+VIEW_MARK = "›"
+VIEW = TRIGGER + " " + VIEW_MARK  # the query that shows the current conversation
 # KRunner asks again only for a query that differs from the one it shows, so a refresh
 # puts an invisible word joiner after the marker, or takes it away again.
 JOINER = "\u2060"
@@ -565,13 +566,15 @@ def parse(query):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
     follow-up, or (None, "") for a query that is not kortex's."""
     q = query.replace(JOINER, "").strip()
-    if q.startswith(VIEW):
-        return "view", q[len(VIEW):].strip()
     if q.lower() == TRIGGER:
         return "list", ""
-    if q[:len(TRIGGER) + 1].lower() == TRIGGER + " ":
-        return "ask", q[len(TRIGGER) + 1:].strip()
-    return None, ""
+    # KRunner sends anything its MatchRegex lets through: `AI`, and a tab after it too.
+    if q[:len(TRIGGER)].lower() != TRIGGER or not q[len(TRIGGER)].isspace():
+        return None, ""
+    rest = q[len(TRIGGER):].strip()
+    if rest.startswith(VIEW_MARK):
+        return "view", rest[len(VIEW_MARK):].strip()
+    return "ask", rest
 
 
 def tool_line(part):
@@ -966,10 +969,11 @@ class Kortex:
                 # KRunner asks again only for a query that differs from the one it shows:
                 # an invisible word joiner goes after `ai ›` or `ai `, or away again.
                 q = self.shown
+                kind, followup = parse(q)
                 if JOINER in q:
                     q = q.replace(JOINER, "")
-                elif q.startswith(VIEW):
-                    q = VIEW + JOINER + q[len(VIEW):]
+                elif kind == "view":  # typed `AI ›` too
+                    q = VIEW + JOINER + (" " + followup if followup else "")
                 else:
                     q = TRIGGER + " " + JOINER
                 self.desktop.query(q)
