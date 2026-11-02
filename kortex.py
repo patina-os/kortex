@@ -78,6 +78,12 @@ class AgentError(Exception):
     """The agent is missing, did not start, or did not answer."""
 
 
+def http_status(error):
+    """The HTTP status the agent answered a failed request with, or None."""
+    cause = error.__cause__
+    return cause.code if isinstance(cause, urllib.error.HTTPError) else None
+
+
 def config_dir():
     return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "kortex"
 
@@ -354,7 +360,7 @@ class Opencode(Server):
         try:
             found = self.request("GET", "/permission")
         except AgentError as e:
-            if not (isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 400):
+            if http_status(e) != 400:
                 raise
             with self.lock:
                 found = list(self.asked.values())
@@ -363,7 +369,11 @@ class Opencode(Server):
         return [p for p in found if p.get("sessionID") == session]
 
     def reply(self, request_id, reply):
-        self.request("POST", f"/permission/{request_id}/reply", {"reply": reply})
+        try:
+            self.request("POST", f"/permission/{request_id}/reply", {"reply": reply})
+        except AgentError as e:
+            if http_status(e) != 404:  # 404: answered already, in the terminal say
+                raise
 
     def sessions(self, limit):
         found = self.request("GET", f"/session?roots=true&limit={limit}")
@@ -456,7 +466,7 @@ class Hermes(Server):
         try:
             return self.request("GET", f"/v1/runs/{run}")
         except AgentError as e:
-            if isinstance(e.__cause__, urllib.error.HTTPError) and e.__cause__.code == 404:
+            if http_status(e) == 404:
                 return {}
             raise
 
@@ -473,11 +483,20 @@ class Hermes(Server):
             return [p for p in self.asked.values() if p["sessionID"] == session]
 
     def reply(self, request_id, reply):
+        """The request is kept until Hermes has the answer, so one that did not reach it
+        is shown again and can be answered again."""
         with self.lock:
-            asked = self.asked.pop(request_id, None)
-        if asked:
+            asked = self.asked.get(request_id)
+        if not asked:
+            return
+        try:
             self.request("POST", f"/v1/runs/{asked['run']}/approval",
                          {"request_id": request_id, "choice": HERMES_CHOICES[reply]})
+        except AgentError as e:
+            if http_status(e) != 404:  # 404: the run is over, nothing waits for the answer
+                raise
+        with self.lock:
+            self.asked.pop(request_id, None)
 
     def sessions(self, limit):
         found = self.request("GET", f"/api/sessions?limit={limit}").get("data") or []

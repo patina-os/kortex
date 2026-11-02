@@ -177,6 +177,7 @@ class Parse(unittest.TestCase):
         self.assertEqual(kortex.parse("firefox"), (None, ""))
 
 
+
 class Answer(unittest.TestCase):
     def test_reply_to_the_last_request_only(self):
         history = [user("first"), assistant(text("old answer")), user("second"),
@@ -748,3 +749,38 @@ class Files(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def http_error(code):
+    """A request that fails as the agent's server answers with `code`."""
+    def request(method, path, *_args, **_kwargs):
+        cause = kortex.urllib.error.HTTPError("http://127.0.0.1:1" + path, code, "x", {}, None)
+        raise kortex.AgentError(f"{method} {path}: {cause}") from cause
+    return request
+
+
+class Replies(unittest.TestCase):
+    """An answer to a permission request that the agent no longer waits for is no error;
+    one that did not reach the agent can be given again."""
+
+    def test_opencode_takes_404_as_answered(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+        with mock.patch.object(oc, "request", http_error(404)):
+            oc.reply("per_1", "once")  # answered in the terminal already
+        with mock.patch.object(oc, "request", http_error(500)), self.assertRaises(kortex.AgentError):
+            oc.reply("per_1", "once")
+
+    def test_hermes_keeps_a_request_until_the_answer_arrives(self):
+        h = kortex.Hermes("http://127.0.0.1:8642", "key")
+        h.asked = {"req_1": {"id": "req_1", "run": "run_1", "sessionID": "ses_1"}}
+        with mock.patch.object(h, "request", http_error(502)), self.assertRaises(kortex.AgentError):
+            h.reply("req_1", "once")
+        self.assertIn("req_1", h.asked)  # shown again, to be answered again
+        with mock.patch.object(h, "request", http_error(404)):
+            h.reply("req_1", "once")  # the run is over
+        self.assertEqual(h.asked, {})
+        h.asked = {"req_2": {"id": "req_2", "run": "run_2", "sessionID": "ses_1"}}
+        with mock.patch.object(h, "request", return_value={}) as sent:
+            h.reply("req_2", "reject")
+        sent.assert_called_once_with("POST", "/v1/runs/run_2/approval", {"request_id": "req_2", "choice": "deny"})
+        self.assertEqual(h.asked, {})
