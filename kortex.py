@@ -53,7 +53,7 @@ MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
 CATEGORY_RELEVANCE = 100  # KRunner::QueryMatch::CategoryRelevance::Highest
-CATEGORY_LOWEST = 0  # ::Lowest, for "Ask the agent" below what the start menu finds
+CATEGORY_LOWEST = 0  # ::Lowest, for "Ask opencode" below what the start menu finds
 
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
 ACTIONS = [
@@ -269,6 +269,8 @@ class Opencode(Server):
     """opencode's HTTP server (`opencode serve`). KORTEX_OPENCODE_URL names one that runs
     already."""
 
+    title = "opencode"  # the name the matches ask by: "Ask opencode"
+
     @classmethod
     def from_environment(cls):
         url = os.environ.get("KORTEX_OPENCODE_URL")
@@ -388,6 +390,7 @@ class Hermes(Server):
     already. Hermes asks before a command it counts as dangerous, not before every
     change; the request comes on the run's event stream."""
 
+    title = "Hermes"
     DONE = ("completed", "failed", "cancelled", "interrupted", "stopped")
 
     def __init__(self, url=None, password=None):
@@ -784,7 +787,7 @@ class Kortex:
     def ask_matches(self, text):
         if not text:
             return [self.hint()]
-        matches = [match("ask" + SEP + text, text, ICON, 1.0, "Ask the agent · Enter")]
+        matches = [match("ask" + SEP + text, text, ICON, 1.0, f"Ask {self.agent.title} · Enter")]
         if self.session:
             matches.append(match("continue" + SEP + text, text, ICON, 0.9, "Continue the conversation"))
         return matches
@@ -808,7 +811,7 @@ class Kortex:
         return matches
 
     def hint(self):
-        return match("hint", "Ask the agent: type ai and your request", ICON, 1.0,
+        return match("hint", f"Ask {self.agent.title}: type ai and your request", ICON, 1.0,
                      "ai › shows the current conversation")
 
     def waiting_match(self):
@@ -819,10 +822,12 @@ class Kortex:
         return match("problem", "The agent is not reachable", "dialog-error", 1.0, self.unreachable)
 
     def anything(self, query):
-        """Any search in the start menu, offered to the agent below what Plasma finds."""
+        """Any search in the start menu, offered to the agent below what Plasma finds, by
+        its name: "Ask opencode: …" reads as something to press."""
         text = query.strip()
-        return match("ask" + SEP + text, "Ask the agent: " + text, ICON, 0.1,
-                     "Search, ask, fix · the agent answers in the command palette", category=CATEGORY_LOWEST)
+        return match("ask" + SEP + text, f"Ask {self.agent.title}: {text}", ICON, 0.1,
+                     f"Search, ask, fix · {self.agent.title} answers in the command palette",
+                     category=CATEGORY_LOWEST)
 
     def menu_view_matches(self, followup):
         """`ai ›` in the start menu, which shows neither the answer nor its actions: the
