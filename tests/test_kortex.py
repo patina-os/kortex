@@ -34,6 +34,8 @@ def tool(name, status="completed", **given):
 
 
 class FakeOpencode:
+    title = "opencode"
+
     def __init__(self):
         self.url = "http://127.0.0.1:4096"
         self.password = "secret"
@@ -271,13 +273,20 @@ class Runner(unittest.TestCase):
         self.assertIn("MatchRegex", k.config())
         [m] = k.match("fix my wifi ", menu=True)
         self.assertEqual(m[0], "ask" + SEP + "fix my wifi")
-        self.assertEqual(m[1], "Ask the agent: fix my wifi")
+        self.assertEqual(m[1], "Ask opencode: fix my wifi")
+        self.assertIn("opencode answers", m[4]["subtext"])
         self.assertEqual(m[4]["category"], kortex.CATEGORY_LOWEST)
         self.assertEqual(k.match("ai hello", menu=True)[0][0], "ask" + SEP + "hello")
         oc.fail = None
         k.run(m[0], "")
         self.assertEqual(oc.asked, [("ses_1", "fix my wifi")])
         self.assertEqual(desk.queries, ["ai ›"])
+
+    def test_the_rows_ask_by_the_agents_name(self):
+        k = kortex.Kortex(kortex.Hermes("http://127.0.0.1:1", "key"), FakeDesktop())
+        self.assertEqual(k.match("fix my wifi", menu=True)[0][1], "Ask Hermes: fix my wifi")
+        self.assertEqual(k.ask_matches("hello")[0][4]["subtext"], "Ask Hermes · Enter")
+        self.assertEqual(k.ask_matches("")[0][1], "Ask Hermes: type ai and your request")
 
     def test_the_start_menu_opens_the_conversation_in_the_palette(self):
         k, oc, desk, _ = new()
