@@ -12,10 +12,11 @@ you allow it, writes code and works on your servers. kortex is the palette end o
 agent; the agent itself is [opencode](https://opencode.ai) or
 [Hermes Agent](https://github.com/NousResearch/hermes-agent), running on your machine.
 
-Status: 0.3.3. `AI ›` and a tab after `ai` work as `ai ›` and a space do, and an
-answer to a request the agent no longer waits for is no error. Since 0.3.2 KRunner
-never waits for the agent, which can take a minute to start: kortex asks it from a
-thread of its own and shows "Waiting for the agent…" meanwhile.
+Status: 0.3.4. The rows that ask call the agent by its name: "Ask opencode: …" or
+"Ask Hermes: …". Since 0.3.3 `AI ›` and a tab after `ai` work as `ai ›` and a space
+do, and an answer to a request the agent no longer waits for is no error. Since 0.3.2
+KRunner never waits for the agent, which can take a minute to start: kortex asks it
+from a thread of its own and shows "Waiting for the agent…" meanwhile.
 Since 0.3.1 the Allow row shows the whole command as it will run, and what Always
 would let through. Since 0.3.0 any search in Plasma's start menu ends with "Ask the
 agent: …", which opens the conversation in KRunner; since 0.2.0 Hermes Agent is the
