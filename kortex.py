@@ -2,12 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """kortex: the AI agent in KDE Plasma's command palette.
 
-A KRunner D-Bus runner (org.kde.krunner1). In KRunner, `ai <request>` asks the agent,
-`ai` alone lists the recent conversations and `ai ›` shows the current one: the
-answer as it grows, and every action the agent wants to take as a match of its own
-with Allow once, Always and Deny. Plasma's start menu searches with the same runners
-but shows neither the answer nor those actions, so there any search ends with "Ask the
-agent", and the conversation opens in KRunner. The agent is opencode or Hermes Agent
+A KRunner D-Bus runner (org.kde.krunner1). Any search in KRunner or Plasma's start menu
+ends with "Ask opencode: …" (first when it reads as a question), `ai <request>` asks at
+once, `ai` alone lists the recent conversations, and `opencode ›` (the agent's name and
+the marker; `ai ›` too) shows the current one: the answer as it grows, what the agent
+thinks meanwhile, and every action the agent wants to take as a match of its own with
+Allow once, Always and Deny. The start menu shows neither the answer nor those actions,
+so the conversation opens in KRunner. While KRunner is closed, a notification follows
+the request until the agent answers. The agent is opencode or Hermes Agent
 (~/.config/kortex/agent, KORTEX_AGENT): kortex starts its server (`opencode serve`,
 `hermes gateway run`) on 127.0.0.1 when it is first needed and talks to its HTTP API
 from a thread of its own, so KRunner never waits for the agent.
@@ -36,24 +38,38 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.3.4"
+VERSION = "0.4.0"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
 RUNNER_ID = "kortex"  # X-KDE-PluginInfo-Name in kortex.desktop
 TRIGGER = "ai"
-VIEW_MARK = "›"
-VIEW = TRIGGER + " " + VIEW_MARK  # the query that shows the current conversation
+VIEW_MARK = "›"  # after the agent's name (`opencode ›`), or `ai`: the current conversation
 # KRunner asks again only for a query that differs from the one it shows, so a refresh
 # puts an invisible word joiner after the marker, or takes it away again.
 JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
+MAX_THOUGHT = 200  # characters of what the agent thinks, shown below its answer meanwhile
+MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
+TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
 CATEGORY_RELEVANCE = 100  # KRunner::QueryMatch::CategoryRelevance::Highest
-CATEGORY_LOWEST = 0  # ::Lowest, for "Ask opencode" below what the start menu finds
+CATEGORY_LOWEST = 0  # ::Lowest, for "Ask opencode" below what a search finds
+# A search that starts with one of these and has three words or more reads as a request
+# to the agent, and so does one that ends with a question mark: "Ask opencode" comes
+# first then. English and German, the words a question or a request starts with.
+ASKING = frozenset({
+    "how", "why", "what", "what's", "whats", "when", "where", "who", "which", "can",
+    "could", "would", "should", "is", "are", "do", "does", "did", "explain", "help", "fix",
+    "make", "write", "install", "set", "change", "show", "tell", "wie", "warum", "wieso",
+    "weshalb", "was", "wann", "wo", "wer", "welche", "welcher", "welches", "kann",
+    "kannst", "könnte", "sollte", "ist", "sind", "gibt", "erkläre", "erklär", "hilf",
+    "mach", "mache", "schreib", "schreibe", "installiere", "zeig", "zeige", "ändere",
+    "stell",
+})
 
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
 ACTIONS = [
@@ -565,19 +581,29 @@ def hermes_messages(found, run):
 # ---- what the palette shows: plain functions of opencode's data ------------------------
 
 
-def parse(query):
+def parse(query, name=TRIGGER):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
-    follow-up, or (None, "") for a query that is not kortex's."""
+    follow-up after `<name> ›` or `ai ›`, or (None, "") for any other search. `name` is
+    the agent's, as the matches call it; any case, and a tab, are read as typed."""
     q = query.replace(JOINER, "").strip()
     if q.lower() == TRIGGER:
         return "list", ""
-    # KRunner sends anything its MatchRegex lets through: `AI`, and a tab after it too.
-    if q[:len(TRIGGER)].lower() != TRIGGER or not q[len(TRIGGER)].isspace():
+    for word in dict.fromkeys((name, TRIGGER)):
+        head, rest = q[:len(word)], q[len(word):]
+        # `opencode ›`, `opencode›`, not `opencodex ›`
+        if head.lower() == word.lower() and rest.lstrip().startswith(VIEW_MARK) and not rest[:1].isalnum():
+            return "view", rest.lstrip()[len(VIEW_MARK):].strip()
+    if q[:len(TRIGGER)].lower() != TRIGGER or not q[len(TRIGGER):][:1].isspace():
         return None, ""
-    rest = q[len(TRIGGER):].strip()
-    if rest.startswith(VIEW_MARK):
-        return "view", rest[len(VIEW_MARK):].strip()
-    return "ask", rest
+    return "ask", q[len(TRIGGER):].strip()
+
+
+def asking(text):
+    """True when a search reads as a request to the agent rather than a search: it ends
+    with a question mark, or it has three words or more and starts with a question or a
+    request (ASKING)."""
+    words = text.lower().split()
+    return text.rstrip().endswith("?") or (len(words) >= 3 and words[0].strip(",.:!") in ASKING)
 
 
 def tool_line(part):
@@ -590,12 +616,15 @@ def tool_line(part):
     return line
 
 
+def last_user(messages):
+    return max((i for i, m in enumerate(messages) if m["info"].get("role") == "user"), default=-1)
+
+
 def answer_of(messages):
     """The agent's reply to the last request, as lines in order (its text and one line
     per tool it used), and the error that stopped it, if one did."""
-    last_user = max((i for i, m in enumerate(messages) if m["info"].get("role") == "user"), default=-1)
     lines, error = [], ""
-    for message in messages[last_user + 1:]:
+    for message in messages[last_user(messages) + 1:]:
         info = message["info"]
         if info.get("role") != "assistant":
             continue
@@ -611,16 +640,50 @@ def answer_of(messages):
     return lines, error
 
 
-def shorten(text):
-    return text if len(text) <= MAX_ANSWER else "…" + text[-MAX_ANSWER:]
+def thinking_of(messages):
+    """What the agent thinks right now, on one line: its reasoning while that is the last
+    thing it wrote of its reply (a reasoning model thinks before it answers), else ""."""
+    parts = [p for m in messages[last_user(messages) + 1:] if m["info"].get("role") == "assistant"
+             for p in m.get("parts", []) if p.get("type") in ("text", "reasoning", "tool")]
+    if parts and parts[-1]["type"] == "reasoning":
+        return " ".join(parts[-1].get("text", "").split())
+    return ""
+
+
+def replied(messages, request):
+    """True when the agent has replied to `request`: it is the last request the
+    conversation has (in what the agent stored of it, which may hold more), and a reply of
+    the agent follows it."""
+    i = last_user(messages)
+    if i < 0 or not any(m["info"].get("role") == "assistant" for m in messages[i + 1:]):
+        return False
+    said = " ".join(p.get("text", "") for p in messages[i].get("parts", [])
+                    if p.get("type") == "text" and not p.get("synthetic"))
+    return request.strip() in said
+
+
+def shorten(text, most=MAX_ANSWER):
+    return text if len(text) <= most else "…" + text[-most:]
+
+
+def seconds(elapsed):
+    """How long the agent has been at it, as the palette says it."""
+    s = int(elapsed)
+    return f"{s} s" if s < 60 else f"{s // 60} min {s % 60} s"
+
+
+def markup(text):
+    """Text as KRunner's styled text (HTML), where `<x ...>` would vanish and a line break
+    would be a space."""
+    return html.escape(text, quote=False).replace("\n", "<br>")
 
 
 def match(match_id, text, icon=ICON, relevance=1.0, subtext="", actions=(), multiline=False,
-          category=CATEGORY_RELEVANCE):
-    """One match. KRunner shows a multiline one as styled text (HTML), where `<x ...>`
-    would vanish and a line break would be a space, so its text goes as escaped HTML."""
-    if multiline:
-        text = html.escape(text, quote=False).replace("\n", "<br>")
+          category=CATEGORY_RELEVANCE, styled=False):
+    """One match. KRunner shows a multiline one as styled text, so its text goes as
+    escaped HTML, unless it is that already (`styled`)."""
+    if multiline and not styled:
+        text = markup(text)
     return (match_id, text, icon, relevance,
             {"subtext": subtext, "actions": list(actions), "multiline": multiline, "category": category})
 
@@ -634,8 +697,10 @@ def asked_for(p):
     return ", ".join(p.get("patterns") or []) or p.get("permission", "")
 
 
-def view(state):
-    """The matches of `ai ›`: what the agent asks to do first, then its answer."""
+def view(state, elapsed=None):
+    """The matches of the conversation (`opencode ›`): what the agent asks to do first,
+    then its answer, with what it thinks meanwhile and how long it has been at it
+    (`elapsed`, seconds, or None)."""
     lines, error = answer_of(state["messages"])
     matches = []
     for p in state["permissions"]:
@@ -657,10 +722,14 @@ def view(state):
     if body or status != "idle":
         subtext = "Copy · Open in terminal"
         if status == "busy":
-            subtext = "Working… · " + subtext
+            subtext = "Working… " + (seconds(elapsed) + " · " if elapsed is not None else "· ") + subtext
         elif status == "retry":
             subtext = f"Retrying: {retry} · " + subtext
-        matches.append(match("answer", shorten(body or "Thinking…"), ICON, 0.9, subtext, ["copy", "terminal"], True))
+        text = markup(shorten(body or "Thinking…"))
+        thought = thinking_of(state["messages"]) if status != "idle" else ""
+        if thought:  # in italics below the answer, so it reads as the agent's thoughts
+            text += "<br><i>" + markup(shorten(thought, MAX_THOUGHT)) + "</i>"
+        matches.append(match("answer", text, ICON, 0.9, subtext, ["copy", "terminal"], True, styled=True))
     return matches
 
 
@@ -707,14 +776,18 @@ class Kortex:
     and a match shows what the agent said last. A request still on its way, or an agent
     that starts (Hermes can take a minute), shows as a waiting row, and the tick shows
     KRunner again when there is news. Only `background`'s jobs call the agent, and only
-    they set `session` while a request is sent, in the order they were made."""
+    they set `session` while a request is sent, in the order they were made.
+
+    The request the user made last is followed until the agent has replied (`asked_at`,
+    `request`): the palette says how long it has been at it, and while KRunner is closed
+    one notification says that the agent works on it, then what it answered."""
 
     def __init__(self, agent, desktop, now=time.monotonic, background=at_once):
         self.agent = agent
         self.desktop = desktop
         self.now = now
         self.background = background
-        self.session = None  # the conversation `ai ›` shows
+        self.session = None  # the conversation `opencode ›` shows
         self.state = None  # (session, what the agent said of it last)
         self.sessions = None  # the recent conversations, as the agent listed them last
         self.down = False  # the last request found no server, or none that answered
@@ -723,17 +796,38 @@ class Kortex:
         self.jobs = 0  # requests in the background
         self.fetching = set()  # what is being fetched, once at a time
         self.shown = None  # the query of kortex's matches KRunner shows, or None
-        self.view_query = VIEW
+        self.view_query = self.marker
         self.closing_at = None  # when a run closed KRunner that `reopen` reopens
         self.signature = None  # what KRunner was shown, to compare with what is known now
-        self.notified = set()
+        self.notified = set()  # the permission requests told of in a notification
+        self.logged = set()  # and in the journal
         self.problem = ""
         self.last_activity = now()
+        self.request = ""  # the request followed until the agent has replied to it
+        self.asked_at = None  # when it was made; None once the agent has replied
+        self.told = 0  # the notification that follows it, once there is one
+        self.followed = False  # KRunner showed the news of it once (logged once)
+        self.shows = set()  # the notifications whose Show opens the conversation
+
+    @property
+    def marker(self):
+        """The query that shows the current conversation: the agent's name and ›."""
+        return f"{self.agent.title} {VIEW_MARK}"
+
+    def parse(self, query):
+        return parse(query, self.agent.title)
 
     @property
     def viewing(self):
-        """KRunner shows `ai ›` right now."""
-        return self.shown is not None and parse(self.shown)[0] == "view"
+        """KRunner shows the conversation right now."""
+        return self.shown is not None and self.parse(self.shown)[0] == "view"
+
+    def elapsed(self):
+        """Seconds since the request followed was made, while the agent is at it and asks
+        for nothing (a waiting Allow row must hold still to be clicked), else None."""
+        if self.asked_at is None or (self.current() or {}).get("permissions"):
+            return None
+        return int(self.now() - self.asked_at)
 
     def work(self, job, then, key=None):
         """Run `job`, requests to the agent, in the background; `then(result, error)` gets
@@ -758,21 +852,24 @@ class Kortex:
             self.problem = str(error)
 
     def config(self, menu=False):
-        # Each program that searches asks for this once: the start menu (`menu`) sends
-        # every query, so any search there can go to the agent; KRunner only `ai` ones.
-        if menu:
-            return {"MinLetterCount": 3}
-        return {"MatchRegex": r"(?i)^ai(\s|$)", "MinLetterCount": 2}
+        # Each program that searches asks for this once. Both send every query, so any
+        # search can go to the agent; KRunner from two letters, for `ai`.
+        return {"MinLetterCount": MIN_SEARCH if menu else len(TRIGGER)}
 
     def match(self, query, menu=False):
-        kind, text = parse(query)
+        kind, text = self.parse(query)
         if kind is None:
-            return [self.anything(query)] if menu and query.strip() else []
+            if not menu:
+                self.shown = None  # another search: nothing of kortex's to keep current
+            return self.anything(query)
         self.last_activity = self.now()
         if menu:
             if kind == "ask":
                 return self.ask_matches(text)
             return self.list_matches(menu) if kind == "list" else self.menu_view_matches(text)
+        if JOINER in query and not self.followed and self.asked_at is not None:
+            self.followed = True
+            log("KRunner asked again: the palette follows the conversation")
         self.shown = query.strip() if kind != "ask" else None
         if kind == "ask":
             matches = self.ask_matches(text)
@@ -811,27 +908,38 @@ class Kortex:
         return matches
 
     def hint(self):
-        return match("hint", f"Ask {self.agent.title}: type ai and your request", ICON, 1.0,
-                     "ai › shows the current conversation")
+        return match("hint", f"Ask {self.agent.title}: type your request", ICON, 1.0,
+                     f"{self.marker} shows the current conversation")
 
     def waiting_match(self):
-        return match("waiting", "Waiting for the agent…", ICON, 0.9,
+        elapsed = self.elapsed() if self.waiting else None
+        return match("waiting", "Waiting for the agent…" + (f" {seconds(elapsed)}" if elapsed else ""), ICON, 0.9,
                      "It starts with the first request, which can take a minute")
 
     def unreachable_match(self):
         return match("problem", "The agent is not reachable", "dialog-error", 1.0, self.unreachable)
 
     def anything(self, query):
-        """Any search in the start menu, offered to the agent below what Plasma finds, by
-        its name: "Ask opencode: …" reads as something to press."""
-        text = query.strip()
-        return match("ask" + SEP + text, f"Ask {self.agent.title}: {text}", ICON, 0.1,
-                     f"Search, ask, fix · {self.agent.title} answers in the command palette",
-                     category=CATEGORY_LOWEST)
+        """Any search, offered to the agent by its name ("Ask opencode: …" reads as
+        something to press): below what Plasma finds, or first when it reads as a
+        question or a request, with a conversation to continue then too."""
+        text = query.replace(JOINER, "").strip()
+        if len(text) < MIN_SEARCH:
+            return []
+        title = self.agent.title
+        if not asking(text):
+            return [match("ask" + SEP + text, f"Ask {title}: {text}", ICON, 0.1,
+                          f"Search, ask, fix · {title} answers in the command palette", category=CATEGORY_LOWEST)]
+        matches = [match("ask" + SEP + text, f"Ask {title}: {text}", ICON, 1.0,
+                         f"A new conversation · {title} answers in the command palette · Enter")]
+        if self.session:
+            matches.append(match("continue" + SEP + text, f"Continue with {title}: {text}", ICON, 0.9,
+                                 "The current conversation"))
+        return matches
 
     def menu_view_matches(self, followup):
-        """`ai ›` in the start menu, which shows neither the answer nor its actions: the
-        conversation opens in KRunner instead."""
+        """The conversation (`opencode ›`) in the start menu, which shows neither the
+        answer nor its actions: the conversation opens in KRunner instead."""
         matches = []
         if followup:
             matches.append(match("continue" + SEP + followup, followup, ICON, 1.0, "Continue the conversation · Enter"))
@@ -853,10 +961,10 @@ class Kortex:
         if self.unreachable:
             return matches + [self.unreachable_match()]
         state = self.current()
-        return matches + (view(state) if state else [self.waiting_match()])
+        return matches + (view(state, self.elapsed()) if state else [self.waiting_match()])
 
     def current(self):
-        """What the agent said last of the conversation `ai ›` shows, or None."""
+        """What the agent said last of the conversation `opencode ›` shows, or None."""
         if self.state and self.state[0] == self.session:
             return self.state[1]
         return None
@@ -865,9 +973,9 @@ class Kortex:
         """What KRunner's matches are made of, to compare with what it was shown."""
         if self.shown is None:
             return None
-        if parse(self.shown)[0] == "list":
+        if self.parse(self.shown)[0] == "list":
             return repr((self.sessions, self.unreachable))
-        return repr((self.session, self.current(), self.problem, self.waiting, self.unreachable))
+        return repr((self.session, self.current(), self.problem, self.waiting, self.unreachable, self.elapsed()))
 
     def refresh(self, start=True):
         """Ask the agent for the conversation in the background; the tick shows what
@@ -901,6 +1009,8 @@ class Kortex:
         if kind in ("ask", "continue"):
             self.problem = ""
             self.waiting = arg
+            self.request, self.asked_at, self.told, self.followed = arg, self.now(), 0, False
+            log(f"asking {self.agent.title}" + (" in the conversation" if kind == "continue" else ""))
 
             def send():
                 if kind == "ask" or not self.session:
@@ -911,14 +1021,16 @@ class Kortex:
             def sent(_result, error):
                 self.waiting = ""
                 self.failed(None, error)
+                if error:
+                    self.finish(f"{self.agent.title} did not get the request", str(error))
 
-            self.reopen(VIEW, menu)
+            self.reopen(self.marker, menu)
             self.work(send, sent)
         elif kind == "session":
             self.session = arg
-            self.reopen(VIEW, menu)
+            self.reopen(self.marker, menu)
         elif kind == "show":
-            self.reopen(VIEW, menu)
+            self.reopen(self.marker, menu)
         elif kind == "permission":
             if action in REPLIES:
                 state = self.current()
@@ -963,32 +1075,83 @@ class Kortex:
         self.closing_at = None
         self.shown = None
 
+    def show(self, note):
+        """A notification's Show: KRunner opens on the conversation."""
+        if note in self.shows:
+            self.desktop.query(self.marker)
+
+    def notify(self, summary, body, replaces=0, transient=False, follows=False):
+        """A notification with Show, which opens the conversation. Its body is markup to
+        the notification server, as a multiline match is to KRunner. One that `follows`
+        the request is the one the next replaces."""
+        def sent(note):
+            self.shows.add(note)
+            if follows:
+                self.told = note
+
+        self.desktop.notify(summary, markup(body), replaces, transient, sent)
+
+    def finish(self, summary, body):
+        """The request followed has ended: the agent replied, or it never got it. While
+        KRunner is closed a notification says how, in place of the one that followed it."""
+        if self.asked_at is None:
+            return
+        log(f"{summary} after {seconds(self.now() - self.asked_at)}")
+        if self.shown is None:
+            self.notify(summary, body or "Done.", max(self.told, 0))
+        self.asked_at = None
+
+    def follow(self):
+        """The request followed, while it runs: done once the agent has replied to it;
+        while KRunner is closed, told of once after TELL_AFTER seconds, and of its end."""
+        state = self.current()
+        if self.asked_at is None or self.waiting or not state:
+            return
+        title = self.agent.title
+        lines, error = answer_of(state["messages"])
+        if replied(state["messages"], self.request) and (error or state["status"][0] == "idle"):
+            if error:
+                self.finish(f"{title} stopped", error)
+            else:
+                answer = "\n".join(lines)
+                self.finish(f"{title} answered", answer if len(answer) <= 300 else answer[:300] + "…")
+            return
+        if self.shown is None and not self.told and self.now() - self.asked_at >= TELL_AFTER:
+            log("KRunner closed while the agent works; a notification follows the request")
+            self.told = -1  # asked for; its id comes with the notification server's answer
+            self.notify(f"{title} is working on it", f"{self.request}\nA notification follows when it answers.",
+                        transient=True, follows=True)
+
     def tick(self):
         """Every REFRESH_MS: ask the agent for news; while KRunner shows kortex's matches
         and what they are made of changed, show them again; while it is closed, notify
-        of a new permission request."""
+        of a new permission request, and follow the request with a notification."""
         self.refresh(start=False)
+        for p in (self.current() or {}).get("permissions", []):
+            if p["id"] not in self.logged:
+                self.logged.add(p["id"])
+                log(f"{self.agent.title} asks first: {p.get('permission', 'a request')}")
         if self.shown is not None:
             if self.seen() != self.signature:
                 self.signature = self.seen()
                 # KRunner asks again only for a query that differs from the one it shows:
-                # an invisible word joiner goes after `ai ›` or `ai `, or away again.
+                # an invisible word joiner goes after `opencode ›` or `ai `, or away again.
                 q = self.shown
-                kind, followup = parse(q)
+                kind, followup = self.parse(q)
                 if JOINER in q:
                     q = q.replace(JOINER, "")
-                elif kind == "view":  # typed `AI ›` too
-                    q = VIEW + JOINER + (" " + followup if followup else "")
+                elif kind == "view":  # typed `ai ›` or `AI ›` too
+                    q = self.marker + JOINER + (" " + followup if followup else "")
                 else:
                     q = TRIGGER + " " + JOINER
                 self.desktop.query(q)
+            self.follow()
             return
+        self.follow()
         for p in (self.current() or {}).get("permissions", []):
             if p["id"] not in self.notified:
                 self.notified.add(p["id"])
-                # The body is markup to the notification server, as a multiline match is to KRunner.
-                what = html.escape(f"{p.get('permission', '')}: {asked_for(p)}", quote=False)
-                self.desktop.notify("The agent asks first", f"{what}\nOpen it with: ai ›")
+                self.notify(f"{self.agent.title} asks first", f"{p.get('permission', '')}: {asked_for(p)}")
 
     def idle(self):
         """True when kortex may stop: nothing asked for a while, nothing on its way to the
@@ -1057,11 +1220,16 @@ def main():
             subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        def notify(self, summary, body):
+        def notify(self, summary, body, replaces=0, transient=False, then=None):
+            # "default" is a click on the notification, "show" its button; both open the
+            # conversation (ActionInvoked below). A transient one leaves no trace in the history.
+            hints = {"transient": dbus.Boolean(True)} if transient else {}
             bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications").Notify(
-                "kortex", dbus.UInt32(0), ICON, summary, body, dbus.Array([], signature="s"),
-                dbus.Dictionary({}, signature="sv"), dbus.Int32(-1),
-                dbus_interface="org.freedesktop.Notifications", reply_handler=ignore, error_handler=logged)
+                "kortex", dbus.UInt32(replaces), ICON, summary, body,
+                dbus.Array(["default", "Show", "show", "Show"], signature="s"),
+                dbus.Dictionary(hints, signature="sv"), dbus.Int32(-1),
+                dbus_interface="org.freedesktop.Notifications",
+                reply_handler=lambda note: then and then(int(note)), error_handler=logged)
 
     class Worker:
         """The thread that makes every request to the agent, one after another, so the
@@ -1161,6 +1329,11 @@ def main():
             loop.quit()
         return True
 
+    # A notification's Show (or a click on it): the server tells every program; kortex
+    # takes those of its own notifications.
+    bus.add_signal_receiver(
+        lambda note, _action: kortex.show(int(note)), signal_name="ActionInvoked",
+        dbus_interface="org.freedesktop.Notifications", path="/org/freedesktop/Notifications")
     GLib.timeout_add(REFRESH_MS, tick)
     for sig in (signal.SIGTERM, signal.SIGINT):
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: loop.quit() or False)

@@ -6,13 +6,22 @@
 kortex answered over D-Bus what you see, the panel is drawn for the replay. How it is
 made: [`docs/demo/`](docs/demo/).</sub>
 
-An AI agent in KDE Plasma's command palette. Press Meta+Space, type `ai` and what you
-want, and the agent answers right there in KRunner: it explains, changes settings once
-you allow it, writes code and works on your servers. kortex is the palette end of the
+An AI agent in KDE Plasma's command palette. Press Meta+Space, type what you want, and
+pick "Ask opencode" (it comes first when you type a question); the agent answers right
+there in KRunner: it explains, changes settings once you allow it, writes code and works
+on your servers. kortex is the palette end of the
 agent; the agent itself is [opencode](https://opencode.ai) or
 [Hermes Agent](https://github.com/NousResearch/hermes-agent), running on your machine.
 
-Status: 0.3.4. The rows that ask call the agent by its name: "Ask opencode: …" or
+Status: 0.4.0. Any search in KRunner ends with "Ask opencode: …", as the start menu's
+did, and a question (one that ends with `?`, or starts with how, why, wie, warum and the
+like) puts it first: no `ai` to type, though `ai` still asks at once. The conversation
+is called by the agent's name, `opencode ›` (`Hermes ›`; `ai ›` still works). While the
+agent works, the palette counts the seconds and shows what a reasoning model thinks,
+in italics below the answer; with KRunner closed, a notification says that the agent
+works on the request and then what it answered, and its Show opens the conversation.
+kortex logs each request, what the agent asks first, how the request ended and whether
+KRunner followed the conversation to the journal. Since 0.3.4 the rows that ask call the agent by its name: "Ask opencode: …" or
 "Ask Hermes: …". Since 0.3.3 `AI ›` and a tab after `ai` work as `ai ›` and a space
 do, and an answer to a request the agent no longer waits for is no error. Since 0.3.2
 KRunner never waits for the agent, which can take a minute to start: kortex asks it
@@ -43,7 +52,10 @@ git clone https://github.com/patina-os/kortex && cd kortex
 ./install.sh                                 # per user, under ~/.local/share; no root
 ```
 
-Then open KRunner (Meta+Space or Alt+Space) and type `ai` and your request.
+Then open KRunner (Meta+Space or Alt+Space), type your request and pick "Ask opencode".
+To open KRunner on kortex alone, bind a key to `dbus-send --session --type=method_call
+--dest=org.kde.krunner /App org.kde.krunner.App.querySingleRunner string:kortex string:`
+(patina binds Meta+A).
 `./uninstall.sh` removes it again. kortex talks to opencode; for Hermes, write `hermes`
 into `~/.config/kortex/agent` (patina does), or set `KORTEX_AGENT=hermes`. A kortex that
 runs stops when the file names the other agent, and D-Bus starts one for it.
@@ -51,33 +63,43 @@ runs stops when the file names the other agent, and D-Bus starts one for it.
 ## What it does
 
 ```text
-Meta+Space   ai why is my wifi slow
-             ▲ Ask opencode                                    Enter
+Meta+Space   why is my wifi slow
+             ▲ Ask opencode: why is my wifi slow               Enter
              ─────────────────────────────────────────────────────────
              ▲ Your wifi runs on 2.4 GHz at 72 Mbit/s; the 5 GHz
                network "home-5G" is in range ...                Copy · Open in terminal
              ▲ Allow: nmcli connection up home-5G              Allow once · Always · Deny
 ```
 
-- `ai <request>` shows one match, "Ask opencode" (or "Ask Hermes", by the agent kortex
-  talks to). Enter sends the request and reopens KRunner on the conversation, `ai ›`,
-  which shows the answer as it grows, as a multi-line match. With a conversation going, a second match continues it instead of
-  starting a new one; so does typing after the marker (`ai › and in dark mode?`).
+- Any search of three letters or more ends with "Ask opencode: …" (or "Ask Hermes: …",
+  by the agent kortex talks to), below what Plasma finds. A search that reads as a
+  question or a request comes first instead: it ends with `?`, or it has three words or
+  more and starts with a question word or a request (how, why, what, can, fix, install,
+  wie, warum, was, kann, hilf, installiere and the like), and with a conversation going
+  a second match continues it. `ai <request>` asks at once, as before. Enter sends the
+  request and reopens KRunner on the conversation, `opencode ›` (`Hermes ›`), which
+  shows the answer as it grows, as a multi-line match. Typing after the marker continues
+  the conversation (`opencode › and in dark mode?`); `ai ›` works as the marker too.
+- While the agent works, the answer's row says for how long ("Working… 12 s"), and what
+  a reasoning model thinks before it answers shows in italics below it, so a model that
+  thinks for a minute does not look stuck. The seconds stop while an Allow row waits,
+  so that it holds still to be clicked.
+- With KRunner closed (a click elsewhere closes it), a notification says, after a few
+  seconds, that the agent works on the request, and the same notification then says what
+  it answered or why it stopped. Its Show, or a click on it, opens the conversation.
 - Every action the agent wants to take that its permissions put on `ask` (changing a
   file, running a command, reaching a server) shows as its own match, with the whole
   command as it will run, and three actions: Allow once, Always, Deny. Nothing runs before you choose; Enter alone on
   such a match answers nothing. While KRunner is closed, a request for permission
-  comes as a notification.
+  comes as a notification, whose Show opens the conversation.
 - Copy puts the answer on the clipboard; Open in terminal continues the same session in
   opencode's own interface, for longer work such as code.
 - `ai` alone lists the recent conversations to continue.
 - Plasma's start menu searches with KRunner's runners too, but shows neither a long
-  answer nor a match's actions. There any search of three letters or more ends with
-  "Ask opencode: …" (search, ask, fix), below what Plasma finds; Enter sends it and
-  opens the conversation in KRunner, as `ai` and a request does, and `ai ›` opens it
-  there too. kortex tells the start menu (plasmashell) from KRunner by who calls it
-  over D-Bus, so KRunner still sees kortex only for `ai`. Nothing reaches the agent
-  before Enter.
+  answer nor a match's actions. There a search ends with "Ask opencode: …" as in
+  KRunner; Enter sends it and opens the conversation in KRunner, and `opencode ›` opens
+  it there too. kortex tells the start menu (plasmashell) from KRunner by who calls it
+  over D-Bus. Nothing reaches the agent before Enter.
 - The words come from what you type, the rest from the agent: kortex adds no prompt of
   its own beyond the session title, so the agent's instructions (patina's
   `defaults/agent.md`, or the user's own `AGENTS.md`) decide how it behaves.
@@ -110,7 +132,9 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 - **Answers in a palette that pulls.** KRunner asks for matches; it is not told about
   new ones. While the conversation is on screen and changes, kortex runs the query
   again through KRunner's own D-Bus method (`org.kde.krunner /App querySingleRunner`)
-  with the marker `ai ›`, so KRunner asks again and gets the news. KRunner asks only
+  with the marker `opencode ›`, so KRunner asks again and gets the news; the first time
+  it does for a request, kortex logs "KRunner asked again" (`journalctl --user -b |
+  grep kortex`). KRunner asks only
   for a query that differs from the one it shows, so each refresh puts an invisible
   word joiner (U+2060) after the marker or takes it away again. The marker and that
   character are all kortex adds to the query line, and a follow-up typed after it is
@@ -150,7 +174,9 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   test model on localhost that asks to run a command. It checks that nothing runs
   before Allow once, and that it runs after; then it connects an MCP server
   (`tests/mock_mcp.py`) in the agent's configuration while kortex runs and checks that
-  the model gets its tool on the next request. `python3 tests/e2e.py hermes` does the
+  the model gets its tool on the next request, with KRunner closed: a stand-in for the
+  notification server gets the notification of the answer, and its Show reopens the
+  conversation. `python3 tests/e2e.py hermes` does the
   same against a real Hermes gateway, with a folder to remove, since Hermes asks first
   only before what it counts as dangerous. CI runs all three.
 
@@ -162,7 +188,7 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
   two things around them do not: opencode fetches its list of models from
   `models.opencode.ai` whenever its server starts (`OPENCODE_DISABLE_MODELS_FETCH=1`
   stops that), and on its first prompt it fetches the provider's package from npm.
-  KRunner also keeps its last queries, `ai` requests included, in
+  KRunner also keeps its last queries, requests to the agent included, in
   `~/.local/share/krunnerstaterc`.
 - No action without a yes. kortex never answers a permission request on its own, and
   "Always" is opencode's own rule, which the Allow row spells out (`Always allows: sh *`
@@ -186,7 +212,11 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 - **Streaming in KRunner.** Whether reopening KRunner on every change keeps the
   selection steady enough to read a growing answer, or whether kortex should reopen it
   only when the answer is complete, with a "thinking" match before it. To try on Plasma
-  6.3 (Debian 13) and the current Plasma.
+  6.3 (Debian 13) and the current Plasma; the journal's "KRunner asked again" says that
+  KRunner followed.
+- **A name of its own.** The conversation is called by the agent's name (`opencode ›`),
+  from one place (the agent's `title`), so that an assistant named by the user can
+  take it later.
 - **Other agents.** opencode and Hermes are the two backends, each a small adapter
   behind the same calls: send, follow, answer a permission. A third (Goose, for
   example) would be another.
@@ -203,7 +233,7 @@ KRunner ──D-Bus (org.kde.krunner1)──> kortex ──HTTP on 127.0.0.1─�
 
 ## First release, done when
 
-- `ai <request>` in KRunner on Debian 13's Plasma answers from a local model through
+- A request in KRunner on Debian 13's Plasma answers from a local model through
   opencode and Ollama, and from a cloud model with the same configuration switched.
 - A request that needs a change shows the Allow / Always / Deny matches, and nothing
   runs before one is chosen.

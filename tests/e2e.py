@@ -2,12 +2,13 @@
 """The end-to-end test: kortex as KRunner uses it, against a real `opencode serve`.
 
 A private session bus that starts kortex by D-Bus activation, as install.sh sets it up,
-a stand-in for KRunner's application object, a test model on
+a stand-in for KRunner's application object and the notification server, a test model on
 localhost (tests/mock_llm.py) and opencode configured to use it. Then, through D-Bus as
 KRunner would: ask for a file, see the agent ask before it runs the command, check that
 nothing ran, allow it once, see the file and the answer; then connect an MCP server
 (tests/mock_mcp.py) in the agent's configuration while the conversation runs and see the
-model get its tool on the next request. The agent is opencode (KORTEX_OPENCODE or on
+model get its tool on the next request, with KRunner closed: a notification says what the
+agent answered, and its Show opens the conversation. The agent is opencode (KORTEX_OPENCODE or on
 PATH) or Hermes (KORTEX_HERMES or on PATH): with Hermes, the request removes a folder,
 since it asks first only before what it counts as dangerous. Needs python3-dbus and
 python3-gi; opencode fetches its provider package from npm on first use, so it needs
@@ -122,9 +123,10 @@ def main(agent):
         print("e2e: D-Bus activation started kortex")
 
         config_reply = k.Config()
-        assert str(config_reply["MatchRegex"]).endswith("ai(\\s|$)"), config_reply
+        assert "MatchRegex" not in config_reply and int(config_reply["MinLetterCount"]) == 2, config_reply
         assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal"]
-        assert list(k.Match("firefox")) == []
+        assert [str(m[0]) for m in k.Match("firefox")] == ["ask" + SEP + "firefox"]  # any search, below
+        marker = "Hermes ›" if agent == "hermes" else "opencode ›"  # the conversation, by the agent's name
 
         proof = home / "kortex-proof"
         if agent == "hermes":
@@ -139,14 +141,14 @@ def main(agent):
         # The agent's server starts with this request (Hermes' takes up to a minute), in
         # kortex's worker thread: KRunner's calls are answered meanwhile, at once.
         k.Run("ask" + SEP + request, "", timeout=5)
-        waiting = k.Match("ai ›", timeout=5)
+        waiting = k.Match(marker, timeout=5)
         assert [str(m[0]) for m in waiting] == ["waiting"], waiting
         print("e2e: KRunner gets an answer at once while the agent starts")
-        wait_for("KRunner reopened on the conversation", lambda: "kortex\tai ›" in record.read_text(), 10)
+        wait_for("KRunner reopened on the conversation", lambda: f"kortex\t{marker}" in record.read_text(), 10)
         print("e2e: KRunner reopened on the conversation")
 
         def permission():
-            for m in k.Match("ai ›", timeout=30):
+            for m in k.Match(marker, timeout=30):
                 if str(m[0]).startswith("permission" + SEP):
                     return m
         asked = wait_for("the agent to ask first", permission)
@@ -161,12 +163,12 @@ def main(agent):
         wait_for("the command to run", ran, 60)
 
         def answer():
-            for m in k.Match("ai ›", timeout=30):
+            for m in k.Match(marker, timeout=30):
                 if str(m[0]) == "answer" and mock_llm.DONE in str(m[1]):
                     return m
         done = wait_for("the answer", answer)
         assert bool(done[5]["multiline"])
-        assert "permission" not in " ".join(str(m[0]) for m in k.Match("ai ›"))
+        assert "permission" not in " ".join(str(m[0]) for m in k.Match(marker))
         print("e2e: allowed once, the file is there, the answer reads:", repr(str(done[1])))
 
         # The first `ai` shows what kortex has; the list arrives a moment later.
@@ -190,6 +192,8 @@ def main(agent):
             (config / "opencode.json").write_text(json.dumps(settings))
             tool = "probe_ping"
         asked_before = len(mock_llm.TOOLS_SEEN)
+        time.sleep(2)
+        k.Teardown()  # the user closes KRunner, and it stays closed while the agent works
         # Hermes keeps a conversation's tools as they were when it began, so a service
         # reaches the next conversation; opencode's reaches the one going on.
         k.Run(("ask" if agent == "hermes" else "continue") + SEP + "and now?", "", timeout=90)
@@ -198,6 +202,19 @@ def main(agent):
         wait_for(f"a model request with {tool}",
                  lambda: any(tool in t for t in mock_llm.TOOLS_SEEN[asked_before:]), 120)
         print("e2e: an MCP server connected while kortex runs reaches the model:", tool)
+
+        def told():
+            for line in record.read_text().splitlines():
+                kind, *rest = line.split("\t")
+                if kind == "notify" and rest[1].endswith(" answered"):
+                    return rest
+        note, _summary, actions, _transient = wait_for("a notification of the answer", told, 60)
+        assert actions.split(",")[:2] == ["default", "Show"], actions
+        shown = record.read_text().count(f"kortex\t{marker}\n")
+        notifications = bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+        notifications.Invoke(dbus.UInt32(int(note)), "show", dbus_interface="io.github.patina_os.kortex.Test")
+        wait_for("Show to open the conversation", lambda: record.read_text().count(f"kortex\t{marker}\n") > shown, 10)
+        print("e2e: with KRunner closed, a notification tells of the answer, and Show opens it")
         k.Teardown()
         password = (home / ".config/kortex/password")
         assert oct(password.stat().st_mode & 0o777) == "0o600"
