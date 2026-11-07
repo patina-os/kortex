@@ -188,18 +188,26 @@ def find_hermes():
     return found
 
 
-def note_event(asked, line):
+def note_event(asked, line, streamed=None):
     """Keep `asked`, the pending permission requests by id, current with one line of
-    opencode's event stream (`data: {"type": ..., "properties": ...}`)."""
+    opencode's event stream (`data: {"type": ..., "properties": ...}`), and `streamed`, the
+    text of each part still being written, by part id: opencode 1.19 keeps a text or
+    reasoning part empty in GET /session/:id/message until the part is done, and sends
+    the words on its event stream meanwhile."""
     if not line.startswith("data:"):
         return
     try:
         event = json.loads(line[5:])
-        if event["type"] == "permission.asked":
-            asked[event["properties"]["id"]] = event["properties"]
-        elif event["type"] == "permission.replied":
-            asked.pop(event["properties"]["requestID"], None)
-    except (ValueError, LookupError, TypeError):
+        kind, props = event["type"], event["properties"]
+        if kind == "permission.asked":
+            asked[props["id"]] = props
+        elif kind == "permission.replied":
+            asked.pop(props["requestID"], None)
+        elif streamed is not None and kind == "message.part.delta" and props.get("field") == "text":
+            streamed[props["partID"]] = streamed.get(props["partID"], "") + props["delta"]
+        elif streamed is not None and kind == "message.part.updated" and props["part"].get("text"):
+            streamed.pop(props["part"]["id"], None)  # done: GET /message has the whole of it now
+    except (ValueError, LookupError, TypeError, AttributeError):
         pass  # not an event kortex follows
 
 
@@ -220,6 +228,7 @@ class Server:
         # Never through a proxy: the server is on this machine.
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         self.asked = {}  # permission requests from an event stream, by id; under self.lock
+        self.streamed = {}  # the text of parts still being written, by part id; under self.lock
         self.lock = threading.Lock()
         self.listened = None  # the server the event stream is followed for
         self.config_seen = None  # the agent's configuration's mtime as the server in use read it
@@ -265,6 +274,7 @@ class Server:
         self.listened = None  # a new server may get the same port
         with self.lock:
             self.asked.clear()
+            self.streamed.clear()
 
     def request(self, method, path, body=None, start=True, timeout=10):
         if start:
@@ -346,7 +356,7 @@ class Opencode(Server):
                         if self.url != url:
                             break
                         with self.lock:
-                            note_event(self.asked, raw.decode("utf-8", "replace"))
+                            note_event(self.asked, raw.decode("utf-8", "replace"), self.streamed)
             except (OSError, http.client.HTTPException):
                 pass  # the server stopped or restarts; try again while it is the one in use
             time.sleep(1)
@@ -368,7 +378,15 @@ class Opencode(Server):
         self.request("POST", f"/session/{session}/prompt_async", {"parts": [{"type": "text", "text": text}]})
 
     def messages(self, session):
-        return self.request("GET", f"/session/{session}/message")
+        """The conversation, with the parts still being written filled in from the event
+        stream, so the answer, and what the agent thinks first, grow on screen."""
+        found = self.request("GET", f"/session/{session}/message")
+        with self.lock:
+            for message in found:
+                for part in message.get("parts", []):
+                    if not part.get("text") and part.get("id") in self.streamed:
+                        part["text"] = self.streamed[part["id"]]
+        return found
 
     def status(self, session):
         """idle, busy or retry, with the retry's message."""
