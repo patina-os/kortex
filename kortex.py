@@ -52,6 +52,7 @@ ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
 MAX_THOUGHT = 200  # characters of what the agent thinks, shown below its answer meanwhile
+MAX_NOTE = 300  # characters of an answer's last words a notification shows; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
 REFRESH_MS = 700
@@ -1131,8 +1132,10 @@ class Kortex:
             if error:
                 self.finish(f"{title} stopped", error)
             else:
-                answer = "\n".join(lines)
-                self.finish(f"{title} answered", answer if len(answer) <= 300 else answer[:300] + "…")
+                # Its last words, not the tools it used: after a task they say how it went,
+                # and a plain answer is its last words anyway.
+                said = ([line for line in lines if not line.startswith("› ")] or lines or [""])[-1]
+                self.finish(f"{title} answered", said if len(said) <= MAX_NOTE else said[:MAX_NOTE] + "…")
             return
         if self.shown is None and not self.told and self.now() - self.asked_at >= TELL_AFTER:
             log("KRunner closed while the agent works; a notification follows the request")
