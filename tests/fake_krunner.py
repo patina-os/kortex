@@ -2,7 +2,7 @@
 """KRunner's application object and a notification server for the end-to-end test:
 org.kde.krunner /App and org.freedesktop.Notifications on the session bus. Both write
 what kortex asks of them to the file they are given: every query KRunner is asked to
-show, and every notification with its actions. `Invoke` (an interface of the test's
+show, and every notification with its actions and its body (on one line). `Invoke` (an interface of the test's
 own) clicks a notification's action, as a user would."""
 
 import sys
@@ -40,7 +40,8 @@ class Notifications(dbus.service.Object):
         if not replaces:
             Notifications.last += 1
         note = int(replaces) or Notifications.last
-        write(f"notify\t{note}\t{summary}\t{','.join(actions)}\t{bool(hints.get('transient'))}")
+        body = body.replace("\t", " ").replace("\n", "<br>")
+        write(f"notify\t{note}\t{summary}\t{','.join(actions)}\t{bool(hints.get('transient'))}\t{body}")
         return note
 
     @dbus.service.signal(NOTIFICATIONS, signature="us")

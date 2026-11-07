@@ -155,6 +155,23 @@ class Events(unittest.TestCase):
             kortex.note_event(asked, line)
         self.assertEqual(asked, {"per_9": FETCH})
 
+    def test_parts_being_written_grow_from_the_stream(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+        for line in (event("message.part.updated", {"part": {"id": "prt_1", "type": "reasoning", "text": ""}}),
+                     event("message.part.delta", {"partID": "prt_1", "field": "text", "delta": "The user "}),
+                     event("message.part.delta", {"partID": "prt_1", "field": "text", "delta": "asks"}),
+                     event("message.part.delta", {"partID": "prt_2", "field": "text", "delta": "Let"})):
+            kortex.note_event(oc.asked, line, oc.streamed)
+        stored = [user("hi"), assistant({"id": "prt_1", "type": "reasoning", "text": ""},
+                                        {"id": "prt_2", "type": "text", "text": ""})]
+        with mock.patch.object(oc, "request", return_value=stored):
+            messages = oc.messages("ses_1")
+        self.assertEqual([p["text"] for p in messages[1]["parts"]], ["The user asks", "Let"])
+        self.assertEqual(kortex.thinking_of(messages), "")  # its text comes after the thought
+        kortex.note_event(oc.asked, event("message.part.updated", {"part": {"id": "prt_1", "type": "reasoning",
+                                                                           "text": "The user asks"}}), oc.streamed)
+        self.assertEqual(oc.streamed, {"prt_2": "Let"})  # a part done is read whole from GET /message
+
     def test_follow_reads_the_stream_until_the_server_changes(self):
         oc = kortex.Opencode("http://127.0.0.1:1", "secret")
         lines = [event("permission.asked", FETCH).encode(), b"\n"]
@@ -581,6 +598,19 @@ class Runner(unittest.TestCase):
         self.assertEqual([c.args[0] for c in logged.call_args_list], [
             "asking opencode", "opencode asks first: bash",
             "KRunner asked again: the palette follows the conversation", "opencode answered after 4 s"])
+
+    def test_the_notification_tells_how_a_task_ended(self):
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "install photocraft", "", menu=True)
+        oc.history = [user("install photocraft"), assistant(
+            text("PhotoCraft comes with the ArtCraft Launcher. " + "x" * 400), tool("bash", command="patina install"),
+            text("The launcher is open: pick PhotoCraft there."))]
+        k.tick()
+        self.assertEqual(desk.notes[-1][1], "The launcher is open: pick PhotoCraft there.")
+        oc.history = [user("explain"), assistant(text("y" * 500))]
+        k.run("ask" + SEP + "explain", "", menu=True)
+        k.tick()
+        self.assertEqual(desk.notes[-1][1], "y" * kortex.MAX_NOTE + "…")  # a long answer from its start
 
     def test_an_answer_on_screen_needs_no_notification(self):
         k, oc, desk, clock = new()

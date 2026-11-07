@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- kortex: a solid summit, the survey point of patina's mark, in the colour scheme's
-     positive colour (aurora's green under patina, green on any Plasma desktop) -->
+<!-- kortex: the survey point of patina's mark, the ▲, inside two contour lines, a drawn
+     inner one and a dotted outer one, in aurora's violets. The ▲ takes the colour
+     scheme's positive colour (aurora's green under patina, green on any Plasma desktop).
+     Drawn to read at 16 and 22 px, the sizes of KRunner's rows. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <style id="current-color-scheme" type="text/css">.ColorScheme-PositiveText { color: #3cff9d; }</style>
-  <path class="ColorScheme-PositiveText" fill="currentColor" d="M32 16 L52 50 H12 Z"/>
+  <circle cx="32.00" cy="4.50" r="3.60" fill="#6d4fc2"/>
+  <circle cx="48.16" cy="9.75" r="3.60" fill="#6d4fc2"/>
+  <circle cx="58.15" cy="23.50" r="3.60" fill="#6d4fc2"/>
+  <circle cx="58.15" cy="40.50" r="3.60" fill="#6d4fc2"/>
+  <circle cx="48.16" cy="54.25" r="3.60" fill="#6d4fc2"/>
+  <circle cx="32.00" cy="59.50" r="3.60" fill="#6d4fc2"/>
+  <circle cx="15.84" cy="54.25" r="3.60" fill="#6d4fc2"/>
+  <circle cx="5.85" cy="40.50" r="3.60" fill="#6d4fc2"/>
+  <circle cx="5.85" cy="23.50" r="3.60" fill="#6d4fc2"/>
+  <circle cx="15.84" cy="9.75" r="3.60" fill="#6d4fc2"/>
+  <circle cx="32" cy="32" r="17.00" fill="none" stroke="#9b6bff" stroke-width="5.00"/>
+  <path class="ColorScheme-PositiveText" fill="currentColor" d="M32 21.61L42.00 38.93H22.00Z"/>
 </svg>

@@ -75,6 +75,7 @@ h1 .tri { color: var(--green); }
 .match .text { min-width: 0; overflow-wrap: anywhere; }
 .match.multi .text { white-space: pre-wrap; }
 .match .text .tool { font-family: var(--mono); font-size: 13.5px; color: var(--violet); }
+.match .text .thought { font-style: italic; color: var(--muted); }
 .match .sub { grid-column: 2; font-size: 13px; color: var(--muted); }
 .match.warn .text { color: var(--amber); font-weight: 600; }
 .acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
@@ -82,6 +83,21 @@ h1 .tri { color: var(--green); }
   border-radius: 6px; padding: 3px 9px; }
 .act.pressed { background: var(--green); color: #000; border-color: var(--green); }
 .match.entered { box-shadow: inset 0 0 0 2px var(--green); }
+
+/* A Plasma notification, at the bottom right where the tray puts it */
+.note {
+  position: absolute; right: 18px; bottom: 70px; width: 300px; background: rgba(13, 14, 18, 0.97);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6);
+  display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 2px 10px; font-size: 13.5px;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.note[hidden] { display: grid; opacity: 0; transform: translateY(8px); pointer-events: none; }
+.note .icon { width: 28px; height: 28px; grid-row: span 3; }
+.note .app { color: var(--muted); font-size: 12px; }
+.note .sum { font-weight: 600; }
+.note .body { color: var(--text); overflow-wrap: anywhere; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical; overflow: hidden; }
+.note .acts { grid-column: 2; display: flex; gap: 6px; margin-top: 6px; }
 
 .caption {
   position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(92%, 620px);
@@ -122,7 +138,7 @@ button.ctl.primary { background: var(--green); color: #000; border-color: var(--
 <div class="wrap">
   <header>
     <h1><span class="tri">▲</span> kortex in KRunner</h1>
-    <p class="lede">The AI agent in Plasma's search: <strong>ai</strong> and a request. This is a replay of a real run, not a screenshot: kortex answered over D-Bus exactly what you see in the panel, and the panel is drawn by this page (<code>docs/demo/</code> in the kortex repository).</p>
+    <p class="lede">The AI agent in Plasma's command palette: <strong>Meta+A</strong> and a request, or any search. This is a replay of a real run, not a screenshot: kortex answered over D-Bus exactly what you see in the panel, and the panel is drawn by this page (<code>docs/demo/</code> in the kortex repository).</p>
     <div class="provenance" id="prov"></div>
   </header>
 
@@ -144,6 +160,7 @@ button.ctl.primary { background: var(--green); color: #000; border-color: var(--
         </div>
         <ul class="results" id="results"></ul>
       </div>
+      <div class="note" id="note" hidden></div>
       <div class="caption" id="caption"></div>
     </div>
 
@@ -161,7 +178,7 @@ button.ctl.primary { background: var(--green); color: #000; border-color: var(--
       </section>
       <div class="notes">
         <p>Set up as a patina desktop would have it: opencode with patina's permissions from <code>defaults/apps.yaml</code>, so the read-only <code>df</code> runs freely and both steps of the install wait for an answer.</p>
-        <p>The model is a scripted stand-in on localhost; a real install talks to Nemotron 3.5 Bolt E4B or Ministral 3 through Ollama. The disk figures are this sandbox's real output; <code>patina</code> and the ArtCraft Launcher were stand-ins: the one prints what the install prints, the other does nothing.</p>
+        <p>The model is a scripted stand-in on localhost that thinks before it answers, as a reasoning model does; a real install talks to Nemotron 3.5 Bolt E4B or Ministral 3 through Ollama. The disk figures are this sandbox's real output; <code>patina</code> and the ArtCraft Launcher were stand-ins: the one prints what the install prints, the other does nothing.</p>
       </div>
     </div>
   </div>
@@ -171,7 +188,11 @@ button.ctl.primary { background: var(--green); color: #000; border-color: var(--
 const TIMELINE = __TIMELINE__;  // timeline.json, filled in by capture.js
 
 const ICONS = {
-  kortex: '<svg viewBox="0 0 64 64" class="icon" aria-hidden="true"><path d="M32 16 L52 50 H12 Z" fill="#3cff9d"/></svg>',
+  // kortex.svg: the ▲ in a drawn and a dotted contour line
+  kortex: '<svg viewBox="0 0 64 64" class="icon" aria-hidden="true">' +
+    Array.from({ length: 10 }, (_, k) => { const a = 2 * Math.PI * k / 10 - Math.PI / 2;
+      return `<circle cx="${(32 + 27.5 * Math.cos(a)).toFixed(2)}" cy="${(32 + 27.5 * Math.sin(a)).toFixed(2)}" r="3.6" fill="#6d4fc2"/>`; }).join("") +
+    '<circle cx="32" cy="32" r="17" fill="none" stroke="#9b6bff" stroke-width="5"/><path d="M32 21.61L42 38.93H22Z" fill="#3cff9d"/></svg>',
   warn: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><path d="M16 3 L30 28 H2 Z" fill="#ffc857"/><path d="M16 12 V19" stroke="#000" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23.5" r="1.8" fill="#000"/></svg>',
   history: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="#8b90a1" stroke-width="2.4"/><path d="M16 9 V16 L21 19" fill="none" stroke="#e8eaf0" stroke-width="2.4" stroke-linecap="round"/></svg>',
 };
@@ -180,8 +201,13 @@ const ACTION_NAMES = { "allow-once": "Allow once", "allow-always": "Always allow
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-// kortex sends a multiline match as KRunner reads it, styled text: escaped, <br> for a new line.
+// kortex sends a multiline match as KRunner reads it, styled text: escaped, <br> for a new line,
+// <i> for what the agent thinks while it works.
 const plain = (s) => s.replace(/<br>/g, "\n").replace(/&(lt|gt|amp);/g, (_, e) => ({ lt: "<", gt: ">", amp: "&" }[e]));
+const styled = (s) => s.split(/<\/?i>/).map((part, j) => {
+  const t = esc(plain(part)).replace(/^› (.*)$/gm, '<span class="tool">› $1</span>');
+  return j % 2 ? `<span class="thought">${t}</span>` : t;
+}).join("");
 
 const start = TIMELINE.find((e) => e.kind === "start");
 $("prov").innerHTML = `Recorded with <b>kortex ${start.kortex}</b> · <b>opencode ${start.opencode}</b> · over a private D-Bus session, the way KRunner calls a runner`;
@@ -191,11 +217,13 @@ const steps = [];
 let firstRunWait = 0;
 TIMELINE.forEach((e, i) => {
   const next = TIMELINE[i + 1];
-  if (e.kind === "type") {
-    let caption = `Meta+Space, then <b>${esc(e.query)}</b>`;
-    if (e.query === "ai") caption = "<b>ai</b> on its own lists the recent conversations";
-    else if (e.matches.length > 1) caption = `A second request: <b>Enter</b> starts a new conversation, the second match would continue the last one`;
-    steps.push({ e, type: e.query, matches: e.matches, caption,
+  if (e.kind === "shortcut") {
+    steps.push({ e, shortcut: e.key, caption: `<b>${esc(e.key)}</b> opens the command palette on the agent alone: no <b>ai</b> to type`,
+      log: `${esc(e.key)} → /App querySingleRunner(kortex, <em>""</em>)` });
+  } else if (e.kind === "type") {
+    let caption = `A question, typed as it comes: <b>Ask opencode</b> is first`;
+    if (e.matches.length > 1) caption = `A second request: <b>Enter</b> starts a new conversation, the second match would continue the last one`;
+    steps.push({ e, type: e.query, single: true, matches: e.matches, caption,
       log: `Match(<em>"${esc(e.query)}"</em>) → ${e.matches.length} match${e.matches.length === 1 ? "" : "es"}` });
   } else if (e.kind === "run") {
     const what = e.action ? `<b>${ACTION_NAMES[e.action]}</b>` : "<b>Enter</b>";
@@ -212,12 +240,21 @@ TIMELINE.forEach((e, i) => {
     const perm = e.matches.find((m) => m.id === "permission");
     const ans = e.matches.find((m) => m.id === "answer");
     let caption = "The answer grows as the agent works; KRunner asks again whenever it changes";
-    if (ans && ans.text === "Thinking…") caption = "The agent is thinking";
+    if (ans && ans.text.startsWith("Thinking…")) caption = "The agent thinks first: its thoughts in <i>italics</i>, the seconds count";
+    else if (ans && ans.text.includes("<i>")) caption = "It thinks about the next step; the seconds count";
     else if (perm && steps.some((s) => s.asked)) caption = "The next command <b>asks again</b>: Allow once covers one command";
     else if (perm) caption = "The agent wants to run a command that changes something. It <b>asks first</b>";
     else if (ans && ans.text.includes("› bash df")) caption = ans.subtext.startsWith("Working") ? "A read-only command, <b>df</b>, runs without asking" : "Done. Copy puts the answer on the clipboard; Open in terminal continues there";
     if (ans && !ans.subtext.startsWith("Working") && ans.text.includes("up to date")) caption = "Done. Both commands ran because you allowed them, each once";
-    steps.push({ e, matches: e.matches, caption, asked: Boolean(perm), log: `Match(<em>"ai ›"</em>) → ${e.matches.map((m) => m.id).join(", ")}` });
+    steps.push({ e, matches: e.matches, caption, asked: Boolean(perm), log: `Match(<em>"${esc(e.query)}"</em>) → ${e.matches.map((m) => m.id).join(", ")}` });
+  } else if (e.kind === "close") {
+    steps.push({ e, close: true, caption: "A click elsewhere closes KRunner. The agent keeps working", log: "Teardown()" });
+  } else if (e.kind === "notify") {
+    const caption = e.summary.endsWith(" answered") ? "…and the same notification brings the answer"
+      : "kortex says so in a notification, which follows the request";
+    steps.push({ e, notify: e, caption, log: `→ Notify(<em>"${esc(e.summary)}"</em>)` });
+  } else if (e.kind === "show") {
+    steps.push({ e, show: true, caption: "<b>Show</b> opens the conversation again", log: "ActionInvoked(show)" });
   } else if (e.kind === "pause") {
     steps.push({ e, hold: true, caption: "Nothing has run yet. The command waits for your answer", log: "(waiting for the user)" });
   }
@@ -233,7 +270,7 @@ function renderField(text, caret) {
 
 function matchHTML(m, i, pressed) {
   const icon = m.id === "permission" ? ICONS.warn : m.id === "session" ? ICONS.history : ICONS.kortex;
-  let text = esc(m.multiline ? plain(m.text) : m.text).replace(/^› (.*)$/gm, '<span class="tool">› $1</span>');
+  const text = m.multiline ? styled(m.text) : esc(m.text);
   const acts = (i === 0 || m.id === "permission") && m.actions.length
     ? `<div class="acts">${m.actions.map((a) => `<span class="act${pressed && pressed.action === a && pressed.id === m.id ? " pressed" : ""}">${ACTION_NAMES[a] || a}</span>`).join("")}</div>` : "";
   const cls = ["match", i === 0 ? "sel" : "", m.multiline ? "multi" : "", m.id === "permission" ? "warn" : "",
@@ -243,7 +280,7 @@ function matchHTML(m, i, pressed) {
 
 function renderResults(matches, pressed) {
   $("results").innerHTML = matches.length ? matches.map((m, i) => matchHTML(m, i, pressed)).join("")
-    : '<li class="empty">Type <b>ai</b> and a request</li>';
+    : '<li class="empty">Type a request</li>';
 }
 
 function renderLog() {
@@ -253,14 +290,34 @@ function renderLog() {
   $("stepno").textContent = `${index + 1} / ${steps.length}`;
 }
 
+function renderNote(n, pressed) {
+  $("note").innerHTML = `${ICONS.kortex}<div class="app">kortex</div><div class="sum">${esc(n.summary)}</div>` +
+    `<div class="body">${esc(plain(n.body))}</div><div class="acts"><span class="act${pressed ? " pressed" : ""}">Show</span></div>`;
+}
+
 function apply(step, animate) {
   clearInterval(typing);
   const k = $("krunner");
   $("caption").innerHTML = step.caption;
-  if (step.type !== undefined) {
+  if (step.shortcut) {
     k.classList.remove("closed");
-    shown.single = false;
-    $("mode").hidden = true;
+    $("note").hidden = true;
+    $("mode").hidden = false;
+    renderField("", true);
+    renderResults([]);
+    shown = { query: "", matches: [], single: true };
+  } else if (step.close) {
+    k.classList.add("closed");
+  } else if (step.notify) {
+    renderNote(step.notify, false);
+    $("note").hidden = false;
+    shown.note = step.notify;
+  } else if (step.show) {
+    if (shown.note) renderNote(shown.note, true);
+    if (animate) setTimeout(() => { $("note").hidden = true; }, 600); else $("note").hidden = true;
+  } else if (step.type !== undefined) {
+    k.classList.remove("closed");
+    $("mode").hidden = !step.single;
     renderResults([]);
     if (!animate) { renderField(step.type, true); renderResults(step.matches); }
     else {
@@ -272,7 +329,7 @@ function apply(step, animate) {
         if (n >= step.type.length) { clearInterval(typing); renderResults(step.matches); }
       }, 55);
     }
-    shown = { query: step.type, matches: step.matches, single: false };
+    shown = { query: step.type, matches: step.matches, single: Boolean(step.single) };
   } else if (step.press) {
     renderResults(shown.matches, { id: step.press, action: step.action });
     if (animate) setTimeout(() => k.classList.add("closed"), 650); else k.classList.add("closed");
@@ -280,11 +337,11 @@ function apply(step, animate) {
     k.classList.remove("closed");
     renderField(step.query, true);
     $("mode").hidden = false;
-    renderResults(shown.matches.filter(() => false));
+    $("results").innerHTML = "";  // KRunner asks kortex at once; its answer is the next step
     shown.query = step.query;
   } else if (step.matches) {
     k.classList.remove("closed");
-    renderField("ai ›", true);
+    renderField(step.e.query, true);
     $("mode").hidden = false;
     renderResults(step.matches);
     shown.matches = step.matches;
@@ -295,8 +352,16 @@ function apply(step, animate) {
 function durationOf(step) {
   if (step.type !== undefined) return step.type.length * 55 + 1900;
   if (step.press) return 1500;
+  if (step.shortcut) return 1500;
+  if (step.close) return 1700;
+  if (step.notify) return 3000;
+  if (step.show) return 1400;
   if (step.hold) return 2600;
   if (step.reopen) return 1100;
+  // A view the next one follows at once plays at the pace it came in, so the words of
+  // the answer and of the agent's thoughts arrive as they did; the last of a run rests.
+  const next = steps[steps.indexOf(step) + 1];
+  if (next && next.matches && !next.type && next.e.t > step.e.t) return Math.max(180, Math.min(1400, next.e.t - step.e.t));
   const text = (step.matches || []).map((m) => m.text).join(" ");
   return Math.min(4200, 1600 + text.length * 14);
 }

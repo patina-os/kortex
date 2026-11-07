@@ -208,7 +208,7 @@ def main(agent):
                 kind, *rest = line.split("\t")
                 if kind == "notify" and rest[1].endswith(" answered"):
                     return rest
-        note, _summary, actions, _transient = wait_for("a notification of the answer", told, 60)
+        note, _summary, actions, _transient, _body = wait_for("a notification of the answer", told, 60)
         assert actions.split(",")[:2] == ["default", "Show"], actions
         shown = record.read_text().count(f"kortex\t{marker}\n")
         notifications = bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
