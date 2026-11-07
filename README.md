@@ -12,8 +12,9 @@
 </p>
 
 <p align="center">
-  The AI agent in KDE Plasma's command palette. Ask in a few words, watch it work
-  where you asked, and allow each change before it happens.
+  The AI agent in KDE Plasma's command palette, made for troubleshooting, for getting
+  Linux to work for you, and for working with an agent the modern way. Ask in your own
+  words, watch it work where you asked, and allow each change before it happens.
 </p>
 
 ![kortex in KRunner: Meta+A and a question, the agent thinking, then PhotoCraft installed in two steps, each waiting for Allow once, and a notification with the answer after KRunner was closed](docs/demo/kortex-demo.gif)
@@ -27,6 +28,25 @@ layer for Plasma on Debian: patina installs it with its AI agent and puts it on 
 It works on any Plasma 6 desktop that has [opencode](https://opencode.ai) or
 [Hermes Agent](https://github.com/NousResearch/hermes-agent): they are the agent, kortex
 is where you talk to it.
+
+## Made for
+
+- **Troubleshooting.** "Why is my wifi so slow?", "the printer stopped printing",
+  "what keeps the fan busy?" The agent looks where a forum thread would send you
+  (`journalctl`, `nmcli`, `lpstat`, `top`), says what it found, and proposes the fix,
+  which waits for your yes.
+- **Getting Linux to work for you.** "Install PhotoCraft", "switch to the light theme",
+  "make the touchpad scroll the other way": say what you want, not the commands for
+  it. On patina the agent knows patina's own (`patina install`, `patina theme`),
+  elsewhere it uses the system's tools, and every change is a row you allow.
+- **Working with an agent.** Have it write a script, find its way through a project,
+  work on your server, or file a ticket through a service you connected (Linear,
+  Notion, GitHub, Nextcloud). Walk away while it works and a notification brings the
+  answer back; Open in terminal takes the conversation into the agent's own interface
+  for longer work.
+
+An agent can be wrong, a small local model more often than a large one: read what it
+proposes before you allow it.
 
 ## What it does
 
