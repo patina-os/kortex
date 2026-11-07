@@ -1,44 +1,91 @@
 [
  {
-  "t": 583,
+  "t": 566,
   "kind": "start",
-  "kortex": "0.1.0",
-  "opencode": "1.19.4"
+  "kortex": "0.4.1",
+  "opencode": "1.19.5"
  },
  {
-  "t": 583,
+  "t": 566,
+  "kind": "shortcut",
+  "key": "Meta+A"
+ },
+ {
+  "t": 567,
   "kind": "type",
-  "query": "ai how full is my disk?",
+  "query": "how full is my disk?",
   "matches": [
    {
     "id": "ask",
-    "text": "how full is my disk?",
-    "subtext": "Ask the agent · Enter",
+    "text": "Ask opencode: how full is my disk?",
+    "subtext": "A new conversation · opencode answers in the command palette · Enter",
     "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 583,
+  "t": 567,
   "kind": "run",
   "id": "ask",
   "action": ""
  },
  {
-  "t": 12088,
+  "t": 868,
   "kind": "reopen",
-  "query": "ai ›"
+  "query": "opencode ›"
  },
  {
-  "t": 12189,
+  "t": 869,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "waiting",
+    "text": "Waiting for the agent…",
+    "subtext": "It starts with the first request, which can take a minute",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 1623,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "waiting",
+    "text": "Waiting for the agent… 1 s",
+    "subtext": "It starts with the first request, which can take a minute",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 2683,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "waiting",
+    "text": "Waiting for the agent…",
+    "subtext": "It starts with the first request, which can take a minute",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 2985,
+  "kind": "view",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "answer",
     "text": "Thinking…",
-    "subtext": "Working… · Copy · Open in terminal",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
     "actions": [
      "copy",
      "terminal"
@@ -48,14 +95,14 @@
   ]
  },
  {
-  "t": 13104,
+  "t": 3588,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "answer",
-    "text": "Let me look.\n› bash df -h /",
-    "subtext": "Working… · Copy · Open in terminal",
+    "text": "Thinking…<br><i>The</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
     "actions": [
      "copy",
      "terminal"
@@ -65,13 +112,625 @@
   ]
  },
  {
-  "t": 15307,
+  "t": 3739,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "answer",
-    "text": "Let me look.\n› bash df -h /\nYour system disk has 30G free of 252G (25% used). That is plenty; nothing to clean up.",
+    "text": "Thinking…<br><i>The user asks</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 3890,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 4041,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 4192,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 4343,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 4644,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on</i>",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 4795,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on /</i>",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 4946,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on / shows it,</i>",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 5097,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on / shows it, and patina</i>",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 5398,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on / shows it, and patina lets</i>",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 5549,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on / shows it, and patina lets df run</i>",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 5700,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>The user asks how full the disk is. df on / shows it, and patina lets df run without</i>",
+    "subtext": "Working… 5 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 5851,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let",
+    "subtext": "Working… 5 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 6153,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.",
+    "subtext": "Working… 5 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 6606,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.",
+    "subtext": "Working… 6 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 6757,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /",
+    "subtext": "Working… 6 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 7360,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df</i>",
+    "subtext": "Working… 6 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 7511,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use</i>",
+    "subtext": "Working… 6 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 7662,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use of</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 7813,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use of the</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 7964,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use of the root file</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 8115,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use of the root file system.</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 8267,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use of the root file system. Say</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 8418,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br><i>df answered: free space and use of the root file system. Say both,</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 8568,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 8870,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 9021,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 9172,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 9324,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 9626,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27%",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 9777,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 9928,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That is",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 10079,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That is plenty;",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 10230,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That is plenty; nothing",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 10381,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That is plenty; nothing to clean",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 10532,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That is plenty; nothing to clean up.",
+    "subtext": "Working… 9 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 10682,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Let me look.<br>› bash df -h /<br>Your system disk has 29G free of 252G (27% used). That is plenty; nothing to clean up.",
     "subtext": "Copy · Open in terminal",
     "actions": [
      "copy",
@@ -82,50 +741,595 @@
   ]
  },
  {
-  "t": 15308,
+  "t": 10682,
+  "kind": "shortcut",
+  "key": "Meta+A"
+ },
+ {
+  "t": 10683,
   "kind": "type",
-  "query": "ai install photocraft",
+  "query": "install PhotoCraft for me",
   "matches": [
    {
     "id": "ask",
-    "text": "install photocraft",
-    "subtext": "Ask the agent · Enter",
+    "text": "Ask opencode: install PhotoCraft for me",
+    "subtext": "A new conversation · opencode answers in the command palette · Enter",
     "actions": [],
     "multiline": false
    },
    {
     "id": "continue",
-    "text": "install photocraft",
-    "subtext": "Continue the conversation",
+    "text": "Continue with opencode: install PhotoCraft for me",
+    "subtext": "The current conversation",
     "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 15308,
+  "t": 10683,
   "kind": "run",
   "id": "ask",
   "action": ""
  },
  {
-  "t": 15629,
+  "t": 10983,
   "kind": "reopen",
-  "query": "ai ›"
+  "query": "opencode ›"
  },
  {
-  "t": 15629,
-  "kind": "reopen",
-  "query": "ai ›"
- },
- {
-  "t": 15638,
+  "t": 10984,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "waiting",
+    "text": "Waiting for the agent…",
+    "subtext": "It starts with the first request, which can take a minute",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 11135,
+  "kind": "view",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "answer",
-    "text": "Thinking…",
+    "text": "Thinking…<br><i>PhotoCraft is part</i>",
+    "subtext": "Working… 0 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 11286,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of</i>",
+    "subtext": "Working… 0 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 11437,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft</i>",
+    "subtext": "Working… 0 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 11588,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite.</i>",
+    "subtext": "Working… 0 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 11739,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 11891,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12042,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12193,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12344,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12495,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12646,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle.</i>",
+    "subtext": "Working… 1 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12797,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes</i>",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 12948,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the</i>",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13099,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the system,</i>",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13249,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the system, so</i>",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13400,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the system, so it waits</i>",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13551,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the system, so it waits for</i>",
+    "subtext": "Working… 2 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13703,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the system, so it waits for the</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 13853,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "Thinking…<br><i>PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft bundle. That changes the system, so it waits for the user's</i>",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 14006,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 14156,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 14458,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 14609,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher,",
+    "subtext": "Working… 3 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 14760,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 14910,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle.",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 15212,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 15363,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 15514,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.",
+    "subtext": "Working… 4 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 15665,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "permission",
+    "text": "Allow bash: patina install --bundles artcraft<br>Always allows: patina *",
+    "subtext": "The agent asks before it does this",
+    "actions": [
+     "allow-once",
+     "allow-always",
+     "deny"
+    ],
+    "multiline": true
+   },
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft",
+    "subtext": "Working… · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 17165,
+  "kind": "pause",
+  "what": "nothing has run yet"
+ },
+ {
+  "t": 17166,
+  "kind": "run",
+  "id": "permission",
+  "action": "allow-once"
+ },
+ {
+  "t": 17467,
+  "kind": "reopen",
+  "query": "opencode ›"
+ },
+ {
+  "t": 17468,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "permission",
+    "text": "Allow bash: patina install --bundles artcraft<br>Always allows: patina *",
+    "subtext": "The agent asks before it does this",
+    "actions": [
+     "allow-once",
+     "allow-always",
+     "deny"
+    ],
+    "multiline": true
+   },
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft",
     "subtext": "Working… · Copy · Open in terminal",
     "actions": [
      "copy",
@@ -138,22 +1342,192 @@
  {
   "t": 17619,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is</i>",
+    "subtext": "Working… 6 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 17771,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is in.</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 17922,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is in. The</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 18073,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is in. The launcher</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 18224,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is in. The launcher installs PhotoCraft</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 18375,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is in. The launcher installs PhotoCraft itself; open</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 18677,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br><i>The bundle is in. The launcher installs PhotoCraft itself; open it next.</i>",
+    "subtext": "Working… 7 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 18828,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed.",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 18979,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed. Now",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 19130,
+  "kind": "view",
+  "query": "opencode ›",
+  "matches": [
+   {
+    "id": "answer",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed. Now the launcher:",
+    "subtext": "Working… 8 s · Copy · Open in terminal",
+    "actions": [
+     "copy",
+     "terminal"
+    ],
+    "multiline": true
+   }
+  ]
+ },
+ {
+  "t": 19281,
+  "kind": "view",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "permission",
-    "text": "Allow bash: patina install --bundles artcraft",
+    "text": "Allow bash: setsid -f artcraft-launcher<br>Always allows: setsid *",
     "subtext": "The agent asks before it does this",
     "actions": [
      "allow-once",
      "allow-always",
      "deny"
     ],
-    "multiline": false
+    "multiline": true
    },
    {
     "id": "answer",
-    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed. Now the launcher:<br>› bash setsid -f artcraft-launcher",
     "subtext": "Working… · Copy · Open in terminal",
     "actions": [
      "copy",
@@ -164,57 +1538,40 @@
   ]
  },
  {
-  "t": 19119,
+  "t": 20781,
   "kind": "pause",
   "what": "nothing has run yet"
  },
  {
-  "t": 19129,
+  "t": 20782,
   "kind": "run",
   "id": "permission",
   "action": "allow-once"
  },
  {
-  "t": 19434,
+  "t": 21083,
   "kind": "reopen",
-  "query": "ai ›"
+  "query": "opencode ›"
  },
  {
-  "t": 19443,
+  "t": 21084,
   "kind": "view",
-  "query": "ai ›",
-  "matches": [
-   {
-    "id": "answer",
-    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft",
-    "subtext": "Working… · Copy · Open in terminal",
-    "actions": [
-     "copy",
-     "terminal"
-    ],
-    "multiline": true
-   }
-  ]
- },
- {
-  "t": 19762,
-  "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "permission",
-    "text": "Allow bash: setsid -f artcraft-launcher",
+    "text": "Allow bash: setsid -f artcraft-launcher<br>Always allows: setsid *",
     "subtext": "The agent asks before it does this",
     "actions": [
      "allow-once",
      "allow-always",
      "deny"
     ],
-    "multiline": false
+    "multiline": true
    },
    {
     "id": "answer",
-    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft\nInstalled. Now the launcher:\n› bash setsid -f artcraft-launcher",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed. Now the launcher:<br>› bash setsid -f artcraft-launcher",
     "subtext": "Working… · Copy · Open in terminal",
     "actions": [
      "copy",
@@ -225,35 +1582,14 @@
   ]
  },
  {
-  "t": 21262,
-  "kind": "pause",
-  "what": "nothing has run yet"
- },
- {
-  "t": 21274,
-  "kind": "run",
-  "id": "permission",
-  "action": "allow-once"
- },
- {
-  "t": 21581,
-  "kind": "reopen",
-  "query": "ai ›"
- },
- {
-  "t": 21581,
-  "kind": "reopen",
-  "query": "ai ›"
- },
- {
-  "t": 21587,
+  "t": 21236,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "answer",
-    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft\nInstalled. Now the launcher:\n› bash setsid -f artcraft-launcher",
-    "subtext": "Working… · Copy · Open in terminal",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed. Now the launcher:<br>› bash setsid -f artcraft-launcher<br><i>Both commands ran,</i>",
+    "subtext": "Working… 10 s · Copy · Open in terminal",
     "actions": [
      "copy",
      "terminal"
@@ -263,47 +1599,61 @@
   ]
  },
  {
-  "t": 23158,
+  "t": 22836,
+  "kind": "close"
+ },
+ {
+  "t": 23438,
+  "kind": "notify",
+  "id": 1,
+  "summary": "opencode is working on it",
+  "actions": [
+   "default",
+   "Show",
+   "show",
+   "Show"
+  ],
+  "transient": true,
+  "body": "install PhotoCraft for me<br>A notification follows when it answers."
+ },
+ {
+  "t": 28245,
+  "kind": "notify",
+  "id": 1,
+  "summary": "opencode answered",
+  "actions": [
+   "default",
+   "Show",
+   "show",
+   "Show"
+  ],
+  "transient": false,
+  "body": "The launcher is open: pick PhotoCraft there, and it keeps it up to date."
+ },
+ {
+  "t": 29745,
+  "kind": "show",
+  "id": 1
+ },
+ {
+  "t": 30248,
+  "kind": "reopen",
+  "query": "opencode ›"
+ },
+ {
+  "t": 30248,
   "kind": "view",
-  "query": "ai ›",
+  "query": "opencode ›",
   "matches": [
    {
     "id": "answer",
-    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.\n› bash patina install --bundles artcraft\nInstalled. Now the launcher:\n› bash setsid -f artcraft-launcher\nThe launcher is open: pick PhotoCraft there, and it keeps it up to date.",
+    "text": "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.<br>› bash patina install --bundles artcraft<br>Installed. Now the launcher:<br>› bash setsid -f artcraft-launcher<br>The launcher is open: pick PhotoCraft there, and it keeps it up to date.",
     "subtext": "Copy · Open in terminal",
     "actions": [
      "copy",
      "terminal"
     ],
     "multiline": true
-   }
-  ]
- },
- {
-  "t": 23161,
-  "kind": "type",
-  "query": "ai",
-  "matches": [
-   {
-    "id": "hint",
-    "text": "Ask the agent: type ai and your request",
-    "subtext": "ai › shows the current conversation",
-    "actions": [],
-    "multiline": false
-   },
-   {
-    "id": "session",
-    "text": "install photocraft",
-    "subtext": "Continue this conversation · just now",
-    "actions": [],
-    "multiline": false
-   },
-   {
-    "id": "session",
-    "text": "how full is my disk?",
-    "subtext": "Continue this conversation · just now",
-    "actions": [],
-    "multiline": false
    }
   ]
  }

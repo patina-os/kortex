@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Record kortex in action for the README: the setup of tests/e2e.py (a private session
-bus that starts kortex by D-Bus activation, a stand-in for KRunner's /App, a real
-`opencode serve`), opencode with the permissions patina gives it, and a scripted model
-(demo_llm.py). Every Match and Run goes over D-Bus as KRunner sends it, and every answer
-kortex gives is written to timeline.json, which page.html replays.
+bus that starts kortex by D-Bus activation, a stand-in for KRunner's /App and for the
+notification server, a real `opencode serve`), opencode with the permissions patina
+gives it, and a scripted model that thinks before it answers (demo_llm.py). Every Match,
+Run and Teardown goes over D-Bus as KRunner sends it, every notification as the
+notification server gets it, and every answer kortex gives is written to timeline.json,
+which page.html replays.
 
     KORTEX_OPENCODE=/path/to/opencode python3 docs/demo/record.py
 """
@@ -27,6 +29,8 @@ import demo_llm
 
 SERVICE = "io.github.patina_os.kortex"
 SEP = "\x1f"
+JOINER = "\u2060"  # in a query kortex puts on screen to refresh what KRunner shows already
+MARKER = "opencode ›"  # the conversation, by the agent's name
 OPENCODE = os.environ.get("KORTEX_OPENCODE") or shutil.which("opencode")
 MODEL = "nemotron-3.5-bolt:e4b"  # the name the scripted model answers under
 # opencode's permissions as patina sets them (defaults/apps.yaml in patina): reading runs
@@ -114,10 +118,16 @@ def main():
     seen = 0
 
     def reopens():
+        """What kortex asked of KRunner and the notification server since the last look."""
         nonlocal seen
         lines = record.read_text().splitlines()
         for line in lines[seen:]:
-            note("reopen", query=line.split("\t", 1)[1])
+            kind, *rest = line.split("\t")
+            if kind == "notify":
+                note("notify", id=int(rest[0]), summary=rest[1], actions=rest[2].split(","),
+                     transient=rest[3] == "True", body=rest[4])
+            elif JOINER not in rest[0]:  # not a refresh of what KRunner shows already
+                note("reopen", query=rest[0])
         seen = len(lines)
 
     def type_query(q):
@@ -133,9 +143,9 @@ def main():
         last = None
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            matches = plain(k.Match("ai ›", timeout=30))
+            matches = plain(k.Match(MARKER, timeout=30))
             if matches != last:
-                note("view", query="ai ›", matches=matches)
+                note("view", query=MARKER, matches=matches)
                 last = matches
                 if until(matches):
                     return
@@ -151,21 +161,44 @@ def main():
         kortex_version = subprocess.run([sys.executable, str(repo / "kortex.py"), "--version"],
                                         capture_output=True, text=True, check=True).stdout.split()[-1]
         note("start", kortex=kortex_version, opencode=version)
-        q1 = "ai how full is my disk?"
+        # Meta+A opens KRunner on kortex alone (patina's `ask` action): no `ai` to type.
+        note("shortcut", key="Meta+A")
+        q1 = "how full is my disk?"
         type_query(q1)
-        run("ask" + SEP + q1[3:])
+        run("ask" + SEP + q1)
         watch(answered("free of"))
-        q2 = "ai install photocraft"
+        note("shortcut", key="Meta+A")
+        q2 = "install PhotoCraft for me"
         type_query(q2)
-        run("ask" + SEP + q2[3:])
+        run("ask" + SEP + q2)
         for command in ("patina install", "artcraft-launcher"):
             watch(lambda ms, command=command: any(m["id"] == "permission" and command in m["text"] for m in ms))
             time.sleep(1.5)
             note("pause", what="nothing has run yet")
-            asked = next(m for m in k.Match("ai ›") if str(m[0]).startswith("permission" + SEP))
+            asked = next(m for m in k.Match(MARKER) if str(m[0]).startswith("permission" + SEP))
             run(str(asked[0]), "allow-once")
-        watch(answered("up to date"))
-        type_query("ai")
+        # The agent thinks about its last step; the user clicks elsewhere meanwhile, which
+        # closes KRunner (its Teardown), and kortex follows the request with a notification.
+        watch(lambda ms: any(m["id"] == "answer" and "<i>" in m["text"] for m in ms), timeout=30)
+        time.sleep(1.6)
+        note("close")
+        k.Teardown()
+
+        def answered_note():
+            reopens()
+            return any(e["kind"] == "notify" and e["summary"].endswith(" answered") for e in timeline)
+        deadline = time.monotonic() + 90
+        while not answered_note():
+            assert time.monotonic() < deadline, "no notification of the answer"
+            time.sleep(0.2)
+        told = next(e for e in reversed(timeline) if e["kind"] == "notify")
+        time.sleep(1.5)
+        note("show", id=told["id"])
+        notifications = bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+        notifications.Invoke(dbus.UInt32(told["id"]), "default", dbus_interface="io.github.patina_os.kortex.Test")
+        time.sleep(0.5)
+        reopens()
+        note("view", query=MARKER, matches=plain(k.Match(MARKER, timeout=30)))
         k.Teardown()
     finally:
         os.kill(pid, signal.SIGTERM)

@@ -1,5 +1,7 @@
 """The scripted model for the kortex demo recording: an OpenAI-compatible endpoint that
-streams slowly, like a small local model, and uses tools the way an agent would."""
+streams slowly, like a small local model, thinks before it answers, as a reasoning model
+does (`reasoning_content`, which opencode keeps as the reply's reasoning), and uses tools
+the way an agent would."""
 
 import json
 import re
@@ -9,12 +11,36 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DELAY = 0.12  # seconds between streamed words
 
+# What the model thinks before each step, streamed ahead of its words.
+THOUGHTS = {
+    ("disk", 0): "The user asks how full the disk is. df on / shows it, and patina lets df run without asking.",
+    ("disk", 1): "df answered: free space and use of the root file system. Say both, briefly.",
+    ("photocraft", 0): "PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft "
+                       "bundle. That changes the system, so it waits for the user's yes.",
+    ("photocraft", 1): "The bundle is in. The launcher installs PhotoCraft itself; open it next.",
+    ("photocraft", 2): "Both commands ran, each after its own Allow once. Tell the user where PhotoCraft is "
+                       "picked and that the launcher keeps it current, so there is nothing left to do by hand "
+                       "and no need to come back for updates.",
+}
+
 
 def content(message):
     c = message.get("content") or ""
     if isinstance(c, list):
         return " ".join(p.get("text", "") for p in c if isinstance(p, dict))
     return c
+
+
+def thought(body):
+    """What the model thinks before this step, or ""."""
+    messages = body.get("messages", [])
+    if not body.get("tools"):
+        return ""
+    last_user = max((i for i, m in enumerate(messages) if m.get("role") == "user"), default=-1)
+    asked = content(messages[last_user]).lower() if last_user >= 0 else ""
+    step = sum(1 for m in messages[last_user + 1:] if m.get("role") == "tool")
+    topic = "disk" if "disk" in asked else "photocraft" if "photocraft" in asked else ""
+    return THOUGHTS.get((topic, step), "")
 
 
 def plan(body):
@@ -93,6 +119,9 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
         send(chunk({"role": "assistant", "content": ""}))
+        for w in re.findall(r"\S+\s*", thought(body)):
+            send(chunk({"reasoning_content": w}))
+            time.sleep(DELAY)
         words = re.findall(r"\S+\s*", text)
         for w in words:
             send(chunk({"content": w}))
