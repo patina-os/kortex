@@ -26,13 +26,21 @@ starts, shows as "Waiting for the agent…".
 
 KRunner asks for matches; it is not told about new ones. While the conversation is on
 screen and changes, kortex runs the query again through KRunner's own D-Bus method
-(`org.kde.krunner /App querySingleRunner`) with the marker, `opencode ›`, so KRunner
+(`org.kde.krunner /App querySingleRunner`) with the marker, `kortex ›`, so KRunner
 asks again and gets the news; the first time it does for a request, kortex logs
 "KRunner asked again". KRunner asks only for a query that differs from the one it
 shows, so each refresh puts an invisible word joiner (U+2060) after the marker or takes
 it away again. The marker and that character are all kortex adds to the query line,
 and a follow-up typed after it is kept. While a request runs, the elapsed seconds are
 news too, except while a row asks, which must hold still to be clicked.
+
+KRunner sizes its window to its rows and gives a one-line row a fixed height, while a
+multi-line row grows by a line with each word that wraps; in the free-floating mode the
+window hangs from a third of the screen's height, so its bottom edge moves. So while
+the agent works, every row of the conversation is one line: one that says how long it
+has been at it and what it wrote last, and one per step (the last four). The window
+grows by a row for a step, not by a line for a word, and the answer, the one
+multi-line row besides a row that asks, comes once the agent is done.
 
 While KRunner is closed (its `Teardown`), kortex follows the request with one
 notification (`org.freedesktop.Notifications`): after three seconds that the agent

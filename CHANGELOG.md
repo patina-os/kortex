@@ -5,6 +5,30 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [0.5.0] - 2026-11-08
+
+### Changed
+
+- While the agent works, the conversation is rows of one line each: one that says how
+  long it has been at it and what it wrote or thought last ("Working · 12 s · …",
+  "Thinking · 12 s · …"), and one per step it took, the last four, older ones folded
+  into one row. Once it is done, its answer takes the first row, on as many lines as
+  it needs, and its steps fold into one row ("3 steps: bash ×2, read"). KRunner gives
+  a one-line row a fixed height, so its window holds still while the agent works; it
+  grew and shrank with each refresh, as the answer gained a line and the thoughts
+  below it came and went. Enter on a step opens the conversation in the terminal.
+- The palette calls itself kortex, whichever agent answers: `kortex ›` shows the
+  conversation, the rows ask "Ask kortex: …", and the notifications say "kortex is
+  working on it" and "kortex answered". The agent is named once, as a detail: in the
+  hint of `ai` and the row that says how long. `opencode ›`, as 0.4 called the
+  conversation, and `ai ›` still show it.
+- Copy puts what the agent said on the clipboard, without the steps it took.
+
+### Fixed
+
+- The seconds count where you see them. They were in the answer row's subtext, which
+  KRunner hides when the text takes the row's whole width, so they never showed.
+
 ## [0.4.1] - 2026-11-07
 
 ### Changed
@@ -136,6 +160,7 @@ What changed in each release of kortex. The format follows
 - The first kortex: the AI agent as a KRunner runner, `ai` and a request, the answer in
   the palette, Allow once, Always and Deny for every action the agent asks to take.
 
+[0.5.0]: https://github.com/patina-os/kortex/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/patina-os/kortex/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/patina-os/kortex/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/patina-os/kortex/compare/v0.3.3...v0.3.4

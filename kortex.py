@@ -3,11 +3,13 @@
 """kortex: the AI agent in KDE Plasma's command palette.
 
 A KRunner D-Bus runner (org.kde.krunner1). Any search in KRunner or Plasma's start menu
-ends with "Ask opencode: …" (first when it reads as a question), `ai <request>` asks at
-once, `ai` alone lists the recent conversations, and `opencode ›` (the agent's name and
-the marker; `ai ›` too) shows the current one: the answer as it grows, what the agent
-thinks meanwhile, and every action the agent wants to take as a match of its own with
-Allow once, Always and Deny. The start menu shows neither the answer nor those actions,
+ends with "Ask kortex: …" (first when it reads as a question), `ai <request>` asks at
+once, `ai` alone lists the recent conversations, and `kortex ›` (`ai ›` too) shows the
+current one: while the agent works, a row that says how long it has been at it and what
+it wrote or thought last, and a row for each step it took; then its answer. Every action
+the agent wants to take is a match of its own with Allow once, Always and Deny. Each of
+those rows is one line, except an answer and a row that asks, so KRunner's window holds
+still while the agent works. The start menu shows neither the answer nor those actions,
 so the conversation opens in KRunner. While KRunner is closed, a notification follows
 the request until the agent answers. The agent is opencode or Hermes Agent
 (~/.config/kortex/agent, KORTEX_AGENT): kortex starts its server (`opencode serve`,
@@ -38,29 +40,31 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
 RUNNER_ID = "kortex"  # X-KDE-PluginInfo-Name in kortex.desktop
 TRIGGER = "ai"
-VIEW_MARK = "›"  # after the agent's name (`opencode ›`), or `ai`: the current conversation
+NAME = "kortex"  # what the palette, its rows and its notifications call it, whatever the agent
+VIEW_MARK = "›"  # after kortex's name (`kortex ›`), or `ai`: the current conversation
 # KRunner asks again only for a query that differs from the one it shows, so a refresh
 # puts an invisible word joiner after the marker, or takes it away again.
 JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
-MAX_THOUGHT = 200  # characters of what the agent thinks, shown below its answer meanwhile
+MAX_LATEST = 36  # characters of what the agent wrote or thought last, after the seconds
+MAX_STEPS = 4  # rows of steps while the agent works; the older ones fold into one row
 MAX_NOTE = 300  # characters of an answer's last words a notification shows; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
 CATEGORY_RELEVANCE = 100  # KRunner::QueryMatch::CategoryRelevance::Highest
-CATEGORY_LOWEST = 0  # ::Lowest, for "Ask opencode" below what a search finds
+CATEGORY_LOWEST = 0  # ::Lowest, for "Ask kortex" below what a search finds
 # A search that starts with one of these and has three words or more reads as a request
-# to the agent, and so does one that ends with a question mark: "Ask opencode" comes
+# to the agent, and so does one that ends with a question mark: "Ask kortex" comes
 # first then. English and German, the words a question or a request starts with.
 ASKING = frozenset({
     "how", "why", "what", "what's", "whats", "when", "where", "who", "which", "can",
@@ -296,7 +300,7 @@ class Opencode(Server):
     """opencode's HTTP server (`opencode serve`). KORTEX_OPENCODE_URL names one that runs
     already."""
 
-    title = "opencode"  # the name the matches ask by: "Ask opencode"
+    title = "opencode"  # the agent's name, which the palette says once, as a detail
 
     @classmethod
     def from_environment(cls):
@@ -600,16 +604,17 @@ def hermes_messages(found, run):
 # ---- what the palette shows: plain functions of opencode's data ------------------------
 
 
-def parse(query, name=TRIGGER):
+def parse(query, agent=None):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
-    follow-up after `<name> ›` or `ai ›`, or (None, "") for any other search. `name` is
-    the agent's, as the matches call it; any case, and a tab, are read as typed."""
+    follow-up after `kortex ›` or `ai ›`, or (None, "") for any other search. The
+    agent's name with the marker (`opencode ›`), as 0.4 called the conversation, shows
+    it too. Any case, and a tab, are read as typed."""
     q = query.replace(JOINER, "").strip()
     if q.lower() == TRIGGER:
         return "list", ""
-    for word in dict.fromkeys((name, TRIGGER)):
+    for word in dict.fromkeys(w for w in (NAME, TRIGGER, agent) if w):
         head, rest = q[:len(word)], q[len(word):]
-        # `opencode ›`, `opencode›`, not `opencodex ›`
+        # `kortex ›`, `kortex›`, not `kortexx ›`
         if head.lower() == word.lower() and rest.lstrip().startswith(VIEW_MARK) and not rest[:1].isalnum():
             return "view", rest.lstrip()[len(VIEW_MARK):].strip()
     if q[:len(TRIGGER)].lower() != TRIGGER or not q[len(TRIGGER):][:1].isspace():
@@ -626,10 +631,11 @@ def asking(text):
 
 
 def tool_line(part):
+    """A step the agent took, on one line: the tool and what it was given."""
     state = part.get("state") or {}
     given = state.get("input") or {}
     detail = given.get("command") or given.get("filePath") or given.get("path") or given.get("url") or state.get("title") or ""
-    line = f"› {part.get('tool', 'tool')} {detail}".rstrip()
+    line = " ".join(f"{part.get('tool', 'tool')} {detail}".splitlines()).rstrip()  # a heredoc's too
     if state.get("status") == "error":
         line += " (failed)"
     return line
@@ -639,10 +645,16 @@ def last_user(messages):
     return max((i for i, m in enumerate(messages) if m["info"].get("role") == "user"), default=-1)
 
 
-def answer_of(messages):
-    """The agent's reply to the last request, as lines in order (its text and one line
-    per tool it used), and the error that stopped it, if one did."""
-    lines, error = [], ""
+def reply_parts(messages):
+    """The parts of the agent's reply to the last request, in order."""
+    return [p for m in messages[last_user(messages) + 1:] if m["info"].get("role") == "assistant"
+            for p in m.get("parts", [])]
+
+
+def reply_of(messages):
+    """The agent's reply to the last request: what it said (its text parts), the steps
+    it took (a line per tool it used) and the error that stopped it, if one did."""
+    said, steps, error = [], [], ""
     for message in messages[last_user(messages) + 1:]:
         info = message["info"]
         if info.get("role") != "assistant":
@@ -650,23 +662,24 @@ def answer_of(messages):
         for part in message.get("parts", []):
             if part.get("type") == "text" and not part.get("synthetic") and not part.get("ignored"):
                 if part.get("text", "").strip():
-                    lines.append(part["text"].strip())
+                    said.append(part["text"].strip())
             elif part.get("type") == "tool":
-                lines.append(tool_line(part))
+                steps.append(tool_line(part))
         if info.get("error"):
             data = info["error"].get("data") or {}
             error = data.get("message") or info["error"].get("name", "error")
-    return lines, error
+    return said, steps, error
 
 
-def thinking_of(messages):
-    """What the agent thinks right now, on one line: its reasoning while that is the last
-    thing it wrote of its reply (a reasoning model thinks before it answers), else ""."""
-    parts = [p for m in messages[last_user(messages) + 1:] if m["info"].get("role") == "assistant"
-             for p in m.get("parts", []) if p.get("type") in ("text", "reasoning", "tool")]
-    if parts and parts[-1]["type"] == "reasoning":
-        return " ".join(parts[-1].get("text", "").split())
-    return ""
+def latest_of(messages):
+    """What the agent wrote last while it works, on one line: (True, its thoughts) when a
+    reasoning model thinks, (False, its words) when it writes, (False, "") when it took a
+    step last or has written nothing yet."""
+    parts = [p for p in reply_parts(messages) if p.get("type") in ("text", "reasoning", "tool")
+             and not p.get("synthetic") and not p.get("ignored")]
+    if not parts or parts[-1]["type"] == "tool":
+        return False, ""
+    return parts[-1]["type"] == "reasoning", " ".join(parts[-1].get("text", "").split())
 
 
 def replied(messages, request):
@@ -683,6 +696,24 @@ def replied(messages, request):
 
 def shorten(text, most=MAX_ANSWER):
     return text if len(text) <= most else "…" + text[-most:]
+
+
+def tail(text, most=MAX_LATEST):
+    """The end of `text`, at most `most` characters from a word's start on."""
+    if len(text) <= most:
+        return text
+    end = text[-most:]
+    return "…" + (end.split(" ", 1)[1] if " " in end[1:] else end)
+
+
+def steps_summary(steps):
+    """The steps the agent took, on one line: `3 steps: bash ×2, read`."""
+    used = {}
+    for step in steps:
+        tool = step.split(" ", 1)[0]
+        used[tool] = used.get(tool, 0) + 1
+    tools = ", ".join(f"{t} ×{n}" if n > 1 else t for t, n in used.items())
+    return f"{len(steps)} step{'s' if len(steps) > 1 else ''}: {tools}"
 
 
 def seconds(elapsed):
@@ -716,11 +747,14 @@ def asked_for(p):
     return ", ".join(p.get("patterns") or []) or p.get("permission", "")
 
 
-def view(state, elapsed=None):
-    """The matches of the conversation (`opencode ›`): what the agent asks to do first,
-    then its answer, with what it thinks meanwhile and how long it has been at it
-    (`elapsed`, seconds, or None)."""
-    lines, error = answer_of(state["messages"])
+def view(state, elapsed=None, agent=""):
+    """The matches of the conversation (`kortex ›`): what the agent asks to do first;
+    while it works, a status row (how long it has been at it, `elapsed` seconds or None,
+    and what it wrote or thought last) and a row for each of its last MAX_STEPS steps;
+    then its answer and its steps on one row. All of them but an answer and a row that
+    asks are one line, which KRunner gives a fixed height: its window grows by a row
+    for a step, never by a line for a word."""
+    said, steps, error = reply_of(state["messages"])
     matches = []
     for p in state["permissions"]:
         if p["id"] == UNREADABLE["id"]:
@@ -734,21 +768,38 @@ def view(state, elapsed=None):
         matches.append(match(
             "permission" + SEP + p["id"], text, "dialog-warning", 1.0,
             "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
+    status, retry = state["status"]
+    working = status != "idle"
+    hint = (agent + " · " if agent else "") + "Copy · Open in terminal"
     if error:
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
-    status, retry = state["status"]
-    body = "\n".join(lines)
-    if body or status != "idle":
-        subtext = "Copy · Open in terminal"
-        if status == "busy":
-            subtext = "Working… " + (seconds(elapsed) + " · " if elapsed is not None else "· ") + subtext
+    elif working:
+        if state["permissions"]:
+            line = "Waiting for your answer"  # holds still while a row asks, to be clicked
         elif status == "retry":
-            subtext = f"Retrying: {retry} · " + subtext
-        text = markup(shorten(body or "Thinking…"))
-        thought = thinking_of(state["messages"]) if status != "idle" else ""
-        if thought:  # in italics below the answer, so it reads as the agent's thoughts
-            text += "<br><i>" + markup(shorten(thought, MAX_THOUGHT)) + "</i>"
-        matches.append(match("answer", text, ICON, 0.9, subtext, ["copy", "terminal"], True, styled=True))
+            line = f"Retrying: {retry}"
+        else:
+            thinking, words = latest_of(state["messages"])
+            line = ("Thinking" if thinking else "Working") + (f" · {seconds(elapsed)}" if elapsed is not None else "")
+            if words:
+                line += " · " + tail(words)
+        matches.append(match("answer", line, ICON, 0.9, hint, ["copy", "terminal"]))
+    elif said or steps:
+        matches.append(match("answer", markup(shorten("\n".join(said) or "Done.")), ICON, 0.9, hint,
+                             ["copy", "terminal"], True, styled=True))
+    if steps and working and not error:
+        shown = steps if len(steps) <= MAX_STEPS else steps[-(MAX_STEPS - 1):]
+        if len(shown) < len(steps):
+            earlier = len(steps) - len(shown)
+            matches.append(match("step" + SEP + "earlier", f"+{earlier} earlier step{'s' if earlier > 1 else ''}",
+                                 "utilities-terminal", 0.85, "Open in terminal"))
+        first = len(steps) - len(shown)
+        for i, step in enumerate(shown):  # in the order taken
+            matches.append(match("step" + SEP + str(first + i), step, "utilities-terminal", 0.84 - i * 0.001,
+                                 "Open in terminal"))
+    elif steps:
+        matches.append(match("step" + SEP + "all", steps_summary(steps), "utilities-terminal", 0.85,
+                             "Open in terminal to see them"))
     return matches
 
 
@@ -806,7 +857,7 @@ class Kortex:
         self.desktop = desktop
         self.now = now
         self.background = background
-        self.session = None  # the conversation `opencode ›` shows
+        self.session = None  # the conversation `kortex ›` shows
         self.state = None  # (session, what the agent said of it last)
         self.sessions = None  # the recent conversations, as the agent listed them last
         self.down = False  # the last request found no server, or none that answered
@@ -830,8 +881,8 @@ class Kortex:
 
     @property
     def marker(self):
-        """The query that shows the current conversation: the agent's name and ›."""
-        return f"{self.agent.title} {VIEW_MARK}"
+        """The query that shows the current conversation: kortex's name and ›."""
+        return f"{NAME} {VIEW_MARK}"
 
     def parse(self, query):
         return parse(query, self.agent.title)
@@ -903,7 +954,7 @@ class Kortex:
     def ask_matches(self, text):
         if not text:
             return [self.hint()]
-        matches = [match("ask" + SEP + text, text, ICON, 1.0, f"Ask {self.agent.title} · Enter")]
+        matches = [match("ask" + SEP + text, text, ICON, 1.0, f"Ask {NAME} · Enter")]
         if self.session:
             matches.append(match("continue" + SEP + text, text, ICON, 0.9, "Continue the conversation"))
         return matches
@@ -927,8 +978,9 @@ class Kortex:
         return matches
 
     def hint(self):
-        return match("hint", f"Ask {self.agent.title}: type your request", ICON, 1.0,
-                     f"{self.marker} shows the current conversation")
+        # The one place outside the conversation that names the agent behind kortex.
+        return match("hint", f"Ask {NAME}: type your request", ICON, 1.0,
+                     f"{self.agent.title} answers · {self.marker} shows the current conversation")
 
     def waiting_match(self):
         elapsed = self.elapsed() if self.waiting else None
@@ -939,25 +991,24 @@ class Kortex:
         return match("problem", "The agent is not reachable", "dialog-error", 1.0, self.unreachable)
 
     def anything(self, query):
-        """Any search, offered to the agent by its name ("Ask opencode: …" reads as
-        something to press): below what Plasma finds, or first when it reads as a
-        question or a request, with a conversation to continue then too."""
+        """Any search, offered to the agent ("Ask kortex: …" reads as something to
+        press): below what Plasma finds, or first when it reads as a question or a
+        request, with a conversation to continue then too."""
         text = query.replace(JOINER, "").strip()
         if len(text) < MIN_SEARCH:
             return []
-        title = self.agent.title
         if not asking(text):
-            return [match("ask" + SEP + text, f"Ask {title}: {text}", ICON, 0.1,
-                          f"Search, ask, fix · {title} answers in the command palette", category=CATEGORY_LOWEST)]
-        matches = [match("ask" + SEP + text, f"Ask {title}: {text}", ICON, 1.0,
-                         f"A new conversation · {title} answers in the command palette · Enter")]
+            return [match("ask" + SEP + text, f"Ask {NAME}: {text}", ICON, 0.1,
+                          f"Search, ask, fix · {NAME} answers in the command palette", category=CATEGORY_LOWEST)]
+        matches = [match("ask" + SEP + text, f"Ask {NAME}: {text}", ICON, 1.0,
+                         f"A new conversation · {NAME} answers in the command palette · Enter")]
         if self.session:
-            matches.append(match("continue" + SEP + text, f"Continue with {title}: {text}", ICON, 0.9,
+            matches.append(match("continue" + SEP + text, f"Continue with {NAME}: {text}", ICON, 0.9,
                                  "The current conversation"))
         return matches
 
     def menu_view_matches(self, followup):
-        """The conversation (`opencode ›`) in the start menu, which shows neither the
+        """The conversation (`kortex ›`) in the start menu, which shows neither the
         answer nor its actions: the conversation opens in KRunner instead."""
         matches = []
         if followup:
@@ -980,10 +1031,10 @@ class Kortex:
         if self.unreachable:
             return matches + [self.unreachable_match()]
         state = self.current()
-        return matches + (view(state, self.elapsed()) if state else [self.waiting_match()])
+        return matches + (view(state, self.elapsed(), self.agent.title) if state else [self.waiting_match()])
 
     def current(self):
-        """What the agent said last of the conversation `opencode ›` shows, or None."""
+        """What the agent said last of the conversation `kortex ›` shows, or None."""
         if self.state and self.state[0] == self.session:
             return self.state[1]
         return None
@@ -1041,7 +1092,7 @@ class Kortex:
                 self.waiting = ""
                 self.failed(None, error)
                 if error:
-                    self.finish(f"{self.agent.title} did not get the request", str(error))
+                    self.finish(f"{NAME} did not get the request", str(error))
 
             self.reopen(self.marker, menu)
             self.work(send, sent)
@@ -1057,9 +1108,9 @@ class Kortex:
                     state["permissions"] = [p for p in state["permissions"] if p["id"] != arg]
                 self.work(lambda: self.agent.reply(arg, REPLIES[action]), self.failed)
             self.reopen(self.view_query, menu)
-        elif kind == "answer" and self.session:
+        elif kind in ("answer", "step") and self.session:
             session = self.session
-            if action == "terminal":
+            if action == "terminal" or kind == "step":  # a step: the terminal shows it
                 def opened(found, error):
                     if found:
                         attach, env = found
@@ -1070,8 +1121,8 @@ class Kortex:
             else:
                 def read(messages, error):
                     if messages is not None:
-                        lines, stopped = answer_of(messages)
-                        self.desktop.copy("\n".join(lines) or stopped)
+                        said, steps, stopped = reply_of(messages)
+                        self.desktop.copy("\n".join(said) or stopped or "\n".join(steps))
                     self.failed(None, error)
 
                 self.work(lambda: self.agent.messages(session), read)
@@ -1126,21 +1177,20 @@ class Kortex:
         state = self.current()
         if self.asked_at is None or self.waiting or not state:
             return
-        title = self.agent.title
-        lines, error = answer_of(state["messages"])
+        said, steps, error = reply_of(state["messages"])
         if replied(state["messages"], self.request) and (error or state["status"][0] == "idle"):
             if error:
-                self.finish(f"{title} stopped", error)
+                self.finish(f"{NAME} stopped", error)
             else:
-                # Its last words, not the tools it used: after a task they say how it went,
+                # Its last words, not the steps it took: after a task they say how it went,
                 # and a plain answer is its last words anyway.
-                said = ([line for line in lines if not line.startswith("› ")] or lines or [""])[-1]
-                self.finish(f"{title} answered", said if len(said) <= MAX_NOTE else said[:MAX_NOTE] + "…")
+                last = (said or steps or [""])[-1]
+                self.finish(f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…")
             return
         if self.shown is None and not self.told and self.now() - self.asked_at >= TELL_AFTER:
             log("KRunner closed while the agent works; a notification follows the request")
             self.told = -1  # asked for; its id comes with the notification server's answer
-            self.notify(f"{title} is working on it", f"{self.request}\nA notification follows when it answers.",
+            self.notify(f"{NAME} is working on it", f"{self.request}\nA notification follows when it answers.",
                         transient=True, follows=True)
 
     def tick(self):
@@ -1156,7 +1206,7 @@ class Kortex:
             if self.seen() != self.signature:
                 self.signature = self.seen()
                 # KRunner asks again only for a query that differs from the one it shows:
-                # an invisible word joiner goes after `opencode ›` or `ai `, or away again.
+                # an invisible word joiner goes after `kortex ›` or `ai `, or away again.
                 q = self.shown
                 kind, followup = self.parse(q)
                 if JOINER in q:
@@ -1172,7 +1222,7 @@ class Kortex:
         for p in (self.current() or {}).get("permissions", []):
             if p["id"] not in self.notified:
                 self.notified.add(p["id"])
-                self.notify(f"{self.agent.title} asks first", f"{p.get('permission', '')}: {asked_for(p)}")
+                self.notify(f"{NAME} asks first", f"{p.get('permission', '')}: {asked_for(p)}")
 
     def idle(self):
         """True when kortex may stop: nothing asked for a while, nothing on its way to the

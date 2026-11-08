@@ -34,4 +34,4 @@ pkill -f "$data/kortex/kortex.py" 2> /dev/null || true
 if command -v kquitapp6 > /dev/null; then
   kquitapp6 krunner 2> /dev/null || true
 fi
-echo "kortex: installed; open KRunner (Meta+Space or Alt+Space), type your request and pick Ask opencode"
+echo "kortex: installed; open KRunner (Meta+Space or Alt+Space), type your request and pick Ask kortex"

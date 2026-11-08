@@ -126,7 +126,7 @@ def main(agent):
         assert "MatchRegex" not in config_reply and int(config_reply["MinLetterCount"]) == 2, config_reply
         assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal"]
         assert [str(m[0]) for m in k.Match("firefox")] == ["ask" + SEP + "firefox"]  # any search, below
-        marker = "Hermes ›" if agent == "hermes" else "opencode ›"  # the conversation, by the agent's name
+        marker = "kortex ›"  # the conversation, whatever the agent
 
         proof = home / "kortex-proof"
         if agent == "hermes":
@@ -164,7 +164,8 @@ def main(agent):
 
         def answer():
             for m in k.Match(marker, timeout=30):
-                if str(m[0]) == "answer" and mock_llm.DONE in str(m[1]):
+                # the answer, not the status row before it, which ends with its last words
+                if str(m[0]) == "answer" and bool(m[5]["multiline"]) and mock_llm.DONE in str(m[1]):
                     return m
         done = wait_for("the answer", answer)
         assert bool(done[5]["multiline"])
