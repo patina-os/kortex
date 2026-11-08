@@ -167,7 +167,7 @@ class Events(unittest.TestCase):
         with mock.patch.object(oc, "request", return_value=stored):
             messages = oc.messages("ses_1")
         self.assertEqual([p["text"] for p in messages[1]["parts"]], ["The user asks", "Let"])
-        self.assertEqual(kortex.thinking_of(messages), "")  # its text comes after the thought
+        self.assertEqual(kortex.latest_of(messages), (False, "Let"))  # its text comes after the thought
         kortex.note_event(oc.asked, event("message.part.updated", {"part": {"id": "prt_1", "type": "reasoning",
                                                                            "text": "The user asks"}}), oc.streamed)
         self.assertEqual(oc.streamed, {"prt_2": "Let"})  # a part done is read whole from GET /message
@@ -209,14 +209,15 @@ class Parse(unittest.TestCase):
         self.assertEqual(kortex.parse("ai\t›"), ("view", ""))
         self.assertEqual(kortex.parse("ai ›" + kortex.JOINER), ("view", ""))
 
-    def test_the_conversation_is_called_by_the_agents_name(self):
-        self.assertEqual(kortex.parse("opencode ›", "opencode"), ("view", ""))
-        self.assertEqual(kortex.parse("Opencode › and y", "opencode"), ("view", "and y"))
-        self.assertEqual(kortex.parse("Hermes ›" + kortex.JOINER, "Hermes"), ("view", ""))
+    def test_the_conversation_is_called_kortex(self):
+        self.assertEqual(kortex.parse("kortex ›"), ("view", ""))
+        self.assertEqual(kortex.parse("Kortex › and y"), ("view", "and y"))
+        self.assertEqual(kortex.parse("kortex ›" + kortex.JOINER, "Hermes"), ("view", ""))
         self.assertEqual(kortex.parse("ai ›", "Hermes"), ("view", ""))  # as typed before 0.4.0
-        self.assertEqual(kortex.parse("opencode", "opencode"), (None, ""))
-        self.assertEqual(kortex.parse("opencodex ›", "opencode"), (None, ""))
+        self.assertEqual(kortex.parse("opencode ›", "opencode"), ("view", ""))  # as 0.4 called it
         self.assertEqual(kortex.parse("opencode ›"), (None, ""))  # not the agent's name
+        self.assertEqual(kortex.parse("kortex"), (None, ""))
+        self.assertEqual(kortex.parse("kortexx ›"), (None, ""))
 
     def test_what_reads_as_a_request(self):
         for text in ("why is my wifi slow", "wifi slow?", "Wie ändere ich das Theme", "install photocraft please",
@@ -231,29 +232,43 @@ class Answer(unittest.TestCase):
         history = [user("first"), assistant(text("old answer")), user("second"),
                    assistant(text("thinking aloud", synthetic=True), tool("bash", command="nmcli dev"),
                              text("Your wifi runs on 2.4 GHz."))]
-        self.assertEqual(kortex.answer_of(history),
-                         (["› bash nmcli dev", "Your wifi runs on 2.4 GHz."], ""))
+        self.assertEqual(kortex.reply_of(history), (["Your wifi runs on 2.4 GHz."], ["bash nmcli dev"], ""))
 
     def test_error(self):
         history = [user("hi"), assistant(error={"name": "ProviderAuthError", "data": {"message": "No API key"}})]
-        self.assertEqual(kortex.answer_of(history), ([], "No API key"))
+        self.assertEqual(kortex.reply_of(history), ([], [], "No API key"))
 
     def test_failed_tool(self):
-        self.assertEqual(kortex.tool_line(tool("edit", "error", filePath="/etc/x")), "› edit /etc/x (failed)")
+        self.assertEqual(kortex.tool_line(tool("edit", "error", filePath="/etc/x")), "edit /etc/x (failed)")
+        self.assertEqual(kortex.tool_line(tool("bash", command="cat <<EOF\nhi\nEOF")), "bash cat <<EOF hi EOF")
+
+    def test_latest_keeps_its_end_from_a_word_on(self):
+        self.assertEqual(kortex.tail("short"), "short")
+        shown = kortex.tail("I'll check what's available through the system's package sources first.")
+        self.assertEqual(shown, "…the system's package sources first.")
+        self.assertLessEqual(len(shown), kortex.MAX_LATEST + 1)
+
+    def test_steps_on_one_line(self):
+        self.assertEqual(kortex.steps_summary(["bash ls", "read /etc/x", "bash df -h"]), "3 steps: bash ×2, read")
+        self.assertEqual(kortex.steps_summary(["webfetch https://example.org"]), "1 step: webfetch")
+
+
+def busy(*parts, permissions=(), error=None):
+    return {"messages": [user("x"), assistant(*parts, error=error)], "status": ("busy", ""),
+            "permissions": list(permissions)}
 
 
 class View(unittest.TestCase):
-    def test_permission_first_then_answer(self):
-        state = {"messages": [user("light theme"), assistant(text("Switching."))],
-                 "status": ("busy", ""), "permissions": [PERMISSION]}
-        matches = kortex.view(state)
+    def test_permission_first_then_the_status(self):
+        state = busy(text("Switching."), permissions=[PERMISSION])
+        matches = kortex.view(state, None, "opencode")
         self.assertEqual([m[0] for m in matches], ["permission" + SEP + "per_1", "answer"])
         self.assertEqual(matches[0][1], "Allow bash: patina theme mode light")  # PERMISSION has no `always`
         self.assertEqual(matches[0][4]["actions"], ["allow-once", "allow-always", "deny"])
         self.assertTrue(matches[0][4]["multiline"])  # a long command is shown whole
-        self.assertEqual(matches[1][1], "Switching.")
-        self.assertTrue(matches[1][4]["multiline"])
-        self.assertTrue(matches[1][4]["subtext"].startswith("Working…"))
+        self.assertEqual(matches[1][1], "Waiting for your answer")  # holds still to be clicked
+        self.assertFalse(matches[1][4]["multiline"])
+        self.assertEqual(matches[1][4]["subtext"], "opencode · Copy · Open in terminal")
 
     def test_the_whole_command_shows_as_written(self):
         # opencode cuts a command at `;`, `|` and `&&` for its patterns; KRunner reads a
@@ -261,7 +276,7 @@ class View(unittest.TestCase):
         command = "true <x ; rm -rf ~/Documents ; curl -s https://example.org/x.sh | sh && echo &amp;"
         asked = dict(PERMISSION, patterns=["true <x", "rm -rf ~/Documents", "curl -s https://example.org/x.sh", "sh",
                                            "echo &amp;"], metadata={"command": command})
-        state = {"messages": [user("x"), assistant(text("a < b\nand b > c"))], "status": ("busy", ""),
+        state = {"messages": [user("x"), assistant(text("a < b\nand b > c"))], "status": ("idle", ""),
                  "permissions": [asked]}
         shown = kortex.view(state)
         self.assertEqual(shown[0][1], "Allow bash: true &lt;x ; rm -rf ~/Documents ; "
@@ -283,27 +298,64 @@ class View(unittest.TestCase):
     def test_single_line_text_stays_plain(self):
         self.assertEqual(kortex.match("ask" + SEP + "a <b>", "a <b>")[1], "a <b>")
 
-    def test_thinking(self):
+    def test_working_before_a_word(self):
         state = {"messages": [user("hi")], "status": ("busy", ""), "permissions": []}
-        self.assertEqual(kortex.view(state)[0][1], "Thinking…")
+        [m] = kortex.view(state, 3)
+        self.assertEqual((m[0], m[1], m[4]["multiline"]), ("answer", "Working · 3 s", False))
+        self.assertEqual(m[4]["actions"], ["copy", "terminal"])
 
-    def test_what_the_agent_thinks_shows_while_it_works(self):
-        state = {"messages": [user("hi"), assistant(reasoning("The user  greets me;\nI <should> greet back."))],
-                 "status": ("busy", ""), "permissions": []}
+    def test_the_status_says_what_the_agent_wrote_or_thought_last(self):
+        state = busy(reasoning("The user  greets me;\nI <should> greet back."))
         [m] = kortex.view(state, 12)
-        self.assertEqual(m[1], "Thinking…<br><i>The user greets me; I &lt;should&gt; greet back.</i>")
-        self.assertTrue(m[4]["subtext"].startswith("Working… 12 s · "))
-        state["messages"][1]["parts"].append(text("Hello!"))  # then it answers
-        self.assertEqual(kortex.view(state, 75)[0][1], "Hello!")
-        self.assertIn("1 min 15 s", kortex.view(state, 75)[0][4]["subtext"])
+        self.assertEqual(m[1], "Thinking · 12 s · …greets me; I <should> greet back.")  # one line, plain text
+        state["messages"][1]["parts"].append(text("Hello there, nice to see you!"))  # then it answers
+        self.assertEqual(kortex.view(state, 75)[0][1], "Working · 1 min 15 s · Hello there, nice to see you!")
         state["messages"][1]["parts"].append(reasoning("x" * 500))
         state["status"] = ("idle", "")  # done: its thoughts are not part of the answer
-        self.assertEqual(kortex.view(state)[0][1], "Hello!")
+        [m] = kortex.view(state)
+        self.assertEqual((m[1], m[4]["multiline"]), ("Hello there, nice to see you!", True))
 
-    def test_long_thoughts_keep_their_end(self):
-        state = {"messages": [user("hi"), assistant(reasoning("y" * 500 + "END"))], "status": ("busy", ""),
-                 "permissions": []}
-        self.assertTrue(kortex.view(state)[0][1].endswith("END</i>"))
+    def test_retrying(self):
+        state = dict(busy(text("x")), status=("retry", "rate limited"))
+        self.assertEqual(kortex.view(state, 5)[0][1], "Retrying: rate limited")
+
+    def test_a_row_per_step_while_the_agent_works(self):
+        state = busy(text("Looking."), tool("bash", command="apt-cache search claude"), tool("read", filePath="/etc/x"))
+        matches = kortex.view(state, 9)
+        self.assertEqual([m[0] for m in matches], ["answer", "step" + SEP + "0", "step" + SEP + "1"])
+        self.assertEqual(matches[0][1], "Working · 9 s")  # a step was the last thing it did
+        self.assertEqual([m[1] for m in matches[1:]], ["bash apt-cache search claude", "read /etc/x"])
+        self.assertEqual(matches[1][2], "utilities-terminal")
+        self.assertGreater(matches[1][3], matches[2][3])  # in the order taken
+        self.assertFalse(any(m[4]["multiline"] for m in matches))  # every row one line: the window holds still
+
+    def test_older_steps_fold_into_one_row(self):
+        state = busy(*[tool("bash", command=f"step {i}") for i in range(6)])
+        matches = kortex.view(state, 30)
+        self.assertEqual([m[1] for m in matches[1:]], ["+3 earlier steps", "bash step 3", "bash step 4", "bash step 5"])
+        self.assertEqual(len(matches), 1 + kortex.MAX_STEPS)
+        self.assertEqual([m[0] for m in matches[2:]], ["step" + SEP + str(i) for i in (3, 4, 5)])
+
+    def test_done_the_answer_and_its_steps_on_one_row(self):
+        state = busy(text("Looking."), tool("bash", command="df -h"), tool("bash", command="du -sh ~"),
+                     text("Your disk is full of <caches>."))
+        state["status"] = ("idle", "")
+        matches = kortex.view(state)
+        self.assertEqual([m[0] for m in matches], ["answer", "step" + SEP + "all"])
+        self.assertEqual(matches[0][1], "Looking.<br>Your disk is full of &lt;caches&gt;.")  # what it said, no steps
+        self.assertEqual(matches[1][1], "2 steps: bash ×2")
+        self.assertFalse(matches[1][4]["multiline"])
+
+    def test_done_with_steps_alone(self):
+        state = busy(tool("bash", command="patina theme mode light"))
+        state["status"] = ("idle", "")
+        self.assertEqual([m[1] for m in kortex.view(state)], ["Done.", "1 step: bash"])
+
+    def test_the_agent_stopped(self):
+        state = busy(tool("bash", command="ls"), error={"name": "APIError", "data": {"message": "rate limited"}})
+        state["status"] = ("idle", "")
+        matches = kortex.view(state)
+        self.assertEqual([(m[0], m[1]) for m in matches], [("answer", "rate limited"), ("step" + SEP + "all", "1 step: bash")])
 
     def test_long_answer_keeps_the_end(self):
         state = {"messages": [user("hi"), assistant(text("x" * 5000 + "END"))], "status": ("idle", ""),
@@ -327,15 +379,15 @@ class Runner(unittest.TestCase):
         for menu in (True, False):
             [m] = k.match("wifi settings ", menu=menu)
             self.assertEqual(m[0], "ask" + SEP + "wifi settings")
-            self.assertEqual(m[1], "Ask opencode: wifi settings")
-            self.assertIn("opencode answers", m[4]["subtext"])
+            self.assertEqual(m[1], "Ask kortex: wifi settings")
+            self.assertIn("kortex answers", m[4]["subtext"])
             self.assertEqual((m[3], m[4]["category"]), (0.1, kortex.CATEGORY_LOWEST))  # below what Plasma finds
         self.assertEqual(k.match("ko"), [])
         self.assertEqual(k.match("ai hello", menu=True)[0][0], "ask" + SEP + "hello")
         oc.fail = None
         k.run(m[0], "")
         self.assertEqual(oc.asked, [("ses_1", "wifi settings")])
-        self.assertEqual(desk.queries, ["opencode ›"])
+        self.assertEqual(desk.queries, ["kortex ›"])
 
     def test_a_question_comes_first(self):
         k, *_ = new()
@@ -349,20 +401,21 @@ class Runner(unittest.TestCase):
     def test_another_search_leaves_the_conversation(self):
         k, oc, desk, _clock = new()
         k.run("ask" + SEP + "x", "")
-        k.match("opencode ›")
+        k.match("kortex ›")
         self.assertTrue(k.viewing)
         k.match("firefox")  # the user types another search over it
         self.assertFalse(k.viewing)
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
-        self.assertEqual(desk.queries, ["opencode ›"])  # the search stays
+        self.assertEqual(desk.queries, ["kortex ›"])  # the search stays
 
-    def test_the_rows_ask_by_the_agents_name(self):
+    def test_the_rows_say_kortex_and_the_hint_names_the_agent(self):
         k = kortex.Kortex(kortex.Hermes("http://127.0.0.1:1", "key"), FakeDesktop())
-        self.assertEqual(k.match("fix my wifi", menu=True)[0][1], "Ask Hermes: fix my wifi")
-        self.assertEqual(k.ask_matches("hello")[0][4]["subtext"], "Ask Hermes · Enter")
-        self.assertEqual(k.ask_matches("")[0][1], "Ask Hermes: type your request")
-        self.assertEqual(k.ask_matches("")[0][4]["subtext"], "Hermes › shows the current conversation")
+        self.assertEqual(k.match("fix my wifi", menu=True)[0][1], "Ask kortex: fix my wifi")
+        self.assertEqual(k.ask_matches("hello")[0][4]["subtext"], "Ask kortex · Enter")
+        self.assertEqual(k.ask_matches("")[0][1], "Ask kortex: type your request")
+        self.assertEqual(k.ask_matches("")[0][4]["subtext"], "Hermes answers · kortex › shows the current conversation")
+        self.assertEqual(k.marker, "kortex ›")
 
     def test_the_start_menu_opens_the_conversation_in_the_palette(self):
         k, oc, desk, _ = new()
@@ -373,14 +426,14 @@ class Runner(unittest.TestCase):
         self.assertEqual(ids, ["continue" + SEP + "and y", "show"])  # no permission it cannot answer
         self.assertFalse(k.viewing)
         k.run("show", "")
-        self.assertEqual(desk.queries, ["opencode ›", "opencode ›"])
+        self.assertEqual(desk.queries, ["kortex ›", "kortex ›"])
 
     def test_ask_then_view(self):
         k, oc, desk, _ = new()
         k.run("ask" + SEP + "switch to the light theme", "")
         self.assertEqual(oc.created, ["switch to the light theme"])
         self.assertEqual(oc.asked, [("ses_1", "switch to the light theme")])
-        self.assertEqual(desk.queries, ["opencode ›"])
+        self.assertEqual(desk.queries, ["kortex ›"])
         oc.history = [user("switch to the light theme")]
         oc.state = ("busy", "")
         oc.pending = [PERMISSION]
@@ -485,7 +538,7 @@ class Runner(unittest.TestCase):
         self.assertFalse(k.viewing)
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
-        self.assertEqual(desk.queries, ["opencode ›"])  # not opened again
+        self.assertEqual(desk.queries, ["kortex ›"])  # not opened again
 
     def test_the_start_menu_closing_late_keeps_the_conversation_on_screen(self):
         k, oc, desk, clock = new()
@@ -509,20 +562,20 @@ class Runner(unittest.TestCase):
         oc.history = [user("x"), assistant(text("hel"))]
         k.tick()
         # KRunner asks again only for a query that differs from the one it shows
-        self.assertNotEqual(desk.queries[-1], "opencode ›")
+        self.assertNotEqual(desk.queries[-1], "kortex ›")
         self.assertEqual(k.parse(desk.queries[-1]), ("view", ""))
         self.assertEqual(len(desk.queries), before + 1)
         k.match(desk.queries[-1])
         oc.history = [user("x"), assistant(text("hello"))]
         k.tick()
-        self.assertEqual(desk.queries[-1], "opencode ›")
+        self.assertEqual(desk.queries[-1], "kortex ›")
 
     def test_the_seconds_count_while_the_agent_works(self):
         k, oc, desk, clock = new()
         k.run("ask" + SEP + "x", "")
         oc.history = [user("x")]
         oc.state = ("busy", "")
-        k.match("opencode ›")
+        k.match("kortex ›")
         k.tick()
         before = len(desk.queries)
         k.tick()
@@ -530,7 +583,7 @@ class Runner(unittest.TestCase):
         clock.t += 1
         k.tick()  # a second later: KRunner shows it again
         self.assertEqual(len(desk.queries), before + 1)
-        self.assertIn("Working… 1 s", k.match(desk.queries[-1])[0][4]["subtext"])
+        self.assertEqual(k.match(desk.queries[-1])[0][1], "Working · 1 s")
         oc.pending = [PERMISSION]
         k.tick()
         k.match(desk.queries[-1])
@@ -546,20 +599,20 @@ class Runner(unittest.TestCase):
         k.tick()
         k.tick()
         self.assertEqual(len(desk.notes), 1)
-        self.assertEqual(desk.notes[0][0], "opencode asks first")
+        self.assertEqual(desk.notes[0][0], "kortex asks first")
         self.assertIn("patina theme mode light", desk.notes[0][1])
         oc.pending = [dict(PERMISSION, id="per_2", metadata={"command": "ls <x; rm -r y >z"})]
         k.tick()
         self.assertIn("bash: ls &lt;x; rm -r y &gt;z", desk.notes[1][1])  # the body is markup too
         k.show(2)  # its Show
-        self.assertEqual(desk.queries[-1], "opencode ›")
+        self.assertEqual(desk.queries[-1], "kortex ›")
         k.show(99)  # another program's notification
         self.assertEqual(len(desk.queries), 2)
 
     def test_a_notification_follows_the_request_while_krunner_is_closed(self):
         k, oc, desk, clock = new()
         k.run("ask" + SEP + "why is my wifi slow", "")
-        k.match("opencode ›")
+        k.match("kortex ›")
         clock.t += 2
         k.teardown()  # the user clicks elsewhere
         oc.history = [user("why is my wifi slow"), assistant(reasoning("Let me look"))]
@@ -571,22 +624,22 @@ class Runner(unittest.TestCase):
         k.tick()
         self.assertEqual(len(desk.notes), 1)
         summary, body, _replaces, transient = desk.notes[0]
-        self.assertEqual((summary, transient), ("opencode is working on it", True))
+        self.assertEqual((summary, transient), ("kortex is working on it", True))
         self.assertIn("why is my wifi slow", body)
         oc.history[1]["parts"].append(text("It runs on 2.4 GHz <slow>."))
         oc.state = ("idle", "")
         k.tick()
-        self.assertEqual(desk.notes[1], ("opencode answered", "It runs on 2.4 GHz &lt;slow&gt;.", 1, False))
+        self.assertEqual(desk.notes[1], ("kortex answered", "It runs on 2.4 GHz &lt;slow&gt;.", 1, False))
         k.tick()
         self.assertEqual(len(desk.notes), 2)
         k.show(2)
-        self.assertEqual(desk.queries[-1], "opencode ›")
+        self.assertEqual(desk.queries[-1], "kortex ›")
 
     def test_the_journal_tells_how_a_request_went(self):
         k, oc, desk, clock = new()
         with mock.patch.object(kortex, "log") as logged:
             k.run("ask" + SEP + "x", "")
-            k.match("opencode ›")
+            k.match("kortex ›")
             oc.history, oc.state, oc.pending = [user("x")], ("busy", ""), [PERMISSION]
             k.tick()
             k.tick()
@@ -597,7 +650,7 @@ class Runner(unittest.TestCase):
             k.tick()
         self.assertEqual([c.args[0] for c in logged.call_args_list], [
             "asking opencode", "opencode asks first: bash",
-            "KRunner asked again: the palette follows the conversation", "opencode answered after 4 s"])
+            "KRunner asked again: the palette follows the conversation", "kortex answered after 4 s"])
 
     def test_the_notification_tells_how_a_task_ended(self):
         k, oc, desk, _clock = new()
@@ -615,7 +668,7 @@ class Runner(unittest.TestCase):
     def test_an_answer_on_screen_needs_no_notification(self):
         k, oc, desk, clock = new()
         k.run("ask" + SEP + "x", "")
-        k.match("opencode ›")
+        k.match("kortex ›")
         clock.t += 30
         oc.history = [user("x"), assistant(text("done"))]
         k.tick()
@@ -629,7 +682,7 @@ class Runner(unittest.TestCase):
         k.run("ask" + SEP + "x", "", menu=True)  # KRunner never opened
         oc.history = [user("x"), assistant(error={"name": "APIError", "data": {"message": "rate limited"}})]
         k.tick()
-        self.assertEqual(desk.notes, [("opencode stopped", "rate limited", 0, False)])
+        self.assertEqual(desk.notes, [("kortex stopped", "rate limited", 0, False)])
 
     def test_an_older_answer_is_not_the_reply(self):
         k, oc, desk, _clock = new()
@@ -641,7 +694,7 @@ class Runner(unittest.TestCase):
         self.assertEqual(len(desk.notes), 1)
         oc.history += [user("second"), assistant(text("new"))]
         k.tick()
-        self.assertEqual(desk.notes[-1][:2], ("opencode answered", "new"))
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", "new"))
 
     def test_idle(self):
         k, oc, _desk, clock = new()
@@ -680,7 +733,7 @@ class Background(unittest.TestCase):
     def test_a_request_shows_a_waiting_row_until_the_agent_answers(self):
         k, oc, desk, _clock, later = held()
         k.run("ask" + SEP + "x", "")
-        self.assertEqual(desk.queries, ["opencode ›"])  # KRunner opens on the conversation at once
+        self.assertEqual(desk.queries, ["kortex ›"])  # KRunner opens on the conversation at once
         self.assertEqual(oc.created, [])  # while nothing has reached the agent yet
         self.assertEqual([m[0] for m in k.match("ai ›")], ["waiting"])
         later.run()
@@ -864,14 +917,14 @@ class HermesBackend(unittest.TestCase):
             {"role": "assistant", "content": "Removed it."},
         ]
         messages = kortex.hermes_messages(found, {"status": "running"})
-        lines, error = kortex.answer_of(messages)
-        self.assertEqual(lines, ["› terminal rm -r old-photos", "› read_file notes.txt (failed)", "› terminal ls", "Removed it."])
-        self.assertEqual(error, "")
+        said, steps, error = kortex.reply_of(messages)
+        self.assertEqual(steps, ["terminal rm -r old-photos", "read_file notes.txt (failed)", "terminal ls"])
+        self.assertEqual((said, error), (["Removed it."], ""))
         self.assertEqual(messages[1]["parts"][2]["state"]["status"], "running")  # no result yet
 
     def test_a_failed_run_shows_its_error(self):
         messages = kortex.hermes_messages([{"role": "user", "content": "x"}], {"status": "failed", "error": "model unreachable"})
-        self.assertEqual(kortex.answer_of(messages), ([], "model unreachable"))
+        self.assertEqual(kortex.reply_of(messages), ([], [], "model unreachable"))
 
     def test_permission_shows_what_hermes_counts_as_dangerous(self):
         self.h.asked["req_1"] = {"id": "req_1", "sessionID": "ses_1", "run": "run_1",
@@ -998,4 +1051,4 @@ class Replies(unittest.TestCase):
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
         self.assertEqual(k.parse(desk.queries[-1]), ("view", ""))
-        self.assertEqual(desk.queries[-1], "opencode ›" + kortex.JOINER)
+        self.assertEqual(desk.queries[-1], "kortex ›" + kortex.JOINER)

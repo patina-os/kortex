@@ -17,13 +17,14 @@
 
 ## Choices still open
 
-- **Streaming in KRunner.** KRunner follows each refresh, but whether reopening it on
-  every change keeps the selection steady enough to read a growing answer, or whether
-  kortex should refresh less often, is still to see on a real desktop, on Plasma 6.3
-  (Debian 13) and the current Plasma.
-- **A name of its own.** The conversation is called by the agent's name (`opencode ›`)
-  from one place, the agent's `title`, so that an assistant named by the user can take
-  it later.
+- **Streaming in KRunner.** The first run on real hardware (0.4.1) showed the window
+  growing and shrinking with each refresh, as the answer grew a line and the thoughts
+  below it came and went. 0.5.0 shows one-line rows while the agent works and the
+  answer once it is done; whether that reads well, and whether the selection stays
+  where it is, is still to see on Plasma 6.3 (Debian 13) and the current Plasma.
+- **A name of its own.** The palette says kortex whichever agent answers (0.5.0), from
+  one place, `NAME`, so that a name the user gives it can take its place later; the
+  agent is named as a detail, in the hint and the row that says how long.
 - **Other agents.** opencode and Hermes are the two backends, each a small adapter
   behind the same calls: send, follow, answer a permission. A third (Goose, for
   example) would be another.

@@ -51,10 +51,11 @@ proposes before you allow it.
 ## What it does
 
 - **Ask from anywhere.** Meta+A opens the palette on the agent alone. Any search in
-  Meta+Space or the start menu ends with "Ask opencode: …", first when it reads as a
+  Meta+Space or the start menu ends with "Ask kortex: …", first when it reads as a
   question. `ai` and a request asks at once, as before.
-- **Watch it work.** The answer grows in the palette as the agent writes it, what a
-  reasoning model thinks shows in italics below it, and the seconds count.
+- **Watch it work.** The palette counts the seconds, shows what the agent wrote or
+  thought last and a row for each step it takes, then its answer. Every row but the
+  answer is one line, so the palette holds still while the agent works.
 - **Nothing changes without a yes.** Every command, file change or web request the
   agent's permissions hold back is a row of its own, with the whole command:
   Allow once, Always or Deny.
@@ -90,12 +91,13 @@ git clone https://github.com/patina-os/kortex && cd kortex
 | Where | What |
 |---|---|
 | Meta+A (patina) | the palette on the agent alone: type a request, Enter |
-| any search, Meta+Space or the start menu | ends with "Ask opencode: …"; first for a question |
+| any search, Meta+Space or the start menu | ends with "Ask kortex: …"; first for a question |
 | `ai` and a request | asks at once |
 | `ai` | the recent conversations |
-| `opencode ›` | the current conversation; type after it to go on |
+| `kortex ›` | the current conversation; type after it to go on |
 | a row that asks | Allow once · Always · Deny |
-| the answer | Copy · Open in terminal |
+| the answer, or the row that says how long | Copy · Open in terminal |
+| a step | Open in terminal |
 
 ## Documentation
 

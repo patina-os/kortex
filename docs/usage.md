@@ -4,24 +4,25 @@ What kortex shows, where, and what each row does. The agent behind it is
 [opencode](https://opencode.ai) or [Hermes Agent](https://github.com/NousResearch/hermes-agent);
 kortex adds no prompt of its own beyond a conversation's title, so the agent's
 instructions (patina's `defaults/agent.md`, or your own `AGENTS.md`) decide how it
-answers.
+answers. The palette calls itself kortex whichever agent answers; the hint row of `ai`
+and the row that says how long name the agent.
 
 ```text
 Meta+A       why is my wifi slow?
-             ◉ Ask opencode: why is my wifi slow?               Enter
+             ◉ Ask kortex: why is my wifi slow?                 Enter
              ─────────────────────────────────────────────────────────
-opencode ›   ◉ Your wifi runs on 2.4 GHz at 72 Mbit/s; the 5 GHz
-               network "home-5G" is in range ...                 Copy · Open in terminal
+kortex ›     ◉ Working · 12 s · …the 5 GHz network is in range   Copy · Open in terminal
+             ▸ bash nmcli device wifi list                      Open in terminal
+             ▸ bash iw dev wlan0 link                           Open in terminal
              ⚠ Allow bash: nmcli connection up home-5G          Allow once · Always · Deny
 ```
 
 ## Asking
 
 - **Meta+A** (patina's `ask` key) opens KRunner on kortex alone: whatever you type goes
-  to the agent. Enter on "Ask opencode: …" sends it.
+  to the agent. Enter on "Ask kortex: …" sends it.
 - **Any search** of three letters or more, in KRunner (Meta+Space) or in Plasma's start
-  menu, ends with "Ask opencode: …" (or "Ask Hermes: …", by the agent kortex talks
-  to), below what Plasma finds. A search that reads as a question or a request comes
+  menu, ends with "Ask kortex: …", below what Plasma finds. A search that reads as a question or a request comes
   first instead: it ends with `?`, or it has three words or more and starts with a
   question word or a request (how, why, what, can, fix, install, wie, warum, was,
   kann, hilf, installiere and the like). With a conversation going, a second row
@@ -33,17 +34,23 @@ opencode ›   ◉ Your wifi runs on 2.4 GHz at 72 Mbit/s; the 5 GHz
 
 ## The conversation
 
-Enter sends the request and opens KRunner on the conversation, `opencode ›` (or
-`Hermes ›`; `ai ›` works too). It shows:
+Enter sends the request and opens KRunner on the conversation, `kortex ›` (`ai ›` works
+too). While the agent works, every row is one line, so KRunner's window holds still
+instead of growing and shrinking with each word. It shows:
 
-- **The answer as it grows**, one multi-line row, with a line for each tool the agent
-  used (`› bash df -h /`). Copy puts the answer on the clipboard; Open in terminal
+- **How long the agent has been at it and what it wrote last**, on one row:
+  "Working · 12 s · …the 5 GHz network is in range", or "Thinking · 12 s · …" while a
+  reasoning model thinks before it answers, so a model that thinks for a minute does
+  not look stuck. While a row asks, it says "Waiting for your answer" and holds still,
+  so that the row can be clicked.
+- **A row for each step the agent takes** (`bash df -h /`), in the order taken. Four
+  at most; older ones fold into one row ("+2 earlier steps"). Enter on a step opens
+  the conversation in the agent's own interface, which shows the step whole.
+- **The answer**, once the agent is done, in place of the row that said how long: what
+  it said, on as many lines as it needs, and its steps folded into one row below
+  ("3 steps: bash ×2, read"). Copy puts the answer on the clipboard; Open in terminal
   goes on with the same conversation in the agent's own interface (`opencode attach`,
   `hermes --resume`), for longer work such as code.
-- **What the agent thinks**, in italics below the answer, while a reasoning model
-  thinks before it answers, and **how long it has been at it** ("Working… 12 s"), so
-  a model that thinks for a minute does not look stuck. The seconds stop while a row
-  asks, so that it holds still to be clicked.
 - **A row for each action the agent asks to take** (a command, a file change, a web
   request its permissions put on `ask`), with the whole command as it will run and
   what Always would let through (`Always allows: sh *` lets any script through).
@@ -52,7 +59,7 @@ Enter sends the request and opens KRunner on the conversation, `opencode ›` (o
   only before what it counts as dangerous.
 - **Why it stopped**, when the agent or its provider failed, with Open in terminal.
 
-Typing after the marker continues the conversation (`opencode › and in dark mode?`).
+Typing after the marker continues the conversation (`kortex › and in dark mode?`).
 Another search typed over it leaves the conversation alone.
 
 ## When KRunner is closed
@@ -102,6 +109,6 @@ journalctl --user -b | grep kortex
 - `KRunner asked again: the palette follows the conversation`: KRunner shows what
   kortex sends it. Without this line the palette stands still while the agent works;
   the notification still comes.
-- `opencode answered after 12 s`, or `opencode stopped after …` with the reason.
+- `kortex answered after 12 s`, or `kortex stopped after …` with the reason.
 
 The agent's own output is in `~/.local/state/kortex/opencode.log` (or `hermes.log`).
