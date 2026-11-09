@@ -26,13 +26,24 @@ starts, shows as "Waiting for the agent…".
 
 KRunner asks for matches; it is not told about new ones. While the conversation is on
 screen and changes, kortex runs the query again through KRunner's own D-Bus method
-(`org.kde.krunner /App querySingleRunner`) with the marker, `kortex ›`, so KRunner
-asks again and gets the news; the first time it does for a request, kortex logs
-"KRunner asked again". KRunner asks only for a query that differs from the one it
+(`org.kde.krunner /App querySingleRunner`) with the marker and a space, `kortex › `, so
+KRunner asks again and gets the news; the first time it does for a request, kortex
+logs "KRunner asked again". KRunner asks only for a query that differs from the one it
 shows, so each refresh puts an invisible word joiner (U+2060) after the marker or takes
-it away again. The marker and that character are all kortex adds to the query line,
-and a follow-up typed after it is kept. While a request runs, the elapsed seconds are
-news too, except while a row asks, which must hold still to be clicked.
+it away again. While a request runs, the elapsed seconds are news too, except while a
+row asks, which must hold still to be clicked.
+
+A refresh replaces what the query line holds with what KRunner asked for last, so it
+comes only while the line holds the bare marker (or `ai`), never while a follow-up is
+typed after it: that one's rows show the news with each key, and once it runs the line
+holds the bare marker again. kortex sends a refresh a moment after deciding on it, and
+drops it if KRunner called meanwhile (a key typed, the line emptied, KRunner closed).
+KRunner calls kortex from the first letter, so a letter typed over the conversation
+reaches it, and the space after the marker is kortex's own, because KRunner does not
+call again for a space typed at the end and a refresh would take it away. 0.5.0
+refreshed a follow-up too: each refresh put back the line as KRunner had last asked
+for it, without the key typed since, and emptied the rows for a moment, so Enter could
+find nothing to run.
 
 KRunner sizes its window to its rows and gives a one-line row a fixed height, while a
 multi-line row grows by a line with each word that wraps; in the free-floating mode the

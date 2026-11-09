@@ -5,6 +5,20 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [0.5.1] - 2026-11-09
+
+### Fixed
+
+- Typing in the palette while it shows the conversation keeps every key. A refresh,
+  once a second while the agent works, put back the query line as KRunner had last
+  asked for it, so the key typed since was lost (a space typed at the end always was,
+  since KRunner does not ask again for it), and it emptied the rows for a moment, so
+  Enter could find nothing to run. kortex now refreshes only while the line holds the
+  bare `kortex ›` or `ai`, drops a refresh when a key comes first, and hears the first
+  letter typed over the conversation. A follow-up's rows show the news with each key.
+- The palette opens on `kortex › `, with the space after the marker, so a follow-up is
+  typed straight away.
+
 ## [0.5.0] - 2026-11-08
 
 ### Changed
