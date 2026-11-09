@@ -123,10 +123,11 @@ def main(agent):
         print("e2e: D-Bus activation started kortex")
 
         config_reply = k.Config()
-        assert "MatchRegex" not in config_reply and int(config_reply["MinLetterCount"]) == 2, config_reply
+        assert "MatchRegex" not in config_reply and int(config_reply["MinLetterCount"]) == 1, config_reply
         assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal"]
         assert [str(m[0]) for m in k.Match("firefox")] == ["ask" + SEP + "firefox"]  # any search, below
         marker = "kortex ›"  # the conversation, whatever the agent
+        opening = marker + " "  # what kortex puts in KRunner's field to show it
 
         proof = home / "kortex-proof"
         if agent == "hermes":
@@ -144,7 +145,7 @@ def main(agent):
         waiting = k.Match(marker, timeout=5)
         assert [str(m[0]) for m in waiting] == ["waiting"], waiting
         print("e2e: KRunner gets an answer at once while the agent starts")
-        wait_for("KRunner reopened on the conversation", lambda: f"kortex\t{marker}" in record.read_text(), 10)
+        wait_for("KRunner reopened on the conversation", lambda: f"kortex\t{opening}\n" in record.read_text(), 10)
         print("e2e: KRunner reopened on the conversation")
 
         def permission():
@@ -211,10 +212,10 @@ def main(agent):
                     return rest
         note, _summary, actions, _transient, _body = wait_for("a notification of the answer", told, 60)
         assert actions.split(",")[:2] == ["default", "Show"], actions
-        shown = record.read_text().count(f"kortex\t{marker}\n")
+        shown = record.read_text().count(f"kortex\t{opening}\n")
         notifications = bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
         notifications.Invoke(dbus.UInt32(int(note)), "show", dbus_interface="io.github.patina_os.kortex.Test")
-        wait_for("Show to open the conversation", lambda: record.read_text().count(f"kortex\t{marker}\n") > shown, 10)
+        wait_for("Show to open the conversation", lambda: record.read_text().count(f"kortex\t{opening}\n") > shown, 10)
         print("e2e: with KRunner closed, a notification tells of the answer, and Show opens it")
         k.Teardown()
         password = (home / ".config/kortex/password")

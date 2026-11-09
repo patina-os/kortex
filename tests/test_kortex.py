@@ -94,9 +94,11 @@ class FakeOpencode:
 class FakeDesktop:
     def __init__(self):
         self.queries, self.copied, self.launched, self.notes = [], [], [], []
+        self.still = None  # whether the last refresh is still wanted when it goes out
 
-    def query(self, t):
+    def query(self, t, still=None):
         self.queries.append(t)
+        self.still = still
 
     def copy(self, t):
         self.copied.append(t)
@@ -375,7 +377,7 @@ class Runner(unittest.TestCase):
         k, oc, desk, _ = new()
         oc.fail = "down"  # offering it needs no server
         self.assertEqual(k.config(menu=True), {"MinLetterCount": 3})
-        self.assertEqual(k.config(), {"MinLetterCount": 2})  # every search, `ai` too
+        self.assertEqual(k.config(), {"MinLetterCount": 1})  # every search, from its first letter
         for menu in (True, False):
             [m] = k.match("wifi settings ", menu=menu)
             self.assertEqual(m[0], "ask" + SEP + "wifi settings")
@@ -387,7 +389,7 @@ class Runner(unittest.TestCase):
         oc.fail = None
         k.run(m[0], "")
         self.assertEqual(oc.asked, [("ses_1", "wifi settings")])
-        self.assertEqual(desk.queries, ["kortex ›"])
+        self.assertEqual(desk.queries, ["kortex › "])
 
     def test_a_question_comes_first(self):
         k, *_ = new()
@@ -407,7 +409,7 @@ class Runner(unittest.TestCase):
         self.assertFalse(k.viewing)
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
-        self.assertEqual(desk.queries, ["kortex ›"])  # the search stays
+        self.assertEqual(desk.queries, ["kortex › "])  # the search stays
 
     def test_the_rows_say_kortex_and_the_hint_names_the_agent(self):
         k = kortex.Kortex(kortex.Hermes("http://127.0.0.1:1", "key"), FakeDesktop())
@@ -426,14 +428,14 @@ class Runner(unittest.TestCase):
         self.assertEqual(ids, ["continue" + SEP + "and y", "show"])  # no permission it cannot answer
         self.assertFalse(k.viewing)
         k.run("show", "")
-        self.assertEqual(desk.queries, ["kortex ›", "kortex ›"])
+        self.assertEqual(desk.queries, ["kortex › ", "kortex › "])
 
     def test_ask_then_view(self):
         k, oc, desk, _ = new()
         k.run("ask" + SEP + "switch to the light theme", "")
         self.assertEqual(oc.created, ["switch to the light theme"])
         self.assertEqual(oc.asked, [("ses_1", "switch to the light theme")])
-        self.assertEqual(desk.queries, ["kortex ›"])
+        self.assertEqual(desk.queries, ["kortex › "])
         oc.history = [user("switch to the light theme")]
         oc.state = ("busy", "")
         oc.pending = [PERMISSION]
@@ -538,7 +540,7 @@ class Runner(unittest.TestCase):
         self.assertFalse(k.viewing)
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
-        self.assertEqual(desk.queries, ["kortex ›"])  # not opened again
+        self.assertEqual(desk.queries, ["kortex › "])  # not opened again
 
     def test_the_start_menu_closing_late_keeps_the_conversation_on_screen(self):
         k, oc, desk, clock = new()
@@ -562,13 +564,13 @@ class Runner(unittest.TestCase):
         oc.history = [user("x"), assistant(text("hel"))]
         k.tick()
         # KRunner asks again only for a query that differs from the one it shows
-        self.assertNotEqual(desk.queries[-1], "kortex ›")
+        self.assertNotEqual(desk.queries[-1], "kortex › ")
         self.assertEqual(k.parse(desk.queries[-1]), ("view", ""))
         self.assertEqual(len(desk.queries), before + 1)
         k.match(desk.queries[-1])
         oc.history = [user("x"), assistant(text("hello"))]
         k.tick()
-        self.assertEqual(desk.queries[-1], "kortex ›")
+        self.assertEqual(desk.queries[-1], "kortex › ")
 
     def test_the_seconds_count_while_the_agent_works(self):
         k, oc, desk, clock = new()
@@ -592,6 +594,44 @@ class Runner(unittest.TestCase):
         k.tick()  # an Allow row holds still to be clicked
         self.assertEqual(len(desk.queries), before)
 
+    def test_a_follow_up_being_typed_is_never_rewritten(self):
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "x", "")
+        oc.history = [user("x")]
+        oc.state = ("busy", "")
+        k.match("kortex › change the boot ord")
+        before = len(desk.queries)
+        for _ in range(3):  # the seconds count on, the answer arrives: the field stays the user's
+            clock.t += 1
+            k.tick()
+        oc.history = [user("x"), assistant(text("done"))]
+        k.tick()
+        self.assertEqual(len(desk.queries), before)
+        # each key shows what is new, and once the follow-up is gone the refreshes go on
+        self.assertEqual(k.match("kortex › change the boot order")[0][0], "continue" + SEP + "change the boot order")
+        k.match("kortex › ")
+        oc.history = [user("x"), assistant(text("done, and more"))]
+        k.tick()
+        self.assertEqual(len(desk.queries), before + 1)
+        self.assertEqual(desk.queries[-1], "kortex ›" + kortex.JOINER + " ")
+
+    def test_a_refresh_is_dropped_once_krunner_calls_again(self):
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "x", "")
+        oc.history = [user("x")]
+        oc.state = ("busy", "")
+        k.match("kortex › ")
+        clock.t += 1
+        k.tick()
+        self.assertTrue(desk.still())  # nothing typed since: it goes out
+        k.match("c")  # typed over the conversation before the refresh went out
+        self.assertFalse(desk.still())
+        k.match("kortex › ")
+        clock.t += 1
+        k.tick()
+        k.teardown()  # the field emptied, or KRunner closed
+        self.assertFalse(desk.still())
+
     def test_tick_notifies_when_closed(self):
         k, oc, desk, _clock = new()
         k.run("ask" + SEP + "x", "")
@@ -605,7 +645,7 @@ class Runner(unittest.TestCase):
         k.tick()
         self.assertIn("bash: ls &lt;x; rm -r y &gt;z", desk.notes[1][1])  # the body is markup too
         k.show(2)  # its Show
-        self.assertEqual(desk.queries[-1], "kortex ›")
+        self.assertEqual(desk.queries[-1], "kortex › ")
         k.show(99)  # another program's notification
         self.assertEqual(len(desk.queries), 2)
 
@@ -633,7 +673,7 @@ class Runner(unittest.TestCase):
         k.tick()
         self.assertEqual(len(desk.notes), 2)
         k.show(2)
-        self.assertEqual(desk.queries[-1], "kortex ›")
+        self.assertEqual(desk.queries[-1], "kortex › ")
 
     def test_the_journal_tells_how_a_request_went(self):
         k, oc, desk, clock = new()
@@ -733,7 +773,7 @@ class Background(unittest.TestCase):
     def test_a_request_shows_a_waiting_row_until_the_agent_answers(self):
         k, oc, desk, _clock, later = held()
         k.run("ask" + SEP + "x", "")
-        self.assertEqual(desk.queries, ["kortex ›"])  # KRunner opens on the conversation at once
+        self.assertEqual(desk.queries, ["kortex › "])  # KRunner opens on the conversation at once
         self.assertEqual(oc.created, [])  # while nothing has reached the agent yet
         self.assertEqual([m[0] for m in k.match("ai ›")], ["waiting"])
         later.run()
@@ -755,7 +795,7 @@ class Background(unittest.TestCase):
         self.assertEqual([m[0] for m in k.match("ai")], ["hint", "waiting"])
         later.run()
         k.tick()
-        self.assertEqual(desk.queries, ["ai " + kortex.JOINER])  # `ai` still, as a query that differs
+        self.assertEqual(desk.queries, ["ai" + kortex.JOINER + " "])  # `ai` still, as a query that differs
         self.assertEqual([m[0] for m in k.match(desk.queries[-1])], ["hint", "session" + SEP + "ses_old"])
         later.run()
         k.tick()
@@ -1051,4 +1091,4 @@ class Replies(unittest.TestCase):
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
         self.assertEqual(k.parse(desk.queries[-1]), ("view", ""))
-        self.assertEqual(desk.queries[-1], "kortex ›" + kortex.JOINER)
+        self.assertEqual(desk.queries[-1], "kortex ›" + kortex.JOINER + " ")

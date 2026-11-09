@@ -40,7 +40,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 SERVICE = "io.github.patina_os.kortex"
 OBJECT_PATH = "/runner"
 IFACE = "org.kde.krunner1"
@@ -49,7 +49,9 @@ TRIGGER = "ai"
 NAME = "kortex"  # what the palette, its rows and its notifications call it, whatever the agent
 VIEW_MARK = "›"  # after kortex's name (`kortex ›`), or `ai`: the current conversation
 # KRunner asks again only for a query that differs from the one it shows, so a refresh
-# puts an invisible word joiner after the marker, or takes it away again.
+# puts an invisible word joiner after the marker, or takes it away again. A refresh
+# rewrites KRunner's field, so it comes only while the field holds the bare `kortex ›`
+# (or `ai`), never while a follow-up is typed after it.
 JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
@@ -866,7 +868,8 @@ class Kortex:
         self.jobs = 0  # requests in the background
         self.fetching = set()  # what is being fetched, once at a time
         self.shown = None  # the query of kortex's matches KRunner shows, or None
-        self.view_query = self.marker
+        self.heard = 0  # KRunner's calls so far; a refresh decided before the latest is dropped
+        self.view_query = self.opening
         self.closing_at = None  # when a run closed KRunner that `reopen` reopens
         self.signature = None  # what KRunner was shown, to compare with what is known now
         self.notified = set()  # the permission requests told of in a notification
@@ -883,6 +886,14 @@ class Kortex:
     def marker(self):
         """The query that shows the current conversation: kortex's name and ›."""
         return f"{NAME} {VIEW_MARK}"
+
+    @property
+    def opening(self):
+        """What kortex puts in KRunner's field to show the conversation: the marker and a
+        space, so what is typed next is a follow-up as it stands. KRunner does not ask
+        again for a space typed at the end, so a space of the user's there would be lost
+        to the next refresh."""
+        return self.marker + " "
 
     def parse(self, query):
         return parse(query, self.agent.title)
@@ -923,11 +934,14 @@ class Kortex:
 
     def config(self, menu=False):
         # Each program that searches asks for this once. Both send every query, so any
-        # search can go to the agent; KRunner from two letters, for `ai`.
-        return {"MinLetterCount": MIN_SEARCH if menu else len(TRIGGER)}
+        # search can go to the agent; KRunner from one letter, so kortex hears the first
+        # one typed over the conversation and no refresh puts the conversation back.
+        return {"MinLetterCount": MIN_SEARCH if menu else 1}
 
     def match(self, query, menu=False):
         kind, text = self.parse(query)
+        if not menu:
+            self.heard += 1
         if kind is None:
             if not menu:
                 self.shown = None  # another search: nothing of kortex's to keep current
@@ -946,7 +960,7 @@ class Kortex:
         elif kind == "list":
             matches = self.list_matches()
         else:
-            self.view_query = self.shown
+            self.view_query = self.shown if text else self.opening
             matches = self.view_matches(text)
         self.signature = self.seen()
         return matches
@@ -1094,13 +1108,13 @@ class Kortex:
                 if error:
                     self.finish(f"{NAME} did not get the request", str(error))
 
-            self.reopen(self.marker, menu)
+            self.reopen(self.opening, menu)
             self.work(send, sent)
         elif kind == "session":
             self.session = arg
-            self.reopen(self.marker, menu)
+            self.reopen(self.opening, menu)
         elif kind == "show":
-            self.reopen(self.marker, menu)
+            self.reopen(self.opening, menu)
         elif kind == "permission":
             if action in REPLIES:
                 state = self.current()
@@ -1139,6 +1153,7 @@ class Kortex:
         # caused, which `reopen` undoes; any other means the user closed KRunner.
         if menu:
             return
+        self.heard += 1  # KRunner closed, or its field was emptied
         if self.closing_at is not None and self.now() - self.closing_at < 1.5:
             self.closing_at = None
             return
@@ -1148,7 +1163,7 @@ class Kortex:
     def show(self, note):
         """A notification's Show: KRunner opens on the conversation."""
         if note in self.shows:
-            self.desktop.query(self.marker)
+            self.desktop.query(self.opening)
 
     def notify(self, summary, body, replaces=0, transient=False, follows=False):
         """A notification with Show, which opens the conversation. Its body is markup to
@@ -1203,19 +1218,21 @@ class Kortex:
                 self.logged.add(p["id"])
                 log(f"{self.agent.title} asks first: {p.get('permission', 'a request')}")
         if self.shown is not None:
-            if self.seen() != self.signature:
+            kind, followup = self.parse(self.shown)
+            # A follow-up being typed is the user's: a refresh would put back what KRunner
+            # asked for last, without the keys typed since. Its rows refresh with each
+            # key, and once it runs the field holds the bare marker again.
+            if not followup and self.seen() != self.signature:
                 self.signature = self.seen()
                 # KRunner asks again only for a query that differs from the one it shows:
-                # an invisible word joiner goes after `kortex ›` or `ai `, or away again.
-                q = self.shown
-                kind, followup = self.parse(q)
-                if JOINER in q:
-                    q = q.replace(JOINER, "")
-                elif kind == "view":  # typed `ai ›` or `AI ›` too
-                    q = self.marker + JOINER + (" " + followup if followup else "")
-                else:
-                    q = TRIGGER + " " + JOINER
-                self.desktop.query(q)
+                # an invisible word joiner goes after `kortex ›` or `ai`, or away again,
+                # with the space after them (`ai ›` and `AI ›` become `kortex ›`).
+                head = self.marker if kind == "view" else TRIGGER
+                q = head + ("" if JOINER in self.shown else JOINER) + " "
+                heard = self.heard
+                # Sent a moment later, and only if KRunner has called kortex since: the
+                # user typed or emptied the field meanwhile.
+                self.desktop.query(q, lambda: self.heard == heard)
             self.follow()
             return
         self.follow()
@@ -1259,11 +1276,14 @@ def main():
     class Desktop:
         """The few things kortex asks of the desktop, over D-Bus where Plasma offers it."""
 
-        def query(self, text):
+        def query(self, text, still=None):
+            """Open KRunner on kortex with `text`, a moment later; a refresh passes
+            `still`, which says whether it is still wanted then."""
             def call():
-                bus.get_object("org.kde.krunner", "/App").querySingleRunner(
-                    RUNNER_ID, text, dbus_interface="org.kde.krunner.App",
-                    reply_handler=ignore, error_handler=logged)
+                if still is None or still():
+                    bus.get_object("org.kde.krunner", "/App").querySingleRunner(
+                        RUNNER_ID, text, dbus_interface="org.kde.krunner.App",
+                        reply_handler=ignore, error_handler=logged)
                 return False
 
             GLib.timeout_add(150, call)
