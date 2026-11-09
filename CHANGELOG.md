@@ -5,6 +5,16 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Fixed
+
+- A request the provider puts off says why and until when. With a free limit used up
+  (OpenCode Zen's, for Big Pickle), the row read "Retrying: Free usage exceeded,
+  subscribe to Go" for hours, with no end in sight; it now takes opencode's own title
+  for the reason and the time of the next try: "Retrying: Free limit reached · next
+  try 00:39".
+
 ## [0.5.1] - 2026-11-09
 
 ### Fixed

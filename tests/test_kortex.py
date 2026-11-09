@@ -4,6 +4,7 @@
 import importlib.util
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -320,6 +321,18 @@ class View(unittest.TestCase):
     def test_retrying(self):
         state = dict(busy(text("x")), status=("retry", "rate limited"))
         self.assertEqual(kortex.view(state, 5)[0][1], "Retrying: rate limited")
+
+    def test_a_retry_says_why_and_when(self):
+        # opencode's status of a request its provider put off: the provider's words may be
+        # an offer, opencode's title says what happened, and `next` when it tries again.
+        limit = {"type": "retry", "attempt": 1, "message": "Free usage exceeded, subscribe to Go",
+                 "action": {"reason": "free_tier_limit", "title": "Free limit reached"}, "next": 4_000_000}
+        at = time.strftime("%H:%M", time.localtime(4000))
+        self.assertEqual(kortex.retry_message(limit, now=lambda: 1000), f"Free limit reached · next try {at}")
+        self.assertEqual(kortex.retry_message(limit, now=lambda: 3990), "Free limit reached")  # in a moment
+        self.assertEqual(kortex.retry_message({"type": "retry", "message": "rate limited"}), "rate limited")
+        self.assertEqual(kortex.retry_message({"type": "busy"}), "")
+        self.assertEqual(kortex.retry_message({"type": "retry", "message": "x", "next": "soon"}), "x")
 
     def test_a_row_per_step_while_the_agent_works(self):
         state = busy(text("Looking."), tool("bash", command="apt-cache search claude"), tool("read", filePath="/etc/x"))

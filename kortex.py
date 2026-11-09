@@ -218,6 +218,21 @@ def note_event(asked, line, streamed=None):
         pass  # not an event kortex follows
 
 
+def retry_message(status, now=time.time):
+    """Why opencode waits before it tries a request again, and when it will: its own
+    title for the reason ("Free limit reached") where it gives one, since the provider's
+    words may be an offer ("subscribe to …"), and the time of the next try once that is
+    a minute or more away, so a limit that lasts hours does not read as a moment."""
+    words = (status.get("action") or {}).get("title") or status.get("message", "")
+    try:
+        at = float(status.get("next") or 0) / 1000
+    except (TypeError, ValueError):
+        at = 0
+    if at - now() >= 60:
+        words += (" · " if words else "") + "next try " + time.strftime("%H:%M", time.localtime(at))
+    return words
+
+
 def free_port():
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -398,7 +413,7 @@ class Opencode(Server):
     def status(self, session):
         """idle, busy or retry, with the retry's message."""
         status = self.request("GET", "/session/status").get(session) or {"type": "idle"}
-        return status.get("type", "idle"), status.get("message", "")
+        return status.get("type", "idle"), retry_message(status)
 
     def permissions(self, session):
         try:
