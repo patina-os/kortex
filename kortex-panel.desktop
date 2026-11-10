@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=kortex
+Comment=What the AI agent does, docked at the screen's right edge
+Exec=dbus-send --session --print-reply --dest=io.github.patina_os.kortex /runner io.github.patina_os.kortex.Panel
+Icon=kortex
+NoDisplay=true
+Terminal=false
+StartupWMClass=io.github.patina_os.kortex

@@ -135,4 +135,8 @@ waits for a window of the terminal's process and gives it the right edge of the 
 area of its screen, full height, `PANEL_SHARE` of the width within `PANEL_MIN` and
 `PANEL_MAX` pixels, kept above. kortex unloads it after 20 seconds. A terminal that
 hands its window to a process already running (konsole's single process mode, kitty's
-`--single-instance`) is not found and stays where it opens.
+`--single-instance`) is not found and stays where it opens. kitty gets `--class
+io.github.patina_os.kortex`, the app id of kortex's hidden application entry
+(`kortex-panel.desktop`, installed under that name), so the taskbar shows the panel as
+kortex with its icon, apart from the terminal's other windows; another terminal keeps
+its own.

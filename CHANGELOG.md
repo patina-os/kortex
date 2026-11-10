@@ -5,6 +5,15 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Fixed
+
+- The panel shows in the taskbar as kortex, with kortex's icon, apart from the
+  terminal's other windows: in kitty it was one more kitty window under kitty's icon.
+  kitty's window takes kortex's app id, which names a hidden application entry
+  `install.sh` puts in place; another terminal keeps its own.
+
 ## [0.7.1] - 2026-11-10
 
 ### Fixed
