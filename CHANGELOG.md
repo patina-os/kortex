@@ -9,6 +9,12 @@ What changed in each release of kortex. The format follows
 
 ### Added
 
+- The panel: Show what the agent does (in place of Open in terminal) docks the agent's
+  own interface on the conversation at the screen's right edge, full height, a fifth
+  of the width (480 to 720 px), above other windows, so the user works on beside it.
+  A KWin script kortex loads over D-Bus places it. `Panel` on kortex's own interface
+  does the same for a key (patina's Meta+Shift+A), the agent's interface alone when
+  there is no conversation.
 - `Open` on kortex's own D-Bus interface (`io.github.patina_os.kortex`), for Meta+A:
   KRunner on kortex alone, on the conversation while a request runs or a row waits for
   an answer. KRunner calls no runner for an empty field, so Meta+A showed an empty
@@ -19,6 +25,13 @@ What changed in each release of kortex. The format follows
 
 ### Changed
 
+- The conversation reads like a chat: no rows for the agent's steps while it works and
+  none folded below the answer (the panel shows them; the answer says how many). The
+  row that says how long says what the agent does during a step ("running a command",
+  "using linear"). A row that asks shows what the agent said right before that step,
+  in place of the command; a command that deletes, runs as root or the like (`sudo`,
+  `rm`, a shell, `kill`, `apt` …) shows under the words, and a step the agent did not
+  explain shows as before.
 - The row that says how long shows the start of the last sentence the agent finished
   writing or thinking, which holds still until the next; it showed the end of what
   streamed in, half sentences that changed with every word.

