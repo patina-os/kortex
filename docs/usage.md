@@ -68,7 +68,9 @@ instead of growing and shrinking with each word. It shows:
   answers nothing, and nothing runs before you choose. Always is not offered where
   its rule would let far more through than what asks: a change to any file, or
   commands that start with `sudo`, `rm`, a shell, `python3`, `curl` and the like;
-  one Always on such a row let every later `sudo` run unasked. opencode asks before
+  one Always on such a row let every later `sudo` run unasked. With Hermes, which
+  names no rule, the command that asks decides, and a question it gives up on after
+  five minutes (`approvals.timeout`) leaves the palette. opencode asks before
   every change (patina's permissions); Hermes only before what it counts as
   dangerous.
 - **What the agent asks you** (opencode's `question` tool: "Which team should the

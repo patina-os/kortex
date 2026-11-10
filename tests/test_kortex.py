@@ -1204,6 +1204,40 @@ class HermesBackend(unittest.TestCase):
             return self.answers.get(path, {})
         self.h.request = request
 
+    def test_always_is_not_offered_on_hermes_rows_of_sudo_and_the_like(self):
+        # Hermes keeps an Always for good, for the kind of command that asked: one Always
+        # on `sudo -A apt-get clean` let every later sudo run unasked.
+        def asked(command, why="sudo with privilege flag (stdin/askpass/shell/list)"):
+            return {"id": "req_1", "sessionID": "ses_1", "run": "run_1", "permission": why, "patterns": [command]}
+        for command in ("sudo -A apt-get clean", "rm -rf ~/junk", "bash -ic 'type ll'", "ls /tmp; sudo -A umount /home/u/Downloads",
+                        "out=$(true) && rm /tmp/backup.iso", "python3 - <<'EOF'"):
+            self.assertFalse(kortex.always_offered(asked(command)), command)
+            row = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked(command)]})[0]
+            self.assertEqual(row[4]["actions"], ["allow-once", "deny"])
+        for command in ("update_issue {\"id\":\"PLA-1\"}", "cp ~/.bashrc ~/.bashrc.bak", "flatpak install --user -y flathub org.kde.kalk"):
+            self.assertTrue(kortex.always_offered(asked(command, "tracker")), command)
+
+    def test_a_question_hermes_gave_up_on_leaves_the_palette(self):
+        # After `approvals.timeout` Hermes goes on without the command. The row stayed,
+        # "Waiting for your answer", and Allow on it was "HTTP Error 409: Conflict".
+        self.h.runs["ses_1"] = "run_1"
+        self.h.asked = {"req_1": {"id": "req_1", "sessionID": "ses_1", "run": "run_1", "permission": "x", "patterns": ["y"]}}
+        self.answers["/v1/runs/run_1"] = {"status": "waiting_for_approval"}
+        self.assertEqual(len(self.h.permissions("ses_1")), 1)
+        self.answers["/v1/runs/run_1"] = {"status": "running"}  # it went on
+        with mock.patch.object(kortex, "log"):
+            self.assertEqual(self.h.permissions("ses_1"), [])
+        self.assertEqual(self.h.asked, {})
+        # and an answer that comes too late is not an error
+        self.h.asked = {"req_2": {"id": "req_2", "sessionID": "ses_1", "run": "run_1", "permission": "x", "patterns": ["y"]}}
+
+        def conflict(method, path, body=None, start=True, timeout=10):
+            cause = kortex.urllib.error.HTTPError("http://127.0.0.1:8642" + path, 409, "Conflict", {}, None)
+            raise kortex.AgentError(f"POST {path}: {cause}") from cause
+        self.h.request = conflict
+        self.h.reply("req_2", "once")
+        self.assertEqual(self.h.asked, {})
+
     def test_a_title_in_use_gets_the_time_behind_it(self):
         # Hermes takes a title once; the same request asked again was "HTTP Error 400".
         titles = []

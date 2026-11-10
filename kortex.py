@@ -608,8 +608,20 @@ class Hermes(Server):
         return ("idle", "") if state is None or state in self.DONE else ("busy", "")
 
     def permissions(self, session):
+        """What the conversation's run asks. Hermes gives up on a question after a while
+        (`approvals.timeout`, five minutes) and goes on without the command; its run
+        then no longer waits for an approval, and the question is dropped here too: its
+        row stood in the palette, "waiting for your answer", while the agent worked on,
+        and Allow on it was an HTTP error."""
         with self.lock:
-            return [p for p in self.asked.values() if p["sessionID"] == session]
+            found = [p for p in self.asked.values() if p["sessionID"] == session]
+        if found and self.run_state(session).get("status") not in (None, "waiting_for_approval"):
+            log("Hermes no longer waits for the answer; its question has expired")
+            with self.lock:
+                for p in found:
+                    self.asked.pop(p["id"], None)
+            return []
+        return found
 
     def questions(self, session):
         return []  # Hermes asks in its answer
@@ -625,7 +637,9 @@ class Hermes(Server):
             self.request("POST", f"/v1/runs/{asked['run']}/approval",
                          {"request_id": request_id, "choice": HERMES_CHOICES[reply]})
         except AgentError as e:
-            if http_status(e) != 404:  # 404: the run is over, nothing waits for the answer
+            # 404: the run is over; 409: Hermes gave up on the question. Nothing waits
+            # for the answer either way.
+            if http_status(e) not in (404, 409):
                 raise
         with self.lock:
             self.asked.pop(request_id, None)
@@ -953,8 +967,15 @@ def asks(p):
 def always_offered(p):
     """False when Always would let through far more than what asks: a change to any
     file, any bash command, or commands that start with sudo, rm, a shell and the like
-    (RISKY). Such a row offers Allow once and Deny."""
-    rules = p.get("always") or []
+    (RISKY). Such a row offers Allow once and Deny. opencode says what its rule would
+    be (`always`); Hermes does not, so there the command itself decides."""
+    rules = p.get("always")
+    if rules is None:
+        # Hermes names no rule. Its Always is kept for good, for every command of the
+        # kind that asked ("sudo with privilege flag": every sudo), so what counts is
+        # the command: each of its parts, cut where a shell would cut it.
+        commands = re.split(r"&&|\|\||[;|\n]", " ".join(p.get("patterns") or []))
+        return not any((part.split() or [""])[0] in RISKY for part in commands)
     if p.get("permission") == "edit" or (p.get("permission") == "bash" and "*" in rules):
         return False
     return not any((rule.split() or [""])[0] in RISKY for rule in rules)
