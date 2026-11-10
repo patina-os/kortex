@@ -30,8 +30,8 @@ What changed in each release of kortex. The format follows
 - A question Hermes gave up on leaves the palette. After five minutes without an
   answer Hermes goes on without the command; the row stayed, "Waiting for your
   answer", while the agent worked on, and Allow on it was "HTTP Error 409: Conflict".
-  The row goes when Hermes' run no longer waits, and an answer that comes too late
-  is no error.
+  Hermes says nowhere that it gave up (its run still reads as waiting), so the row
+  goes once the model writes again, and an answer that comes too late is no error.
 - The same request asked of Hermes a second time is answered. Hermes takes a
   conversation's title once, and kortex names a conversation after the request: the
   second time the palette said "POST /api/sessions: HTTP Error 400: Bad Request ·

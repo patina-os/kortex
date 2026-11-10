@@ -1220,14 +1220,18 @@ class HermesBackend(unittest.TestCase):
     def test_a_question_hermes_gave_up_on_leaves_the_palette(self):
         # After `approvals.timeout` Hermes goes on without the command. The row stayed,
         # "Waiting for your answer", and Allow on it was "HTTP Error 409: Conflict".
-        self.h.runs["ses_1"] = "run_1"
-        self.h.asked = {"req_1": {"id": "req_1", "sessionID": "ses_1", "run": "run_1", "permission": "x", "patterns": ["y"]}}
-        self.answers["/v1/runs/run_1"] = {"status": "waiting_for_approval"}
-        self.assertEqual(len(self.h.permissions("ses_1")), 1)
-        self.answers["/v1/runs/run_1"] = {"status": "running"}  # it went on
-        with mock.patch.object(kortex, "log"):
-            self.assertEqual(self.h.permissions("ses_1"), [])
-        self.assertEqual(self.h.asked, {})
+        # Its run still reads "waiting_for_approval" then; that the model writes again is
+        # what says the question is over.
+        asked = {}
+        request = hermes_event(event="approval.request", request_id="req_1", command="sudo -A true", description="sudo")
+        other = hermes_event(event="approval.request", request_id="req_9", command="rm -r x", description="delete")
+        kortex.note_hermes_event(asked, request, "ses_1", "run_1")
+        kortex.note_hermes_event(asked, other, "ses_2", "run_2")
+        for still in ("tool.completed", "tool.started"):  # the command that waited ends, another starts
+            kortex.note_hermes_event(asked, hermes_event(event=still, tool="terminal"), "ses_1", "run_1")
+        self.assertEqual(sorted(asked), ["req_1", "req_9"])
+        kortex.note_hermes_event(asked, hermes_event(event="message.delta", delta="It"), "ses_1", "run_1")
+        self.assertEqual(sorted(asked), ["req_9"])  # another run's question stays
         # and an answer that comes too late is not an error
         self.h.asked = {"req_2": {"id": "req_2", "sessionID": "ses_1", "run": "run_1", "permission": "x", "patterns": ["y"]}}
 

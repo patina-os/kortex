@@ -608,20 +608,8 @@ class Hermes(Server):
         return ("idle", "") if state is None or state in self.DONE else ("busy", "")
 
     def permissions(self, session):
-        """What the conversation's run asks. Hermes gives up on a question after a while
-        (`approvals.timeout`, five minutes) and goes on without the command; its run
-        then no longer waits for an approval, and the question is dropped here too: its
-        row stood in the palette, "waiting for your answer", while the agent worked on,
-        and Allow on it was an HTTP error."""
         with self.lock:
-            found = [p for p in self.asked.values() if p["sessionID"] == session]
-        if found and self.run_state(session).get("status") not in (None, "waiting_for_approval"):
-            log("Hermes no longer waits for the answer; its question has expired")
-            with self.lock:
-                for p in found:
-                    self.asked.pop(p["id"], None)
-            return []
-        return found
+            return [p for p in self.asked.values() if p["sessionID"] == session]
 
     def questions(self, session):
         return []  # Hermes asks in its answer
@@ -672,6 +660,14 @@ def note_hermes_event(asked, line, session, run):
                 "permission": what, "patterns": [command]}
         elif kind == "approval.responded":
             asked.pop(event.get("request_id"), None)
+        elif kind in ("message.delta", "message.interim", "reasoning.available", "reasoning.delta"):
+            # The model writes or thinks again: no command of this run waits any more.
+            # Hermes gives up on a question after a while (`approvals.timeout`, five
+            # minutes) and goes on without the command, and says so nowhere: its run
+            # still reads "waiting_for_approval". The row stood in the palette, "Waiting
+            # for your answer", while the agent worked on.
+            for key in [k for k, p in asked.items() if p["run"] == run]:
+                del asked[key]
         return kind in ("run.completed", "run.failed", "run.cancelled", "run.interrupted")
     except (ValueError, LookupError, TypeError, AttributeError):
         return False  # not an event kortex follows
