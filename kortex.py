@@ -56,7 +56,7 @@ JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
-MAX_LATEST = 36  # characters of what the agent wrote or thought last, after the seconds
+MAX_LATEST = 40  # characters of what the agent wrote or thought last, after the seconds
 MAX_STEPS = 4  # rows of steps while the agent works; the older ones fold into one row
 MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
@@ -295,7 +295,7 @@ class Server:
             try:
                 # opencode leaves the first connection it accepts while it starts
                 # unanswered; a short wait per try moves on to the next one.
-                self.request("GET", health, start=False, timeout=1)
+                self.request("GET", health, start=False, timeout=1, quiet=True)
                 return
             except AgentError:
                 time.sleep(0.2)
@@ -316,7 +316,7 @@ class Server:
             self.asked.clear()
             self.streamed.clear()
 
-    def request(self, method, path, body=None, start=True, timeout=10):
+    def request(self, method, path, body=None, start=True, timeout=10, quiet=False):
         if start:
             self.start()
         data = None if body is None else json.dumps(body).encode()
@@ -328,7 +328,29 @@ class Server:
                 raw = response.read()
             return json.loads(raw) if raw else None
         except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as e:
-            raise AgentError(f"{method} {path}: {e}") from e
+            if not quiet:  # the details, for the journal; not each try while a server starts
+                log(f"{method} {path}: {e}")
+            raise AgentError(f"{self.title} {failure(e, timeout)}") from e
+
+
+def failure(error, timeout):
+    """Why a request to the agent's server failed, in words for the palette: what
+    urllib says ("<urlopen error [Errno 111] Connection refused>") explains nothing to
+    a user, and the log has it."""
+    if isinstance(error, urllib.error.HTTPError):
+        if error.code in (401, 403):
+            return f"refused kortex's password (HTTP {error.code})"
+        if error.code >= 500:
+            return f"failed on the request (HTTP {error.code})"
+        return f"did not take the request (HTTP {error.code})"
+    reason = getattr(error, "reason", error)
+    if isinstance(reason, ConnectionRefusedError):
+        return "is not running"
+    if isinstance(reason, TimeoutError):
+        return f"did not answer within {timeout} s"
+    if isinstance(error, ValueError):
+        return "sent an answer kortex cannot read"
+    return "could not be reached"
 
 
 class Opencode(Server):
@@ -752,6 +774,13 @@ def tool_line(part):
     return line
 
 
+def composing(part):
+    """True for a tool call the model is still writing: it has no input yet, and its
+    row would be the tool's bare name."""
+    state = part.get("state") or {}
+    return state.get("status") == "pending" and not state.get("input")
+
+
 def denied(part):
     """True for a step the user denied: opencode marks it failed, with these words."""
     state = part.get("state") or {}
@@ -800,7 +829,7 @@ def reply_of(messages):
             if part.get("type") == "text" and not part.get("synthetic") and not part.get("ignored"):
                 if part.get("text", "").strip():
                     said.append(part["text"].strip())
-            elif part.get("type") == "tool":
+            elif part.get("type") == "tool" and not composing(part):
                 steps.append(tool_line(part))
         if info.get("error"):
             data = info["error"].get("data") or {}
@@ -816,7 +845,15 @@ def latest_of(messages):
              and not p.get("synthetic") and not p.get("ignored")]
     if not parts or parts[-1]["type"] == "tool":
         return False, ""
-    return parts[-1]["type"] == "reasoning", " ".join(parts[-1].get("text", "").split())
+    return parts[-1]["type"] == "reasoning", last_sentence(parts[-1].get("text", ""))
+
+
+def last_sentence(text):
+    """The last sentence of `text` that is complete, on one line, or "" before the
+    first is: what streams in is cut off mid-sentence, and its end changes with every
+    word."""
+    done = re.findall(r"[^.!?:]*[.!?:](?=\s|$)", " ".join(text.split()))
+    return done[-1].strip() if done else ""
 
 
 def replied(messages, request):
@@ -849,12 +886,12 @@ def shorten_end(text, most):
     return text if len(text) <= most else text[:most - 1] + "…"
 
 
-def tail(text, most=MAX_LATEST):
-    """The end of `text`, at most `most` characters from a word's start on."""
+def head(text, most=MAX_LATEST):
+    """The start of `text`, at most `most` characters, cut at a word's end."""
     if len(text) <= most:
         return text
-    end = text[-most:]
-    return "…" + (end.split(" ", 1)[1] if " " in end[1:] else end)
+    start = text[:most - 1]
+    return (start.rsplit(" ", 1)[0] if " " in start else start).rstrip(",;: ") + "…"
 
 
 def steps_summary(steps):
@@ -1038,7 +1075,7 @@ def view(state, elapsed=None, agent="", stop=False):
             thinking, words = latest_of(state["messages"])
             line = ("Thinking" if thinking else "Working") + (f" · {seconds(elapsed)}" if elapsed is not None else "")
             if words:
-                line += " · " + tail(words)
+                line += " · " + head(words)
         matches.append(match("answer", line, ICON, 0.9, agent, ["copy", "terminal"] + (["stop"] if stop else [])))
     elif said or steps:
         matches.append(match("answer", rich(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9,
@@ -1465,6 +1502,15 @@ class Kortex:
         self.closing_at = None
         self.shown = None
 
+    def open(self):
+        """Meta+A (patina's `ask` key): KRunner on kortex alone, on the conversation while
+        a request runs or waits for an answer, else empty for a new request. KRunner
+        calls no runner for an empty field, so it showed nothing then."""
+        self.last_activity = self.now()
+        state = self.current() or {}
+        busy = self.asked_at is not None or self.waiting or state.get("permissions") or state.get("questions")
+        self.desktop.query(self.opening if busy and self.session else "")
+
     def show(self, note):
         """A notification's Show: KRunner opens on the conversation."""
         if note in self.shows:
@@ -1524,8 +1570,13 @@ class Kortex:
     def tick(self):
         """Every REFRESH_MS: ask the agent for news; while KRunner shows kortex's matches
         and what they are made of changed, show them again; while it is closed, notify
-        of a new permission request, and follow the request with a notification."""
-        self.refresh(start=False)
+        of a new permission request, and follow the request with a notification. With
+        KRunner on something else and the agent done, there is nothing to ask it: the
+        next look at the conversation fetches it."""
+        state = self.current() or {}
+        if (self.shown is not None or self.asked_at is not None or self.waiting or not state
+                or state["status"][0] != "idle" or state.get("permissions") or state.get("questions")):
+            self.refresh(start=False)
         for p in (self.current() or {}).get("permissions", []):
             if p["id"] not in self.logged:
                 self.logged.add(p["id"])
@@ -1660,7 +1711,8 @@ def main():
                 except AgentError as e:
                     result, error = None, e
                 except Exception as e:  # noqa: BLE001 - the thread must outlive any job
-                    result, error = None, AgentError(repr(e))
+                    log(f"a request failed: {e!r}")
+                    result, error = None, AgentError(f"kortex failed on it ({type(e).__name__}); its log says more")
                 GLib.idle_add(hand_back, then, result, error)
 
     def hand_back(then, result, error):
@@ -1717,6 +1769,11 @@ def main():
         @dbus.service.method(IFACE, in_signature="s")
         def SetActivationToken(self, token):
             os.environ["XDG_ACTIVATION_TOKEN"] = str(token)
+
+        @dbus.service.method(SERVICE)
+        def Open(self):
+            # Not KRunner's: what Meta+A calls (patina's ask.desktop)
+            kortex.open()
 
     try:
         name = dbus.service.BusName(SERVICE, bus, do_not_queue=True)

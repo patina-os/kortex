@@ -73,8 +73,8 @@ API:
 | `GET /permission`, `POST /permission/:id/reply` | the rows that ask: `once`, `always` or `reject` |
 | `GET /event` | what the two above cannot tell |
 
-It reads them when KRunner asks, and every 0.7 s while a conversation is on screen or
-a request runs. The event stream fills two gaps of opencode 1.19:
+It reads them when KRunner asks, and every 0.7 s while a conversation is on screen, a
+request runs or the agent works or asks; otherwise not at all until the next look. The event stream fills two gaps of opencode 1.19:
 
 - `GET /session/:id/message` keeps a text or reasoning part empty until the part is
   done, while the stream sends its words (`message.part.delta`); kortex keeps them and

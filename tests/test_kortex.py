@@ -183,7 +183,7 @@ class Events(unittest.TestCase):
         with mock.patch.object(oc, "request", return_value=stored):
             messages = oc.messages("ses_1")
         self.assertEqual([p["text"] for p in messages[1]["parts"]], ["The user asks", "Let"])
-        self.assertEqual(kortex.latest_of(messages), (False, "Let"))  # its text comes after the thought
+        self.assertEqual(kortex.latest_of(messages), (False, ""))  # its text comes after the thought, unfinished
         kortex.note_event(oc.asked, event("message.part.updated", {"part": {"id": "prt_1", "type": "reasoning",
                                                                            "text": "The user asks"}}), oc.streamed)
         self.assertEqual(oc.streamed, {"prt_2": "Let"})  # a part done is read whole from GET /message
@@ -262,11 +262,32 @@ class Answer(unittest.TestCase):
         self.assertEqual(kortex.tool_line(tool("edit", "error", filePath="/etc/x")), "edit /etc/x (failed)")
         self.assertEqual(kortex.tool_line(tool("bash", command="cat <<EOF\nhi\nEOF")), "bash cat <<EOF hi EOF")
 
-    def test_latest_keeps_its_end_from_a_word_on(self):
-        self.assertEqual(kortex.tail("short"), "short")
-        shown = kortex.tail("I'll check what's available through the system's package sources first.")
-        self.assertEqual(shown, "…the system's package sources first.")
-        self.assertLessEqual(len(shown), kortex.MAX_LATEST + 1)
+    def test_latest_is_the_start_of_its_last_whole_sentence(self):
+        self.assertEqual(kortex.head("short"), "short")
+        shown = kortex.head("I'll check what's available through the system's package sources first.")
+        self.assertEqual(shown, "I'll check what's available through…")
+        self.assertLessEqual(len(shown), kortex.MAX_LATEST)
+        self.assertEqual(kortex.last_sentence("The user asks. Let me check the"), "The user asks.")
+        self.assertEqual(kortex.last_sentence("Let me check the"), "")
+        self.assertEqual(kortex.last_sentence("One.  Two!\nThree? fo"), "Three?")
+
+    def test_a_tool_call_being_written_is_no_step(self):
+        messages = [user("hi"), assistant(tool("bash", "pending"))]
+        self.assertEqual(kortex.reply_of(messages)[1], [])
+        messages[1]["parts"].append(tool("bash", "pending", command="ls"))
+        self.assertEqual(kortex.reply_of(messages)[1], ["bash ls"])
+
+    def test_a_failed_request_says_why_in_plain_words(self):
+        import urllib.error
+        refused = urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+        self.assertEqual(kortex.failure(refused, 10), "is not running")
+        self.assertEqual(kortex.failure(urllib.error.URLError(TimeoutError()), 10), "did not answer within 10 s")
+        self.assertEqual(kortex.failure(TimeoutError(), 5), "did not answer within 5 s")
+        self.assertEqual(kortex.failure(urllib.error.HTTPError("u", 401, "no", {}, None), 10),
+                         "refused kortex's password (HTTP 401)")
+        self.assertEqual(kortex.failure(urllib.error.HTTPError("u", 500, "no", {}, None), 10),
+                         "failed on the request (HTTP 500)")
+        self.assertEqual(kortex.failure(ValueError("bad json"), 10), "sent an answer kortex cannot read")
 
     def test_steps_on_one_line(self):
         self.assertEqual(kortex.steps_summary(["bash ls", "read /etc/x", "bash df -h"]), "3 steps: bash ×2, read")
@@ -389,7 +410,7 @@ class View(unittest.TestCase):
     def test_the_status_says_what_the_agent_wrote_or_thought_last(self):
         state = busy(reasoning("The user  greets me;\nI <should> greet back."))
         [m] = kortex.view(state, 12)
-        self.assertEqual(m[1], "Thinking · 12 s · …greets me; I <should> greet back.")  # one line, plain text
+        self.assertEqual(m[1], "Thinking · 12 s · The user greets me; I <should> greet…")  # one line, plain text
         state["messages"][1]["parts"].append(text("Hello there, nice to see you!"))  # then it answers
         self.assertEqual(kortex.view(state, 75)[0][1], "Working · 1 min 15 s · Hello there, nice to see you!")
         state["messages"][1]["parts"].append(reasoning("x" * 500))
@@ -696,6 +717,39 @@ class Runner(unittest.TestCase):
         oc.history = [user("x"), assistant(text("news"))]
         k.tick()
         self.assertEqual(desk.queries, ["kortex › "])  # not opened again
+
+    def test_a_closed_palette_asks_nothing_once_the_agent_is_done(self):
+        k, oc, _desk, clock = new()
+        k.run("ask" + SEP + "x", "")
+        k.match("ai ›")
+        clock.t += 2
+        k.teardown()
+        oc.history = [user("x"), assistant(text("done"))]
+        k.tick()  # the request is followed until it is answered
+        self.assertIsNone(k.asked_at)
+        fetched = oc.services_added
+        for _ in range(5):
+            k.tick()
+        self.assertEqual(oc.services_added, fetched)  # nothing more to ask while KRunner is closed
+        k.match("ai ›")  # a look at the conversation fetches it again
+        self.assertGreater(oc.services_added, fetched)
+
+    def test_meta_a_opens_the_conversation_while_a_request_runs(self):
+        k, oc, desk, clock = new()
+        k.open()
+        self.assertEqual(desk.queries, [""])  # nothing runs: an empty field for a request
+        k.run("ask" + SEP + "x", "")
+        oc.state = ("busy", "")
+        k.match("ai ›")
+        clock.t += 2
+        k.teardown()
+        k.tick()
+        k.open()
+        self.assertEqual(desk.queries[-1], "kortex › ")
+        oc.history, oc.state = [user("x"), assistant(text("done"))], ("idle", "")
+        k.tick()
+        k.open()
+        self.assertEqual(desk.queries[-1], "")  # answered: Meta+A is for the next request
 
     def test_the_start_menu_closing_late_keeps_the_conversation_on_screen(self):
         k, oc, desk, clock = new()
