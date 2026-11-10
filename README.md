@@ -13,15 +13,17 @@
 
 <p align="center">
   The AI agent in KDE Plasma's command palette, made for troubleshooting, for getting
-  Linux to work for you, and for working with an agent the modern way. Ask in your own
-  words, watch it work where you asked, and allow each change before it happens.
+  Linux to work for you, and for working with an agent the modern way. Talk to it as
+  in a chat, allow each change it explains in its own words, and dock its view at the
+  edge of the screen when you want to see every step.
 </p>
 
-![kortex in KRunner: Meta+A and a question, the agent thinking, then PhotoCraft installed in two steps, each waiting for Allow once, and a notification with the answer after KRunner was closed](docs/demo/kortex-demo.gif)
+![kortex in KRunner: Meta+A and a question answered in a sentence; then PhotoCraft installed in two steps, each asking first in the agent's own words, the second while the palette was closed, through a notification and Meta+A; then Show what the agent does docks the agent's view of the conversation at the right edge](docs/demo/kortex-demo.gif)
 
-<sub>A replay of a real run of kortex 0.4.1 with opencode 1.19.5 and a scripted model
-that thinks before it answers: kortex answered over D-Bus what you see, the panel is
-drawn for the replay. How it is made: [`docs/demo/`](docs/demo/).</sub>
+<sub>A replay of a real run of kortex 0.7.0 with opencode 1.19.5 and a scripted model
+that thinks before it answers and says what each step does: kortex answered over D-Bus
+what the palette shows, and the panel shows the conversation as opencode kept it; both
+are drawn for the replay. How it is made: [`docs/demo/`](docs/demo/).</sub>
 
 kortex is a small part of [patina](https://github.com/patina-os/patina), the polish
 layer for Plasma on Debian: patina installs it with its AI agent and puts it on Meta+A.
@@ -50,9 +52,9 @@ proposes before you allow it.
 
 ## What it does
 
-- **Ask from anywhere.** Meta+A opens the palette on the agent alone. Any search in
-  Meta+Space or the start menu ends with "Ask kortex: …", first when it reads as a
-  question. `ai` and a request asks at once, as before.
+- **Ask from anywhere.** Meta+A opens the palette on the agent alone, and on the
+  conversation while the agent waits for your answer. Any search in Meta+Space or the
+  start menu ends with "Ask kortex: …", first when it reads as a question.
 - **A conversation, not a console.** The palette reads like a chat: the seconds,
   what the agent wrote, thought or does last ("running a command"), then its answer.
   Its commands are in the panel, for when you want to see them.
@@ -91,14 +93,15 @@ git clone https://github.com/patina-os/kortex && cd kortex
 ```
 
 `./uninstall.sh` removes it again. For Hermes instead of opencode, write `hermes` into
-`~/.config/kortex/agent`; to open the palette on kortex with a key of your own, see
+`~/.config/kortex/agent`; to open the palette or the panel with a key of your own, see
 [Using kortex](docs/usage.md#a-key-for-the-agent).
 
 ## Use
 
 | Where | What |
 |---|---|
-| Meta+A (patina) | the palette on the agent alone: type a request, Enter |
+| Meta+A (patina) | the palette on the agent alone: type a request, Enter; the conversation while the agent waits for you |
+| Meta+Shift+A (patina) | the panel: the agent's own view of the conversation, docked at the right edge |
 | any search, Meta+Space or the start menu | ends with "Ask kortex: …"; first for a question |
 | `ai` and a request | a row that asks only the agent; Enter sends it |
 | `ai` | the recent conversations |
@@ -110,7 +113,8 @@ git clone https://github.com/patina-os/kortex && cd kortex
 ## Documentation
 
 - [Using kortex](docs/usage.md): the searches, the conversation, the rows that ask, the
-  notifications, a key of your own, Hermes, and what to look at when it seems stuck
+  panel, the notifications, a key of your own, Hermes, and what to look at when it
+  seems stuck
 - [How it works](docs/how-it-works.md): the KRunner D-Bus runner, the agents' HTTP
   APIs, the palette that pulls, services connected on the fly
 - [Principles](docs/principles.md): privacy, no action without a yes, root through a

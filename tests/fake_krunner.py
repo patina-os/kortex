@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""KRunner's application object and a notification server for the end-to-end test:
-org.kde.krunner /App and org.freedesktop.Notifications on the session bus. Both write
-what kortex asks of them to the file they are given: every query KRunner is asked to
-show, and every notification with its actions and its body (on one line). `Invoke` (an interface of the test's
-own) clicks a notification's action, as a user would."""
+"""KRunner's application object, a notification server and KWin's scripting for the
+end-to-end test and the demo: org.kde.krunner /App, org.freedesktop.Notifications and
+org.kde.KWin /Scripting on the session bus. They write what kortex asks of them to the
+file they are given: every query KRunner is asked to show, every notification with its
+actions and its body (on one line), and every KWin script loaded to place a window (the
+panel), with the process it places. `Invoke` (an interface of the test's own) clicks a
+notification's action, as a user would."""
 
+import re
 import sys
 
 import dbus
@@ -53,8 +56,34 @@ class Notifications(dbus.service.Object):
         self.ActionInvoked(note, action)
 
 
+class Scripting(dbus.service.Object):
+    """KWin's /Scripting, as far as kortex's panel uses it: a script loaded from a file
+    under a name, then run through its own object, and unloaded by name."""
+    loaded = 0
+
+    @dbus.service.method("org.kde.kwin.Scripting", in_signature="ss", out_signature="i")
+    def loadScript(self, path, name):
+        Scripting.loaded += 1
+        with open(path) as f:
+            pid = re.search(r"const pid = (\d+)", f.read())
+        write(f"kwin\tload\t{name}\t{pid.group(1) if pid else ''}")
+        Script(bus, f"/Scripting/Script{Scripting.loaded}")
+        return Scripting.loaded
+
+    @dbus.service.method("org.kde.kwin.Scripting", in_signature="s", out_signature="b")
+    def unloadScript(self, name):
+        return True
+
+
+class Script(dbus.service.Object):
+    @dbus.service.method("org.kde.kwin.Script")
+    def run(self):
+        write("kwin\trun")
+
+
 bus = dbus.SessionBus()
 App(dbus.service.BusName("org.kde.krunner", bus), "/App")
+Scripting(dbus.service.BusName("org.kde.KWin", bus), "/Scripting")
 Notifications(dbus.service.BusName(NOTIFICATIONS, bus), "/org/freedesktop/Notifications")
 print("ready", flush=True)
 GLib.MainLoop().run()

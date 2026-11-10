@@ -1,7 +1,9 @@
 """The scripted model for the kortex demo recording: an OpenAI-compatible endpoint that
 streams slowly, like a small local model, thinks before it answers, as a reasoning model
 does (`reasoning_content`, which opencode keeps as the reply's reasoning), and uses tools
-the way an agent would."""
+the way an agent would: before each step that changes something it says in one plain
+sentence what the step does, as patina's agent.md asks, and the palette shows that
+sentence where it asks."""
 
 import json
 import re
@@ -18,9 +20,8 @@ THOUGHTS = {
     ("photocraft", 0): "PhotoCraft is part of the ArtCraft suite. patina installs its launcher with the artcraft "
                        "bundle. That changes the system, so it waits for the user's yes.",
     ("photocraft", 1): "The bundle is in. The launcher installs PhotoCraft itself; open it next.",
-    ("photocraft", 2): "Both commands ran, each after its own Allow once. Tell the user where PhotoCraft is "
-                       "picked and that the launcher keeps it current, so there is nothing left to do by hand "
-                       "and no need to come back for updates.",
+    ("photocraft", 2): "Both steps ran, each after its own Allow once. Tell the user where PhotoCraft is "
+                       "picked and that the launcher keeps it current.",
 }
 
 
@@ -58,25 +59,25 @@ def plan(body):
         return "Conversation", None
     if "disk" in asked:
         if not tools_after:
-            return "Let me look.", ("bash", {"command": "df -h /", "description": "Show free disk space"})
+            return "Let me look at your disk.", ("bash", {"command": "df -h /", "description": "Show free disk space"})
         out = content(tools_after[-1])
         row = next((line for line in out.splitlines() if line.rstrip().endswith(" /")), "")
         cols = row.split()
         if len(cols) >= 5:
-            return (f"Your system disk has {cols[3]} free of {cols[1]} ({cols[4]} used). "
-                    "That is plenty; nothing to clean up."), None
+            return f"Your system disk has {cols[3]} free of {cols[1]} ({cols[4]} used).", None
         return "I could not read the disk usage.", None
     if "photocraft" in asked:
         # Two changes, each asked for: patina's artcraft bundle brings the ArtCraft
         # Launcher, and the launcher installs PhotoCraft once the user picks it.
         if not tools_after:
-            return "PhotoCraft comes with the ArtCraft Launcher, patina's artcraft bundle. I will install it.", (
+            return "I'll install patina's ArtCraft bundle, which brings the launcher PhotoCraft comes from.", (
                 "bash", {"command": "patina install --bundles artcraft",
                          "description": "Install patina's artcraft bundle"})
         if len(tools_after) == 1:
-            return "Installed. Now the launcher:", (
+            return "The bundle is in. Now I'll open the ArtCraft Launcher, where you pick PhotoCraft.", (
                 "bash", {"command": "setsid -f artcraft-launcher", "description": "Open the ArtCraft Launcher"})
-        return "The launcher is open: pick PhotoCraft there, and it keeps it up to date.", None
+        return ("The ArtCraft Launcher is open: pick PhotoCraft there, and the launcher keeps it up to date. "
+                "To remove it later, ask me to remove the artcraft bundle."), None
     return "I can answer questions, change settings once you allow it, and run commands for you.", None
 
 
@@ -129,7 +130,8 @@ class Handler(BaseHTTPRequestHandler):
                 time.sleep(DELAY)
         if call:
             name, args = call
-            send(chunk({"tool_calls": [{"index": 0, "id": "call_1", "type": "function",
+            calls = sum(1 for m in body.get("messages", []) if m.get("role") == "tool")
+            send(chunk({"tool_calls": [{"index": 0, "id": f"call_{calls + 1}", "type": "function",
                                         "function": {"name": name, "arguments": json.dumps(args)}}]}))
             send(chunk({}, "tool_calls"))
         else:

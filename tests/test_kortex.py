@@ -277,6 +277,9 @@ class Answer(unittest.TestCase):
         self.assertLessEqual(len(shown), kortex.MAX_LATEST)
         self.assertEqual(kortex.last_sentence("The user asks. Let me check the"), "The user asks.")
         self.assertEqual(kortex.last_sentence("Let me check the"), "")
+        self.assertEqual(kortex.last_sentence("df answered: free space and"), "")  # a colon ends no sentence
+        self.assertEqual(kortex.last_sentence("It has 8.0G free of 252G. Version 1.19.5 is"),
+                         "It has 8.0G free of 252G.")  # nor a stop inside a number
         self.assertEqual(kortex.last_sentence("One.  Two!\nThree? fo"), "Three?")
 
     def test_a_tool_call_being_written_is_no_step(self):
@@ -342,6 +345,8 @@ class View(unittest.TestCase):
         first = dict(tool("bash", command="ls"), callID="c1")
         second = dict(tool("bash", "running", command="apt-cache policy firefox-esr"), callID="c2")
         state = busy(text("Looking."), first, text("Now the version."), second, permissions=[called])
+        self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.")
+        second["callID"] = called["tool"]["callID"] = "c1"  # one id for both calls: the later one asks
         self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.")
 
     def test_the_whole_command_shows_as_written(self):
@@ -877,6 +882,20 @@ class Runner(unittest.TestCase):
         k.teardown()  # the field emptied, or KRunner closed
         self.assertFalse(desk.still())
 
+    def test_an_answered_request_a_late_fetch_brings_back_is_not_told_of(self):
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "x", "")
+        oc.state, oc.pending = ("busy", ""), [PERMISSION]
+        k.match("ai ›")
+        k.run("permission" + SEP + "per_1", "allow-once")
+        self.assertEqual(oc.replies, [("per_1", "once")])
+        clock.t += 2
+        k.teardown()  # the user closes KRunner while opencode still lists the request
+        k.tick()
+        k.tick()
+        self.assertFalse(any(n[0] == "kortex asks first" for n in desk.notes))
+        self.assertEqual(k.current()["permissions"], [])
+
     def test_tick_notifies_when_closed(self):
         k, oc, desk, _clock = new()
         k.run("ask" + SEP + "x", "")
@@ -889,6 +908,12 @@ class Runner(unittest.TestCase):
         oc.pending = [dict(PERMISSION, id="per_2", metadata={"command": "ls <x; rm -r y >z"})]
         k.tick()
         self.assertIn("bash: ls &lt;x; rm -r y &gt;z", desk.notes[1][1])  # the body is markup too
+        oc.state = ("busy", "")
+        oc.history = [user("x"), assistant(text("I'll switch to the light theme."),
+                                           tool("bash", "running", command="kwriteconfig6 --key x y"))]
+        oc.pending = [dict(PERMISSION, id="per_3", metadata={"command": "kwriteconfig6 --key x y"})]
+        k.tick()
+        self.assertEqual(desk.notes[-1][1], "Allow: I'll switch to the light theme.")  # its words, as in the palette
         k.show(2)  # its Show
         self.assertEqual(desk.queries[-1], "kortex › ")
         k.show(99)  # another program's notification
