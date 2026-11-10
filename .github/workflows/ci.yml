@@ -47,7 +47,9 @@ jobs:
           sudo apt-get install -y -q python3-dbus python3-gi dbus
       - name: Hermes Agent
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/hermes-install.sh" \
+          # Retried: GitHub's raw host answers 429 to a runner's shared address now and
+          # then, which failed this job twice in a day before any test ran.
+          curl -fsSL --retry 5 --retry-delay 10 -o "$RUNNER_TEMP/hermes-install.sh" \
             "https://raw.githubusercontent.com/NousResearch/hermes-agent/$HERMES_TAG/scripts/install.sh"
           bash "$RUNNER_TEMP/hermes-install.sh" --non-interactive --commit "$HERMES_COMMIT" \
             --skip-browser --skip-computer-use < /dev/null
