@@ -124,7 +124,7 @@ def main(agent):
 
         config_reply = k.Config()
         assert "MatchRegex" not in config_reply and int(config_reply["MinLetterCount"]) == 1, config_reply
-        assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal"]
+        assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal", "stop"]
         assert [str(m[0]) for m in k.Match("firefox")] == ["ask" + SEP + "firefox"]  # any search, below
         marker = "kortex ›"  # the conversation, whatever the agent
         opening = marker + " "  # what kortex puts in KRunner's field to show it
@@ -154,7 +154,9 @@ def main(agent):
                     return m
         asked = wait_for("the agent to ask first", permission)
         assert str(asked[1]).split("<br>")[0] == f"Allow {asks}: {command}", asked[1]
-        assert list(asked[5]["actions"]) == ["allow-once", "allow-always", "deny"]
+        # Hermes asks before it removes a folder: Always is not offered for rm (kortex.RISKY)
+        offered = ["allow-once", "deny"] if agent == "hermes" else ["allow-once", "allow-always", "deny"]
+        assert list(asked[5]["actions"]) == offered, asked[5]["actions"]
         time.sleep(1)
         ran = (lambda: not proof.exists()) if agent == "hermes" else proof.exists
         assert not ran(), "the command ran before it was allowed"

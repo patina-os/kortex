@@ -56,9 +56,13 @@ proposes before you allow it.
 - **Watch it work.** The palette counts the seconds, shows what the agent wrote or
   thought last and a row for each step it takes, then its answer. Every row but the
   answer is one line, so the palette holds still while the agent works.
-- **Nothing changes without a yes.** Every command, file change or web request the
-  agent's permissions hold back is a row of its own, with the whole command:
-  Allow once, Always or Deny.
+- **Nothing changes without a yes.** Every command, file change, web request or
+  service's tool the agent's permissions hold back is a row of its own, with the
+  whole command, the changed lines or what the tool is given: Allow once, Always or
+  Deny. What the permissions hold back is the agent's configuration: patina's asks
+  before every change, on the machine and in a connected service.
+- **It asks you, too.** A question of the agent's is a row with its answers; pick
+  one or type your own.
 - **Walk away.** Click elsewhere and a notification follows the request to its answer.
   Its Show brings the conversation back.
 - **Go on in a terminal.** Open in terminal hands the conversation to the agent's own
@@ -92,11 +96,12 @@ git clone https://github.com/patina-os/kortex && cd kortex
 |---|---|
 | Meta+A (patina) | the palette on the agent alone: type a request, Enter |
 | any search, Meta+Space or the start menu | ends with "Ask kortex: …"; first for a question |
-| `ai` and a request | asks at once |
+| `ai` and a request | a row that asks only the agent; Enter sends it |
 | `ai` | the recent conversations |
 | `kortex ›` | the current conversation; type after it to go on |
 | a row that asks | Allow once · Always · Deny |
-| the answer, or the row that says how long | Copy · Open in terminal |
+| what the agent asks you | Enter on an answer, or type your own |
+| the answer, or the row that says how long | Copy · Open in terminal · Stop |
 | a step | Open in terminal |
 
 ## Documentation
