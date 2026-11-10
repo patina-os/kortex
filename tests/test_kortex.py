@@ -324,6 +324,36 @@ class View(unittest.TestCase):
         state = dict(busy(text("x")), status=("retry", "rate limited"))
         self.assertEqual(kortex.view(state, 5)[0][1], "Retrying: rate limited")
 
+    def test_a_step_of_a_service_says_what_it_was_given(self):
+        step = tool("tracker_update_issue", id="DES-103", priority="high", labels=["x"])
+        self.assertEqual(kortex.tool_line(step), "tracker_update_issue id=DES-103, priority=high")
+        self.assertEqual(kortex.tool_line(tool("cloud_list_notes")), "cloud_list_notes")
+        long = kortex.tool_line(tool("cloud_create_note", title="t", content="x" * 300))
+        self.assertTrue(len(long) < 125 and long.endswith("…"), long)
+        self.assertEqual(kortex.steps_summary([kortex.tool_line(step)] * 2), "2 steps: tracker_update_issue ×2")
+
+    def test_a_denied_step_does_not_end_in_done(self):
+        # opencode ends the turn when a step is denied; the palette said "Done.", or
+        # what the agent had said before, as if it had gone on.
+        no = tool("bash", "error", command="rm -rf ~/Downloads/.cache")
+        no["state"]["error"] = "The user rejected permission to use this specific tool call."
+        state = {"messages": [user("clean up"), assistant(no)], "status": ("idle", ""), "permissions": []}
+        answer, steps = kortex.view(state)
+        self.assertEqual(answer[1], kortex.DENIED)
+        self.assertEqual(steps[1], "1 step: bash")
+        self.assertEqual(kortex.tool_line(no), "bash rm -rf ~/Downloads/.cache (denied)")
+        state["messages"] = [user("clean up"), assistant(text("I will delete the cache."), no)]
+        self.assertEqual(kortex.view(state)[0][1], "I will delete the cache.<br>" + kortex.DENIED)
+        state["messages"] = [user("clean up"), assistant(no, text("Then I leave it."))]  # an agent that goes on
+        self.assertEqual(kortex.view(state)[0][1], "Then I leave it.")
+        state["messages"] = [user("clean up"), assistant(tool("bash", command="true"))]
+        self.assertEqual(kortex.view(state)[0][1], "Done.")
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "clean up", "", menu=True)
+        oc.history = [user("clean up"), assistant(text("I will delete the cache."), no)]
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", kortex.DENIED))
+
     def test_a_retry_says_why_and_when(self):
         # opencode's status of a request its provider put off: the provider's words may be
         # an offer, opencode's title says what happened, and `next` when it tries again.

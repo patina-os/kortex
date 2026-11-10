@@ -653,10 +653,34 @@ def tool_line(part):
     state = part.get("state") or {}
     given = state.get("input") or {}
     detail = given.get("command") or given.get("filePath") or given.get("path") or given.get("url") or state.get("title") or ""
+    if not detail and isinstance(given, dict):
+        # A service's tool (MCP): what it was given says which issue or note it touched.
+        detail = shorten_end(", ".join(f"{k}={v}" for k, v in given.items() if isinstance(v, (str, int, float, bool))), 100)
     line = " ".join(f"{part.get('tool', 'tool')} {detail}".splitlines()).rstrip()  # a heredoc's too
     if state.get("status") == "error":
-        line += " (failed)"
+        line += " (denied)" if denied(part) else " (failed)"
     return line
+
+
+def denied(part):
+    """True for a step the user denied: opencode marks it failed, with these words."""
+    state = part.get("state") or {}
+    return state.get("status") == "error" and "rejected permission" in str(state.get("error", ""))
+
+
+DENIED = "Stopped: you denied the last step, so it did not run. Say what to do instead."
+
+
+def answer_of(messages):
+    """The agent's reply to the last request as the palette gives it: what it said; "Done." when it took steps and said nothing; and when the
+    last thing in it is a step the user denied, that it stopped there, since opencode
+    ends the turn on a Deny and what the agent said before reads as if it went on."""
+    said, _steps, _error = reply_of(messages)
+    parts = [p for p in reply_parts(messages) if p.get("type") in ("text", "tool")
+             and not p.get("synthetic") and not p.get("ignored") and (p.get("type") == "tool" or p.get("text", "").strip())]
+    if parts and parts[-1]["type"] == "tool" and denied(parts[-1]):
+        said = said + [DENIED]
+    return said or ["Done."]
 
 
 def last_user(messages):
@@ -714,6 +738,11 @@ def replied(messages, request):
 
 def shorten(text, most=MAX_ANSWER):
     return text if len(text) <= most else "…" + text[-most:]
+
+
+def shorten_end(text, most):
+    """The start of `text`, at most `most` characters."""
+    return text if len(text) <= most else text[:most - 1] + "…"
 
 
 def tail(text, most=MAX_LATEST):
@@ -806,7 +835,7 @@ def view(state, elapsed=None, agent=""):
                 line += " · " + tail(words)
         matches.append(match("answer", line, ICON, 0.9, hint, ["copy", "terminal"]))
     elif said or steps:
-        matches.append(match("answer", markup(shorten("\n".join(said) or "Done.")), ICON, 0.9, hint,
+        matches.append(match("answer", markup(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9, hint,
                              ["copy", "terminal"], True, styled=True))
     if steps and working and not error:
         shown = steps if len(steps) <= MAX_STEPS else steps[-(MAX_STEPS - 1):]
@@ -1225,6 +1254,8 @@ class Kortex:
                 # Its last words, not the steps it took: after a task they say how it went,
                 # and a plain answer is its last words anyway.
                 last = (said or steps or [""])[-1]
+                if answer_of(state["messages"])[-1] == DENIED:
+                    last = DENIED
                 self.finish(f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…")
             return
         if self.shown is None and not self.told and self.now() - self.asked_at >= TELL_AFTER:

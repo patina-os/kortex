@@ -15,6 +15,11 @@ What changed in each release of kortex. The format follows
   for the reason and the time of the next try: "Retrying: Free limit reached · next
   try 00:39".
 
+- A step you denied no longer ends in "Done.". opencode ends the turn on a Deny, and
+  the palette showed "Done.", or what the agent had said before, as if it had gone
+  on; it now says "Stopped: you denied the last step, so it did not run. Say what to
+  do instead.", in the palette and in the notification, and the step reads
+  "(denied)" in the terminal's place of "(failed)".
 - A follow-up that repeats the request before it ("try again") is no longer taken as
   answered by the answer before it: what kortex knew of the conversation when the
   follow-up was sent is dropped, so no notification says "kortex answered" with the
@@ -25,6 +30,9 @@ What changed in each release of kortex. The format follows
 
 ### Changed
 
+- A step of a service (an MCP server's tool) says what it was given: "tracker_update_issue
+  id=DES-103, priority=high" where the row was the tool's bare name, so it shows
+  which issue or note was touched.
 - `kortex >` shows the conversation as `kortex ›` does: few keyboards have a key
   for ›, which the hint names.
 - While a row asks, the row below it says how to answer from the keyboard: "Waiting
