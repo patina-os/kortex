@@ -709,7 +709,9 @@ class Runner(unittest.TestCase):
             self.assertEqual(hermes.attach(None)[0], ["/usr/bin/hermes"])
             self.assertEqual(hermes.attach("s1")[0], ["/usr/bin/hermes", "--resume", "s1"])
         k, oc, desk, _ = new()
-        k.panel()  # Meta+Shift+A before any request
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
+            k.panel()  # Meta+Shift+A before any request
+        self.assertEqual(desk.launched[0][0], ["konsole", "-e", "/usr/bin/opencode", "attach", oc.url])
         self.assertEqual(desk.docked, [4242])
 
     def test_list(self):
