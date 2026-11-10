@@ -124,7 +124,7 @@ def main(agent):
 
         config_reply = k.Config()
         assert "MatchRegex" not in config_reply and int(config_reply["MinLetterCount"]) == 1, config_reply
-        assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal"]
+        assert [str(a[0]) for a in k.Actions()] == ["allow-once", "allow-always", "deny", "copy", "terminal", "stop"]
         assert [str(m[0]) for m in k.Match("firefox")] == ["ask" + SEP + "firefox"]  # any search, below
         marker = "kortex ›"  # the conversation, whatever the agent
         opening = marker + " "  # what kortex puts in KRunner's field to show it

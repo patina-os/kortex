@@ -7,7 +7,36 @@ What changed in each release of kortex. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A question of the agent's is answered in the palette. opencode's `question` tool
+  ("Which team should the ticket go to?") left the palette at "Working" until the
+  user gave up, and the conversation was lost. It is a row now, with a row for each
+  answer it offers: Enter on one answers, and so does typing your own after
+  `kortex ›`. With KRunner closed a notification asks.
+- What a conversation the agent starts for a part of the work (its `task` tool) asks
+  is shown in the conversation that started it; it was shown nowhere, and both waited.
+- Stop, on the row that says how long, ends what the agent does (opencode).
+- A provider that puts a request off for more than a minute is told of once in a
+  notification that stays, with the time of its next try.
+
 ### Fixed
+
+- Always is not offered where its rule lets far more through than what asks: a
+  change to any file, any bash command, or commands that start with `sudo`, `rm`, a
+  shell, `python3`, `curl` and the like. One Always on a row that measured a folder
+  (`du …; sudo -A du …`, "Always allows: du *, sudo *") let every later `sudo` run
+  unasked, in every conversation.
+- A row that asks shows what it asks for: the whole path and the changed lines of a
+  file (it read "Allow edit: home/u/.bashrc"), what a service's tool is given (it
+  read "Allow tracker_create_issue: *"), "access outside your home folder" for
+  opencode's `external_directory`, and what the agent said it would do, which the
+  palette hid while it asked.
+- The answer is what the agent said after its last step, not every sentence of the
+  turn ("let me check…" stood in front of it), and a long one keeps its start: it
+  kept the last 1,500 characters, so a list began at its sixth entry.
+- An agent whose server exits while it works ends the request ("kortex stopped");
+  the palette said "working" until kortex stopped itself a quarter of an hour later.
 
 - A request the provider puts off says why and until when. With a free limit used up
   (OpenCode Zen's, for Big Pickle), the row read "Retrying: Free usage exceeded,
@@ -30,6 +59,16 @@ What changed in each release of kortex. The format follows
 
 ### Changed
 
+- The Markdown of an answer is read as far as a row can show it: bold, a heading as
+  a bold line, lists with bullets, a table's rows with · between the cells, code
+  without its backticks. It showed raw.
+- Subtexts are short enough to stay whole: KRunner cuts a long one in its middle
+  ("A new conve…tte · Enter", "op…al"). "New conversation · Enter", "Search, ask,
+  fix", "Enter copies", "Asks first".
+- "install photocraft" reads as a request with two words (so does "installiere"):
+  KRunner's own first row for it runs the `install` command. please, bitte, können,
+  update and umlaut-less forms start a request too; do, set, show, make and change
+  no longer do, since "do not disturb" and "show hidden files" are settings.
 - A step of a service (an MCP server's tool) says what it was given: "tracker_update_issue
   id=DES-103, priority=high" where the row was the tool's bare name, so it shows
   which issue or note was touched.
