@@ -317,7 +317,8 @@ class View(unittest.TestCase):
         # One Always on `du …; sudo -A du …` let every later sudo run unasked, in every
         # conversation: such a rule cannot be given from the palette.
         for kind, rules in (("bash", ["du *", "sudo *"]), ("bash", ["echo *", "sh *"]), ("bash", ["rm *"]),
-                            ("bash", ["*"]), ("edit", ["*"]), ("bash", ["python3 *"])):
+                            ("bash", ["*"]), ("edit", ["*"]), ("bash", ["python3 *"]), ("bash", ["patina *"]),
+                            ("bash", ["git -C *"])):
             asked = dict(PERMISSION, permission=kind, always=rules)
             self.assertFalse(kortex.always_offered(asked), rules)
             [row, _status] = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
@@ -354,6 +355,8 @@ class View(unittest.TestCase):
         self.assertEqual(kortex.view(state)[0][1], "Allow tracker_create_issue: team=Design, title=Favicon is blurry"
                                                    "<br>Always allows, in every conversation: any tracker_create_issue")
         self.assertEqual(kortex.asked_for(asked), "*")  # without the conversation
+        nothing = dict(asked, permission="tracker_list_teams", always=[], tool={"messageID": "msg_1", "callID": "call_8"})
+        self.assertEqual(kortex.view(dict(state, permissions=[nothing]))[0][1], "Allow tracker_list_teams")
         outside = dict(PERMISSION, permission="external_directory", patterns=["/etc/*"], always=["/etc/*"])
         self.assertTrue(kortex.view(dict(state, permissions=[outside]))[0][1].startswith(
             "Allow access outside your home folder: /etc/*"))

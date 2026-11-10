@@ -86,11 +86,13 @@ ASKING = frozenset({
 ASKING_TWO = frozenset({"install", "installiere"})
 # A rule for Always that starts with one of these lets through far more than the
 # command that asks: any command as root, any script, any deletion. Always is not
-# offered for it, nor for a change to any file.
+# offered for it, nor for a change to any file. git, apt and patina are here for the
+# width of their rules: "git -C *", "patina *" hold every subcommand.
 RISKY = frozenset({
     "sudo", "su", "doas", "pkexec", "rm", "sh", "bash", "zsh", "fish", "dash", "python",
     "python3", "perl", "ruby", "node", "curl", "wget", "env", "xargs", "eval", "dd",
-    "chmod", "chown", "mv", "tee", "nohup",
+    "chmod", "chown", "mv", "tee", "nohup", "kill", "pkill", "killall", "git", "apt",
+    "apt-get", "dpkg", "patina",
 })
 
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
@@ -960,7 +962,8 @@ def view(state, elapsed=None, agent="", stop=False):
                                  "dialog-warning", 1.0, "Clears when opencode restarts"))
             continue
         kind = p.get("permission", "this")
-        text = f"Allow {asks(p)}: {asked_for(p, state['messages'])}"
+        what = asked_for(p, state["messages"])
+        text = f"Allow {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
         always = always_offered(p)
         if p.get("always") and always:  # opencode's rule for Always: `du *` lets any du through
             # opencode keeps the rule for every conversation, until its server stops
