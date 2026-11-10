@@ -219,6 +219,8 @@ class Parse(unittest.TestCase):
         self.assertEqual(kortex.parse("ai ›", "Hermes"), ("view", ""))  # as typed before 0.4.0
         self.assertEqual(kortex.parse("opencode ›", "opencode"), ("view", ""))  # as 0.4 called it
         self.assertEqual(kortex.parse("opencode ›"), (None, ""))  # not the agent's name
+        self.assertEqual(kortex.parse("kortex > and y"), ("view", "and y"))  # › as a keyboard types it
+        self.assertEqual(kortex.parse("kortex >"), ("view", ""))
         self.assertEqual(kortex.parse("kortex"), (None, ""))
         self.assertEqual(kortex.parse("kortexx ›"), (None, ""))
 
@@ -269,7 +271,7 @@ class View(unittest.TestCase):
         self.assertEqual(matches[0][1], "Allow bash: patina theme mode light")  # PERMISSION has no `always`
         self.assertEqual(matches[0][4]["actions"], ["allow-once", "allow-always", "deny"])
         self.assertTrue(matches[0][4]["multiline"])  # a long command is shown whole
-        self.assertEqual(matches[1][1], "Waiting for your answer")  # holds still to be clicked
+        self.assertEqual(matches[1][1], "Waiting for your answer · Shift+Enter allows once")  # holds still to be clicked
         self.assertFalse(matches[1][4]["multiline"])
         self.assertEqual(matches[1][4]["subtext"], "opencode · Copy · Open in terminal")
 
@@ -290,13 +292,13 @@ class View(unittest.TestCase):
         asked = dict(PERMISSION, patterns=["echo one", "sh"], metadata={"command": "echo one | sh"},
                      always=["echo *", "sh *"])
         shown = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
-        self.assertEqual(shown[0][1], "Allow bash: echo one | sh<br>Always allows: echo *, sh *")
+        self.assertEqual(shown[0][1], "Allow bash: echo one | sh<br>Always allows, in every conversation: echo *, sh *")
         icons = {a[0]: a[2] for a in kortex.ACTIONS}
         self.assertNotEqual(icons["allow-once"], icons["allow-always"])
 
     def test_patterns_without_a_command(self):
         state = {"messages": [], "status": ("idle", ""), "permissions": [FETCH]}
-        self.assertEqual(kortex.view(state)[0][1], "Allow webfetch: https://example.org/<br>Always allows: any webfetch")
+        self.assertEqual(kortex.view(state)[0][1], "Allow webfetch: https://example.org/<br>Always allows, in every conversation: any webfetch")
 
     def test_single_line_text_stays_plain(self):
         self.assertEqual(kortex.match("ask" + SEP + "a <b>", "a <b>")[1], "a <b>")
@@ -687,6 +689,40 @@ class Runner(unittest.TestCase):
         self.assertEqual(len(desk.notes), 2)
         k.show(2)
         self.assertEqual(desk.queries[-1], "kortex › ")
+
+    def test_a_follow_up_is_not_answered_by_the_answer_before_it(self):
+        # What kortex knew of the conversation when a follow-up was sent held the last
+        # answer: a follow-up that repeats the request read as replied to, at once.
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "try again", "", menu=True)
+        oc.history = [user("try again"), assistant(text("first answer"))]
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", "first answer"))
+        k.run("continue" + SEP + "try again", "", menu=True)
+        self.assertIsNone(k.current())  # nothing is known of the conversation yet
+        k.follow()
+        self.assertEqual(len(desk.notes), 1)
+        oc.history += [user("try again")]
+        oc.state = ("busy", "")
+        k.tick()
+        self.assertEqual(len(desk.notes), 1)
+        oc.history += [assistant(text("second answer"))]
+        oc.state = ("idle", "")
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", "second answer"))
+
+    def test_another_conversation_ends_the_following_of_a_request(self):
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "why is my wifi slow", "")
+        oc.history, oc.state = [user("why is my wifi slow")], ("busy", "")
+        k.run("session" + SEP + "ses_old", "")  # an older conversation from the list
+        k.teardown()
+        clock.t += 2
+        k.teardown()  # the user closes KRunner
+        clock.t += 10
+        k.tick()
+        k.tick()
+        self.assertEqual(desk.notes, [])  # no "working on it" for a conversation that is not asked
 
     def test_the_journal_tells_how_a_request_went(self):
         k, oc, desk, clock = new()

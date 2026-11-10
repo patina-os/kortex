@@ -9,7 +9,7 @@
   KRunner keeps its last queries, requests to the agent included, in
   `~/.local/share/krunnerstaterc`.
 - **No action without a yes.** kortex never answers a permission request on its own.
-  "Always" is the agent's own rule, which the row spells out (`Always allows: sh *`
+  "Always" is the agent's own rule, which the row spells out (`Always allows, in every conversation: sh *`
   lets any script through): with opencode it holds for every conversation until its
   server stops, after a quiet quarter of an hour, and is not written into its
   configuration. A request opencode cannot list comes from its event stream and is

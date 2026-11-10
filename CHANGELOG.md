@@ -15,6 +15,25 @@ What changed in each release of kortex. The format follows
   for the reason and the time of the next try: "Retrying: Free limit reached · next
   try 00:39".
 
+- A follow-up that repeats the request before it ("try again") is no longer taken as
+  answered by the answer before it: what kortex knew of the conversation when the
+  follow-up was sent is dropped, so no notification says "kortex answered" with the
+  old answer.
+- Opening another conversation from `ai`'s list while a request runs ends the
+  following of that request: the conversation opened got a "kortex is working on
+  it" for a request that was never made in it.
+
+### Changed
+
+- `kortex >` shows the conversation as `kortex ›` does: few keyboards have a key
+  for ›, which the hint names.
+- While a row asks, the row below it says how to answer from the keyboard: "Waiting
+  for your answer · Shift+Enter allows once". KRunner runs a row's first action
+  with Shift+Enter and says so only in a tooltip; Enter answers nothing, as before.
+- A row that asks says how far Always reaches: "Always allows, in every
+  conversation: du *". opencode keeps the rule for every conversation until its
+  server stops, which the row did not say.
+
 ## [0.5.1] - 2026-11-09
 
 ### Fixed

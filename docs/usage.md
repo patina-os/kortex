@@ -34,15 +34,15 @@ kortex ›     ◉ Working · 12 s · …the 5 GHz network is in range   Copy ·
 
 ## The conversation
 
-Enter sends the request and opens KRunner on the conversation, `kortex ›` (`ai ›` works
-too). While the agent works, every row is one line, so KRunner's window holds still
+Enter sends the request and opens KRunner on the conversation, `kortex ›` (`kortex >` and
+`ai ›` work too). While the agent works, every row is one line, so KRunner's window holds still
 instead of growing and shrinking with each word. It shows:
 
 - **How long the agent has been at it and what it wrote last**, on one row:
   "Working · 12 s · …the 5 GHz network is in range", or "Thinking · 12 s · …" while a
   reasoning model thinks before it answers, so a model that thinks for a minute does
-  not look stuck. While a row asks, it says "Waiting for your answer" and holds still,
-  so that the row can be clicked.
+  not look stuck. While a row asks, it says "Waiting for your answer · Shift+Enter
+  allows once" and holds still, so that the row can be clicked.
 - **A row for each step the agent takes** (`bash df -h /`), in the order taken. Four
   at most; older ones fold into one row ("+2 earlier steps"). Enter on a step opens
   the conversation in the agent's own interface, which shows the step whole.
@@ -53,9 +53,11 @@ instead of growing and shrinking with each word. It shows:
   `hermes --resume`), for longer work such as code.
 - **A row for each action the agent asks to take** (a command, a file change, a web
   request its permissions put on `ask`), with the whole command as it will run and
-  what Always would let through (`Always allows: sh *` lets any script through).
-  Allow once, Always or Deny answer it; Enter alone answers nothing, and nothing runs
-  before you choose. opencode asks before every change (patina's permissions); Hermes
+  what Always would let through (`Always allows, in every conversation: sh *` lets any
+  script through, in this conversation and the next ones, until the agent's server
+  stops). Allow once, Always or Deny answer it, with the mouse; from the keyboard,
+  Shift+Enter is Allow once (KRunner runs a row's first action with it). Enter alone
+  answers nothing, and nothing runs before you choose. opencode asks before every change (patina's permissions); Hermes
   only before what it counts as dangerous.
 - **Why it stopped**, when the agent or its provider failed, with Open in terminal.
 

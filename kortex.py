@@ -58,7 +58,7 @@ SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
 MAX_LATEST = 36  # characters of what the agent wrote or thought last, after the seconds
 MAX_STEPS = 4  # rows of steps while the agent works; the older ones fold into one row
-MAX_NOTE = 300  # characters of an answer's last words a notification shows; Show has the rest
+MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
 REFRESH_MS = 700
@@ -623,7 +623,7 @@ def hermes_messages(found, run):
 
 def parse(query, agent=None):
     """(kind, text): ask with the request, list for `ai` alone, view with an optional
-    follow-up after `kortex ›` or `ai ›`, or (None, "") for any other search. The
+    follow-up after `kortex ›` or `ai ›` (`>` is read as `›`), or (None, "") for any other search. The
     agent's name with the marker (`opencode ›`), as 0.4 called the conversation, shows
     it too. Any case, and a tab, are read as typed."""
     q = query.replace(JOINER, "").strip()
@@ -632,8 +632,9 @@ def parse(query, agent=None):
     for word in dict.fromkeys(w for w in (NAME, TRIGGER, agent) if w):
         head, rest = q[:len(word)], q[len(word):]
         # `kortex ›`, `kortex›`, not `kortexx ›`
-        if head.lower() == word.lower() and rest.lstrip().startswith(VIEW_MARK) and not rest[:1].isalnum():
-            return "view", rest.lstrip()[len(VIEW_MARK):].strip()
+        # `>` too: few keyboards have a key for ›, which the hint names
+        if head.lower() == word.lower() and rest.lstrip().startswith((VIEW_MARK, ">")) and not rest[:1].isalnum():
+            return "view", rest.lstrip()[1:].strip()
     if q[:len(TRIGGER)].lower() != TRIGGER or not q[len(TRIGGER):][:1].isspace():
         return None, ""
     return "ask", q[len(TRIGGER):].strip()
@@ -781,7 +782,8 @@ def view(state, elapsed=None, agent=""):
         kind = p.get("permission", "this")
         text = f"Allow {kind}: {asked_for(p)}"
         if p.get("always"):  # opencode's rule for Always: `sh *` lets any script through
-            text += "\nAlways allows: " + ("any " + kind if p["always"] == ["*"] else ", ".join(p["always"]))
+            # opencode keeps the rule for every conversation, until its server stops
+            text += "\nAlways allows, in every conversation: " + ("any " + kind if p["always"] == ["*"] else ", ".join(p["always"]))
         matches.append(match(
             "permission" + SEP + p["id"], text, "dialog-warning", 1.0,
             "The agent asks before it does this", ["allow-once", "allow-always", "deny"], True))  # all of it, never elided
@@ -792,7 +794,9 @@ def view(state, elapsed=None, agent=""):
         matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
     elif working:
         if state["permissions"]:
-            line = "Waiting for your answer"  # holds still while a row asks, to be clicked
+            # holds still while a row asks, to be clicked; KRunner runs a row's first
+            # action, Allow once, on Shift+Enter, and says so only in a tooltip
+            line = "Waiting for your answer · Shift+Enter allows once"
         elif status == "retry":
             line = f"Retrying: {retry}"
         else:
@@ -1119,6 +1123,10 @@ class Kortex:
 
             def sent(_result, error):
                 self.waiting = ""
+                if not error:
+                    # What is known of the conversation is from before this request: a
+                    # follow-up that repeats the last request would read as replied to.
+                    self.state = None
                 self.failed(None, error)
                 if error:
                     self.finish(f"{NAME} did not get the request", str(error))
@@ -1126,6 +1134,8 @@ class Kortex:
             self.reopen(self.opening, menu)
             self.work(send, sent)
         elif kind == "session":
+            if arg != self.session:
+                self.asked_at = None  # the request followed was made in another conversation
             self.session = arg
             self.reopen(self.opening, menu)
         elif kind == "show":
