@@ -22,6 +22,12 @@ What changed in each release of kortex. The format follows
 
 ### Fixed
 
+- The same request asked of Hermes a second time is answered. Hermes takes a
+  conversation's title once, and kortex names a conversation after the request: the
+  second time the palette said "POST /api/sessions: HTTP Error 400: Bad Request ·
+  Not sent", for good. The second conversation gets the time behind its title.
+- A tool of a service that a hook of Hermes' sends to its approval (patina's gate)
+  reads "Allow tracker: update_issue {…}", not Hermes' name for the rule.
 - Always is not offered where its rule lets far more through than what asks: a
   change to any file, any bash command, or commands that start with `sudo`, `rm`, a
   shell, `python3`, `curl` and the like. One Always on a row that measured a folder

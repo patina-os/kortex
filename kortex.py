@@ -571,7 +571,16 @@ class Hermes(Server):
                 del self.asked[key]
 
     def new_session(self, title):
-        return self.request("POST", "/api/sessions", {"title": title})["session"]["id"]
+        """A conversation named after the request. Hermes takes a title once: the same
+        request asked again (the first 60 characters of it) was refused for good, with
+        an HTTP error as the palette's answer. The second gets the time behind it."""
+        try:
+            return self.request("POST", "/api/sessions", {"title": title})["session"]["id"]
+        except AgentError as e:
+            if http_status(e) != 400:
+                raise
+        again = f"{title[:50]} · {time.strftime('%d.%m. %H:%M:%S')}"
+        return self.request("POST", "/api/sessions", {"title": again})["session"]["id"]
 
     def ask(self, session, text):
         run = self.request("POST", "/v1/runs", {"input": text, "session_id": session})["run_id"]
@@ -638,9 +647,15 @@ def note_hermes_event(asked, line, session, run):
         event = json.loads(line[5:])
         kind = event.get("event")
         if kind == "approval.request":
+            what, command = event.get("description") or "a command", event.get("command", "")
+            if command.endswith("(plugin approval rule)") and ": " in what:
+                # A hook sent the tool to the approval (patina's gate before a service's
+                # tool): its message says what is asked, "tracker: update_issue {…}";
+                # the command is Hermes' name for the rule.
+                what, command = what.split(": ", 1)
             asked[event["request_id"]] = {
                 "id": event["request_id"], "sessionID": session, "run": run,
-                "permission": event.get("description") or "a command", "patterns": [event.get("command", "")]}
+                "permission": what, "patterns": [command]}
         elif kind == "approval.responded":
             asked.pop(event.get("request_id"), None)
         return kind in ("run.completed", "run.failed", "run.cancelled", "run.interrupted")

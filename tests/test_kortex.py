@@ -1204,6 +1204,29 @@ class HermesBackend(unittest.TestCase):
             return self.answers.get(path, {})
         self.h.request = request
 
+    def test_a_title_in_use_gets_the_time_behind_it(self):
+        # Hermes takes a title once; the same request asked again was "HTTP Error 400".
+        titles = []
+
+        def request(method, path, body=None, start=True, timeout=10):
+            titles.append(body["title"])
+            if len(titles) == 1:
+                cause = kortex.urllib.error.HTTPError("http://127.0.0.1:8642/api/sessions", 400, "Bad Request", {}, None)
+                raise kortex.AgentError(f"POST /api/sessions: {cause}") from cause
+            return {"session": {"id": "api_2"}}
+        self.h.request = request
+        self.assertEqual(self.h.new_session("what's in my calendar this week"), "api_2")
+        self.assertEqual(titles[0], "what's in my calendar this week")
+        self.assertTrue(titles[1].startswith("what's in my calendar this week · "))
+        self.assertNotEqual(titles[0], titles[1])
+
+        def down(*_args, **_kwargs):
+            cause = kortex.urllib.error.HTTPError("http://127.0.0.1:8642/api/sessions", 500, "x", {}, None)
+            raise kortex.AgentError("POST /api/sessions") from cause
+        self.h.request = down
+        with self.assertRaises(kortex.AgentError):
+            self.h.new_session("x")
+
     def test_approval_requests_come_and_go_with_the_stream(self):
         asked = {}
         request = hermes_event(event="approval.request", request_id="req_1", command="rm -r old-photos",
@@ -1211,6 +1234,11 @@ class HermesBackend(unittest.TestCase):
         self.assertFalse(kortex.note_hermes_event(asked, request, "ses_1", "run_1"))
         self.assertEqual(asked["req_1"], {"id": "req_1", "sessionID": "ses_1", "run": "run_1",
                                           "permission": "recursive delete", "patterns": ["rm -r old-photos"]})
+        gate = hermes_event(event="approval.request", request_id="req_2", description='tracker: update_issue {"id":"PLA-1"}',
+                            command="<mcp__tracker__update_issue> (plugin approval rule)")
+        kortex.note_hermes_event(asked, gate, "ses_1", "run_1")  # a hook's rule: its message says what is asked
+        self.assertEqual((asked["req_2"]["permission"], asked["req_2"]["patterns"]), ("tracker", ['update_issue {"id":"PLA-1"}']))
+        del asked["req_2"]
         kortex.note_hermes_event(asked, hermes_event(event="approval.responded", request_id="req_1"), "ses_1", "run_1")
         self.assertEqual(asked, {})
         self.assertFalse(kortex.note_hermes_event(asked, ": keepalive\n", "ses_1", "run_1"))
