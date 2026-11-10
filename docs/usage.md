@@ -11,10 +11,8 @@ and the row that says how long name the agent.
 Meta+A       why is my wifi slow?
              ◉ Ask kortex: why is my wifi slow?                 Enter
              ─────────────────────────────────────────────────────────
-kortex ›     ◉ Working · 12 s · …the 5 GHz network is in range   Copy · Open in terminal · Stop
-             ▸ bash nmcli device wifi list                      Open in terminal
-             ▸ bash iw dev wlan0 link                           Open in terminal
-             ⚠ Allow bash: nmcli connection up home-5G          Allow once · Always · Deny
+kortex ›     ◉ Working · 12 s · running a command                Copy · Show what the agent does · Stop
+             ⚠ Allow: I'll switch you to the 5 GHz network.     Allow once · Always · Deny
 ```
 
 ## Asking
@@ -39,30 +37,31 @@ kortex ›     ◉ Working · 12 s · …the 5 GHz network is in range   Copy ·
 ## The conversation
 
 Enter sends the request and opens KRunner on the conversation, `kortex ›` (`kortex >` and
-`ai ›` work too). While the agent works, every row is one line, so KRunner's window holds still
-instead of growing and shrinking with each word. It shows:
+`ai ›` work too). It reads like a chat with the agent: its words, not its commands, which
+are in the panel (below). While the agent works, the row that says so is one line, so
+KRunner's window holds still instead of growing and shrinking with each word. It shows:
 
-- **How long the agent has been at it and what it wrote last**, on one row:
+- **How long the agent has been at it and what it wrote or does last**, on one row:
   "Working · 12 s · The 5 GHz network is in range.", or "Thinking · 12 s · …" while a
   reasoning model thinks (the start of the last sentence it finished, which holds still
-  until it finishes the next) before it answers, so a model that thinks for a minute does
-  not look stuck. While a row asks, it says "Waiting for your answer · Shift+Enter
+  until it finishes the next) before it answers, or what it does during a step
+  ("running a command", "reading a file", "using linear"), so a model that thinks for a
+  minute does not look stuck. While a row asks, it says "Waiting for your answer · Shift+Enter
   allows once" and holds still, so that the row can be clicked.
-- **A row for each step the agent takes** (`bash df -h /`), in the order taken. Four
-  at most; older ones fold into one row ("+2 earlier steps"). Enter on a step opens
-  the conversation in the agent's own interface, which shows the step whole.
 - **The answer**, once the agent is done, in place of the row that said how long: what
   it said after its last step (what it said between the steps is how it got there),
-  and its steps folded into one row below ("3 steps: bash ×2, read"). The Markdown a
+  with how many steps it took beside it ("Enter copies · 3 steps"). The Markdown a
   model writes is read as far as a row can show it: bold, lists, a table's rows. An
-  answer longer than 1,500 characters shows its start and says that the terminal has
-  the rest. Enter or Copy puts the answer on the clipboard; Open in terminal
-  goes on with the same conversation in the agent's own interface (`opencode attach`,
-  `hermes --resume`), for longer work such as code.
+  answer longer than 1,500 characters shows its start and says that the panel has the
+  rest. Enter or Copy puts the answer on the clipboard.
 - **A row for each action the agent asks to take** (a command, a file change, a web
-  request, a service's tool its permissions put on `ask`), with the whole command as
-  it will run, the path and the changed lines of a file, or what a service's tool is
-  given; with what the agent said it would do; and with
+  request, a service's tool its permissions put on `ask`), in what the agent said right
+  before that step ("Allow: I'll add the alias to your .bashrc, after a copy of it as
+  .bashrc.bak."). A command that deletes, runs as root or the like (`sudo`, `rm`, a
+  shell, `kill`, `apt` …) shows, whole, under the words: words can be wrong, and in a
+  test an agent called a folder that held a thesis "one stale cache file". A step the
+  agent did not explain shows as before: the whole command as it will run, the path
+  and the changed lines of a file, or what a service's tool is given. And with
   what Always would let through (`Always allows, in every conversation: sh *` lets any
   script through, in this conversation and the next ones, until the agent's server
   stops). Allow once, Always or Deny answer it, with the mouse; from the keyboard,
@@ -80,7 +79,21 @@ instead of growing and shrinking with each word. It shows:
   does typing your own after `kortex ›`. What a conversation the agent started for a
   part of the work asks is shown here too.
 - **Stop**, on the row that says how long, ends what the agent does (opencode).
-- **Why it stopped**, when the agent or its provider failed, with Open in terminal.
+- **Why it stopped**, when the agent or its provider failed, with Show what the agent
+  does.
+
+## The panel
+
+Show what the agent does, on the row that says how long or on the answer, opens the
+agent's own interface on the conversation (`opencode attach`, `hermes --resume`) in the
+terminal Plasma names, docked at the screen's right edge: as high as the screen's work
+area, a fifth of its width but at least 480 and at most 720 pixels, above your other
+windows. Every step is there, whole, and the conversation goes on there too, for
+longer work such as code; close it when you have seen enough. patina puts it on
+Meta+Shift+A, which opens the agent's interface alone when there is no conversation
+yet. The docking is a small KWin script kortex loads over D-Bus for the moment the
+window takes to appear (Plasma lets no program place its own window on Wayland);
+without KWin the terminal opens where it would.
 
 Typing after the marker continues the conversation (`kortex › and in dark mode?`).
 Another search typed over it leaves the conversation alone.
@@ -100,8 +113,8 @@ there opens the conversation in KRunner.
 
 ## A key for the agent
 
-patina puts the palette on Meta+A and the agent's own terminal on Meta+Shift+A. On
-another desktop, bind a key (System Settings, Shortcuts, Add New, Command) to:
+patina puts the palette on Meta+A and the panel on Meta+Shift+A. On another desktop,
+bind a key (System Settings, Shortcuts, Add New, Command) to:
 
 ```sh
 dbus-send --session --print-reply --dest=io.github.patina_os.kortex /runner \
@@ -112,6 +125,8 @@ kortex's `Open` opens the palette on kortex alone, or on the conversation while 
 request runs or waits for an answer; D-Bus starts kortex for it. Earlier releases' key
 called KRunner itself (`org.kde.krunner /App querySingleRunner string:kortex string:`),
 which shows an empty field whatever runs.
+
+The panel, the same way: `io.github.patina_os.kortex.Panel` in place of `Open`.
 
 ## opencode or Hermes
 

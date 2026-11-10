@@ -12,7 +12,9 @@
   real Plasma 6.3 session.
 - [x] KRunner follows the conversation by itself (0.4.0): patina's desktop workflow
   fails without kortex's "KRunner asked again".
-- [ ] Open in terminal continues the session, on a real desktop.
+- [ ] The panel (Show what the agent does, Meta+Shift+A) docks the agent's view of the
+  session at the right edge on Wayland, on a real desktop (seen on X11 in a test
+  session only).
 - [ ] Installing and removing it per user leaves nothing behind but the password file.
 
 ## Choices still open

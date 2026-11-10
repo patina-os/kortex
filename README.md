@@ -42,8 +42,8 @@ is where you talk to it.
 - **Working with an agent.** Have it write a script, find its way through a project,
   work on your server, or file a ticket through a service you connected (Linear,
   Notion, GitHub, Nextcloud). Walk away while it works and a notification brings the
-  answer back; Open in terminal takes the conversation into the agent's own interface
-  for longer work.
+  answer back; Show what the agent does docks the agent's own view of the conversation
+  at the screen's right edge, for longer work.
 
 An agent can be wrong, a small local model more often than a large one: read what it
 proposes before you allow it.
@@ -53,20 +53,24 @@ proposes before you allow it.
 - **Ask from anywhere.** Meta+A opens the palette on the agent alone. Any search in
   Meta+Space or the start menu ends with "Ask kortex: …", first when it reads as a
   question. `ai` and a request asks at once, as before.
-- **Watch it work.** The palette counts the seconds, shows what the agent wrote or
-  thought last and a row for each step it takes, then its answer. Every row but the
-  answer is one line, so the palette holds still while the agent works.
+- **A conversation, not a console.** The palette reads like a chat: the seconds,
+  what the agent wrote, thought or does last ("running a command"), then its answer.
+  Its commands are in the panel, for when you want to see them.
 - **Nothing changes without a yes.** Every command, file change, web request or
-  service's tool the agent's permissions hold back is a row of its own, with the
-  whole command, the changed lines or what the tool is given: Allow once, Always or
-  Deny. What the permissions hold back is the agent's configuration: patina's asks
+  service's tool the agent's permissions hold back is a row of its own, in the
+  agent's words ("I'll add the alias to your .bashrc, after a copy of it"): Allow
+  once, Always or Deny. A command that deletes, runs as root or the like shows under
+  the words, since words can be wrong; a step the agent did not explain shows as
+  the command, the changed lines or what a service's tool is given. What the permissions hold back is the agent's configuration: patina's asks
   before every change, on the machine and in a connected service.
 - **It asks you, too.** A question of the agent's is a row with its answers; pick
   one or type your own.
 - **Walk away.** Click elsewhere and a notification follows the request to its answer.
   Its Show brings the conversation back.
-- **Go on in a terminal.** Open in terminal hands the conversation to the agent's own
-  interface, for longer work such as code.
+- **See what it does.** Show what the agent does (or Meta+Shift+A with patina) docks
+  the agent's own interface on the conversation at the screen's right edge, full
+  height and a fifth of its width, above your windows: every step and command, while
+  you work on beside it.
 - **Local first.** kortex sends nothing anywhere itself. Where a request goes is the
   agent's configuration: a model on the machine through Ollama, or the provider you chose.
 
@@ -101,8 +105,7 @@ git clone https://github.com/patina-os/kortex && cd kortex
 | `kortex ›` | the current conversation; type after it to go on |
 | a row that asks | Allow once · Always · Deny |
 | what the agent asks you | Enter on an answer, or type your own |
-| the answer, or the row that says how long | Copy · Open in terminal · Stop |
-| a step | Open in terminal |
+| the answer, or the row that says how long | Copy · Show what the agent does · Stop |
 
 ## Documentation
 

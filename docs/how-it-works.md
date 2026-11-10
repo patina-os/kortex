@@ -48,9 +48,9 @@ find nothing to run.
 KRunner sizes its window to its rows and gives a one-line row a fixed height, while a
 multi-line row grows by a line with each word that wraps; in the free-floating mode the
 window hangs from a third of the screen's height, so its bottom edge moves. So while
-the agent works, every row of the conversation is one line: one that says how long it
-has been at it and what it wrote last, and one per step (the last four). The window
-grows by a row for a step, not by a line for a word, and the answer, the one
+the agent works, the row that says how long it has been at it and what it wrote or
+does last is one line, and the steps are not rows at all (the panel shows them). The
+window grows by a row that asks, not by a line for a word, and the answer, the one
 multi-line row besides a row that asks, comes once the agent is done.
 
 While KRunner is closed (its `Teardown`), kortex follows the request with one
@@ -123,8 +123,16 @@ starts, and keeps a conversation's tools as they were when it began: when the fi
 changed, kortex stops the gateway it started once no run is busy, and the next request
 starts it again, so the service is there from the next conversation on.
 
-## Open in terminal
+## The panel
 
-Runs the terminal Plasma names (`TerminalApplication` in `kdeglobals`, else konsole)
-with `opencode attach <server> --session <id>` (Hermes: `hermes --resume <id>`), the
-password in the environment, not on the command line.
+Show what the agent does (the `terminal` action) and `Panel` on kortex's own D-Bus
+interface run the terminal Plasma names (`TerminalApplication` in `kdeglobals`, else
+konsole) with `opencode attach <server> --session <id>` (Hermes: `hermes --resume
+<id>`; without a conversation, `opencode attach <server>` or `hermes`), the password in
+the environment, not on the command line. Then kortex writes a KWin script
+(`~/.local/state/kortex/panel.js`) and loads it through `org.kde.KWin /Scripting`: it
+waits for a window of the terminal's process and gives it the right edge of the work
+area of its screen, full height, `PANEL_SHARE` of the width within `PANEL_MIN` and
+`PANEL_MAX` pixels, kept above. kortex unloads it after 20 seconds. A terminal that
+hands its window to a process already running (konsole's single process mode, kitty's
+`--single-instance`) is not found and stays where it opens.

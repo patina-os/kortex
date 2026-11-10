@@ -57,7 +57,7 @@ ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
 MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
 MAX_LATEST = 40  # characters of what the agent wrote or thought last, after the seconds
-MAX_STEPS = 4  # rows of steps while the agent works; the older ones fold into one row
+PANEL_SHARE, PANEL_MIN, PANEL_MAX = 0.2, 480, 720  # the panel's width: a fifth of the screen, in px
 MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
@@ -95,13 +95,32 @@ RISKY = frozenset({
     "apt-get", "dpkg", "patina",
 })
 
+# The KWin script that docks the panel (Desktop.dock): the window of one process, at
+# the right edge of the screen it opens on, as high as the work area, kept above.
+PANEL_SCRIPT = """
+const pid = %d, share = %s, least = %d, most = %d;
+function dock(window) {
+    if (!window || window.pid !== pid || !window.normalWindow) {
+        return false;
+    }
+    const area = workspace.clientArea(KWin.MaximizeArea, window);
+    const width = Math.round(Math.min(most, Math.max(least, area.width * share)));
+    window.frameGeometry = {x: area.x + area.width - width, y: area.y, width: width, height: area.height};
+    window.keepAbove = true;
+    return true;
+}
+if (!workspace.windowList().some(dock)) {
+    workspace.windowAdded.connect(dock);
+}
+"""
+
 # The actions a match can offer: id, text, icon. KRunner asks for them once.
 ACTIONS = [
     ("allow-once", "Allow once", "dialog-ok-apply"),
     ("allow-always", "Always allow", "media-playlist-repeat"),  # not a second check mark
     ("deny", "Deny", "dialog-cancel"),
     ("copy", "Copy the answer", "edit-copy"),
-    ("terminal", "Open in terminal", "utilities-terminal"),
+    ("terminal", "Show what the agent does", "view-right-new"),  # the panel, docked on the right
     ("stop", "Stop", "process-stop"),
 ]
 REPLIES = {"allow-once": "once", "allow-always": "always", "deny": "reject"}
@@ -430,8 +449,11 @@ class Opencode(Server):
 
     def attach(self, session):
         """The command, and its environment, that continues a session in opencode's own
-        interface; the password goes in the environment, not on the command line."""
-        return [find_opencode(), "attach", self.url, "--session", session], {"OPENCODE_SERVER_PASSWORD": self.password or ""}
+        interface, or a new one without `session`; the password goes in the environment,
+        not on the command line."""
+        self.start()
+        return ([find_opencode(), "attach", self.url] + (["--session", session] if session else []),
+                {"OPENCODE_SERVER_PASSWORD": self.password or ""})
 
     def new_session(self, title):
         return self.request("POST", "/session", {"title": title})["id"]
@@ -558,7 +580,7 @@ class Hermes(Server):
             req.add_header("Authorization", "Bearer " + self.password)
 
     def attach(self, session):
-        return [find_hermes(), "--resume", session], {}
+        return [find_hermes()] + (["--resume", session] if session else []), {}
 
     def stop(self):
         super().stop()
@@ -856,6 +878,54 @@ def last_sentence(text):
     return done[-1].strip() if done else ""
 
 
+DOING = {"bash": "running a command", "read": "reading a file", "edit": "changing a file",
+         "write": "writing a file", "glob": "looking for files", "grep": "searching files",
+         "list": "looking at a folder", "webfetch": "reading a web page", "task": "handing part of it on",
+         "todowrite": "planning", "question": "asking you"}
+
+
+def doing(messages):
+    """What the agent does right now, in words, while its last part is a step: the
+    palette shows no commands, and "Working" alone looks stuck during a long one."""
+    parts = [p for p in reply_parts(messages) if p.get("type") in ("text", "reasoning", "tool")
+             and not p.get("synthetic") and not p.get("ignored")]
+    if not parts or parts[-1]["type"] != "tool" or composing(parts[-1]):
+        return ""
+    tool = str(parts[-1].get("tool", ""))
+    if tool in DOING:
+        return DOING[tool]
+    service = tool.split("_", 1)[0] if "_" in tool else ""
+    return f"using {service}" if service else "taking a step"
+
+
+def explained(p, messages):
+    """What the agent said, in its own words, right before the step that asks: the
+    text after the step before it. "" when it said nothing in between."""
+    parts = [x for x in reply_parts(messages) if not x.get("synthetic") and not x.get("ignored")
+             and (x.get("type") == "tool" or x.get("type") == "text" and x.get("text", "").strip())]
+    call = (p.get("tool") or {}).get("callID")
+    at = next((i for i, x in enumerate(parts) if call and x.get("type") == "tool" and x.get("callID") == call), None)
+    if at is None:  # Hermes names no call: the step that asks is the last, or not stored yet
+        last = parts[-1] if parts else {}
+        running = last.get("type") == "tool" and (last.get("state") or {}).get("status") in ("pending", "running")
+        at = len(parts) - 1 if running else len(parts)
+    for x in reversed(parts[:at]):
+        if x["type"] == "tool":
+            return ""
+        return " ".join(x["text"].split())
+    return ""
+
+
+def risky(p):
+    """True for a command that deletes, runs as root or the like (RISKY): its row shows
+    the command under the agent's words, which can be wrong (the test's thesis was
+    "one stale cache file")."""
+    if p.get("permission") not in ("bash", None) and not (p.get("metadata") or {}).get("command"):
+        return False
+    words = (p.get("metadata") or {}).get("command") or " ".join(p.get("patterns") or [])
+    return any((part.split() or [""])[0] in RISKY for part in re.split(r"&&|\|\||[;|\n(){}]", words))
+
+
 def replied(messages, request):
     """True when the agent has replied to `request`: it is the last request the
     conversation has (in what the agent stored of it, which may hold more), and a reply of
@@ -868,7 +938,7 @@ def replied(messages, request):
     return request.strip() in said
 
 
-MORE = "… Open in terminal has the rest."
+MORE = "… Show what the agent does has the rest."
 
 
 def shorten(text, most=MAX_ANSWER):
@@ -892,16 +962,6 @@ def head(text, most=MAX_LATEST):
         return text
     start = text[:most - 1]
     return (start.rsplit(" ", 1)[0] if " " in start else start).rstrip(",;: ") + "…"
-
-
-def steps_summary(steps):
-    """The steps the agent took, on one line: `3 steps: bash ×2, read`."""
-    used = {}
-    for step in steps:
-        tool = step.split(" ", 1)[0]
-        used[tool] = used.get(tool, 0) + 1
-    tools = ", ".join(f"{t} ×{n}" if n > 1 else t for t, n in used.items())
-    return f"{len(steps)} step{'s' if len(steps) > 1 else ''}: {tools}"
 
 
 def seconds(elapsed):
@@ -1015,16 +1075,15 @@ def always_offered(p):
 
 
 def view(state, elapsed=None, agent="", stop=False):
-    """The matches of the conversation (`kortex ›`): what the agent asks to do and what
-    it asks the user first; while it works, a status row (how long it has been at it,
-    `elapsed` seconds or None, and what it wrote or thought last) and a row for each of
-    its last MAX_STEPS steps; then its answer and its steps on one row. All of them but
-    an answer and a row that asks are one line, which KRunner gives a fixed height: its
-    window grows by a row for a step, never by a line for a word. `stop`: the agent's
-    work can be stopped, so the status row offers it."""
+    """The matches of the conversation (`kortex ›`), as a chat shows it: what the agent
+    asks to do, in its own words, and what it asks the user; while it works, a status
+    row (how long it has been at it, `elapsed` seconds or None, and what it wrote or
+    thought or does last); then its answer. The steps and their commands are the
+    panel's (Show what the agent does), but for a risky command a row asks for. The
+    status row is one line, which KRunner gives a fixed height, so its window holds
+    still. `stop`: the agent's work can be stopped, so the status row offers it."""
     said, steps, error = reply_of(state["messages"])
     matches = []
-    told = False
     for p in state["permissions"]:
         if p["id"] == UNREADABLE["id"]:
             matches.append(match("stuck", "The agent waits for an answer kortex cannot show (an opencode bug)",
@@ -1032,16 +1091,19 @@ def view(state, elapsed=None, agent="", stop=False):
             continue
         kind = p.get("permission", "this")
         what = asked_for(p, state["messages"])
-        text = f"Allow {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
+        words = explained(p, state["messages"])
+        if words:
+            # The agent's own words, as in a chat; the command only where a wrong
+            # explanation would cost the most. The panel shows every step.
+            text = "Allow: " + shorten_end(words, 240)
+            if risky(p):
+                text += "\n" + what
+        else:  # it said nothing first: the command, not a blind Allow
+            text = f"Allow {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
         always = always_offered(p)
         if p.get("always") and always:  # opencode's rule for Always: `du *` lets any du through
             # opencode keeps the rule for every conversation, until its server stops
             text += "\nAlways allows, in every conversation: " + ("any " + kind if p["always"] == ["*"] else ", ".join(p["always"]))
-        if said and not told:
-            # What the agent said it would do, beside the first row that asks: the row
-            # is all the user sees while it waits, and a bare command explains nothing.
-            told = True
-            text += "\nThe agent: " + shorten_end(" ".join(said[-1].split()), 220)
         matches.append(match(
             "permission" + SEP + p["id"], text, "dialog-warning", 1.0, "Asks first",
             ["allow-once"] + (["allow-always"] if always else []) + ["deny"], True))  # all of it, never elided
@@ -1074,25 +1136,15 @@ def view(state, elapsed=None, agent="", stop=False):
         else:
             thinking, words = latest_of(state["messages"])
             line = ("Thinking" if thinking else "Working") + (f" · {seconds(elapsed)}" if elapsed is not None else "")
+            words = words or doing(state["messages"])
             if words:
                 line += " · " + head(words)
         matches.append(match("answer", line, ICON, 0.9, agent, ["copy", "terminal"] + (["stop"] if stop else [])))
     elif said or steps:
+        took = f" · {len(steps)} step{'s' if len(steps) > 1 else ''}" if steps else ""
         matches.append(match("answer", rich(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9,
-                             (agent + " · " if agent else "") + "Enter copies", ["copy", "terminal"], True, styled=True))
-    if steps and working and not error:
-        shown = steps if len(steps) <= MAX_STEPS else steps[-(MAX_STEPS - 1):]
-        if len(shown) < len(steps):
-            earlier = len(steps) - len(shown)
-            matches.append(match("step" + SEP + "earlier", f"+{earlier} earlier step{'s' if earlier > 1 else ''}",
-                                 "utilities-terminal", 0.85, "Open in terminal"))
-        first = len(steps) - len(shown)
-        for i, step in enumerate(shown):  # in the order taken
-            matches.append(match("step" + SEP + str(first + i), step, "utilities-terminal", 0.84 - i * 0.001,
-                                 "Open in terminal"))
-    elif steps:
-        matches.append(match("step" + SEP + "all", steps_summary(steps), "utilities-terminal", 0.85,
-                             "Open in terminal"))
+                             (agent + " · " if agent else "") + "Enter copies" + took, ["copy", "terminal"], True,
+                             styled=True))
     return matches
 
 
@@ -1464,17 +1516,11 @@ class Kortex:
             session = self.session
             self.work(lambda: self.agent.abort(session), self.failed)
             self.reopen(self.view_query, menu)
-        elif kind in ("answer", "step") and self.session:
-            session = self.session
-            if action == "terminal" or kind == "step":  # a step: the terminal shows it
-                def opened(found, error):
-                    if found:
-                        attach, env = found
-                        self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env)
-                    self.failed(None, error)
-
-                self.work(lambda: self.agent.attach(session), opened)
+        elif kind == "answer" and self.session:
+            if action == "terminal":
+                self.panel()
             else:
+                session = self.session
                 def read(messages, error):
                     if messages is not None:
                         said, steps, stopped = reply_of(messages)
@@ -1482,6 +1528,21 @@ class Kortex:
                     self.failed(None, error)
 
                 self.work(lambda: self.agent.messages(session), read)
+
+    def panel(self):
+        """Show what the agent does: its own interface on the conversation, in a terminal
+        docked to the screen's right edge, so the user works on beside it; the agent's
+        interface alone when there is no conversation (Meta+Shift+A)."""
+        self.last_activity = self.now()
+        session = self.session
+
+        def opened(found, error):
+            if found:
+                attach, env = found
+                self.desktop.dock(self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env))
+            self.failed(None, error)
+
+        self.work(lambda: self.agent.attach(session), opened)
 
     def reopen(self, query, menu=False):
         """After a run, which closes KRunner, or the start menu (`menu`): open KRunner
@@ -1677,8 +1738,38 @@ def main():
             return next((t for t in ("konsole", "kitty", "x-terminal-emulator") if shutil.which(t)), "konsole")
 
         def launch(self, command, env):
-            subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
-                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL).pid
+
+        def dock(self, pid):
+            """Place the window of process `pid` at the screen's right edge, full height, a
+            fifth of the width (PANEL_*), above other windows: a KWin script, loaded over
+            D-Bus for the moment the window takes to appear. Plasma lets no program place
+            its own window on Wayland."""
+            script = state_dir() / "panel.js"
+            state_dir().mkdir(parents=True, exist_ok=True)
+            script.write_text(PANEL_SCRIPT % (pid, PANEL_SHARE, PANEL_MIN, PANEL_MAX))
+            try:
+                kwin = bus.get_object("org.kde.KWin", "/Scripting")
+                kwin.unloadScript("kortex-panel", dbus_interface="org.kde.kwin.Scripting")
+                # loadScript is overloaded (path; path and name): the signature picks one
+                number = kwin.loadScript(str(script), "kortex-panel", signature="ss",
+                                         dbus_interface="org.kde.kwin.Scripting")
+                bus.get_object("org.kde.KWin", f"/Scripting/Script{int(number)}").run(
+                    dbus_interface="org.kde.kwin.Script")
+            except (dbus.DBusException, TypeError) as e:  # no KWin, or another one
+                log(f"the panel stays where the terminal put it: {e}")
+                return
+
+            def unload():
+                try:
+                    kwin.unloadScript("kortex-panel", dbus_interface="org.kde.kwin.Scripting")
+                except dbus.DBusException:
+                    pass
+                return False
+
+            GLib.timeout_add_seconds(20, unload)
 
         def notify(self, summary, body, replaces=0, transient=False, then=None):
             # "default" is a click on the notification, "show" its button; both open the
@@ -1774,6 +1865,11 @@ def main():
         def Open(self):
             # Not KRunner's: what Meta+A calls (patina's ask.desktop)
             kortex.open()
+
+        @dbus.service.method(SERVICE)
+        def Panel(self):
+            # Not KRunner's: what Meta+Shift+A calls (patina's agent.desktop)
+            kortex.panel()
 
     try:
         name = dbus.service.BusName(SERVICE, bus, do_not_queue=True)
