@@ -5,6 +5,24 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Fixed
+
+- With the palette closed, the notification that a step asks first says what the agent
+  said of it, as the palette's row does; it named the command.
+- Allow once right before the palette was closed no longer brings a notification that
+  the same step asks first: a fetch begun before the answer listed it once more.
+- The row that says how long no longer cuts a sentence at a stop inside a number or a
+  name ("8.0G", "df.py") or at a colon.
+- A model that gives two tool calls one id no longer has the second step's row show
+  the first step's words.
+
+### Changed
+
+- The README's demo is a replay of kortex 0.7.0: rows in the agent's words, a step
+  asked while the palette was closed, Meta+A on the waiting row, and the panel.
+
 ## [0.7.0] - 2026-11-10
 
 ### Added

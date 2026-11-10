@@ -874,7 +874,8 @@ def last_sentence(text):
     """The last sentence of `text` that is complete, on one line, or "" before the
     first is: what streams in is cut off mid-sentence, and its end changes with every
     word."""
-    done = re.findall(r"[^.!?:]*[.!?:](?=\s|$)", " ".join(text.split()))
+    # a stop ends a sentence only before a space or the end: "8.0G" and "df.py" go on
+    done = re.findall(r"(?:[^.!?]|[.!?](?!\s|$))*[.!?](?=\s|$)", " ".join(text.split()))
     return done[-1].strip() if done else ""
 
 
@@ -904,7 +905,9 @@ def explained(p, messages):
     parts = [x for x in reply_parts(messages) if not x.get("synthetic") and not x.get("ignored")
              and (x.get("type") == "tool" or x.get("type") == "text" and x.get("text", "").strip())]
     call = (p.get("tool") or {}).get("callID")
-    at = next((i for i, x in enumerate(parts) if call and x.get("type") == "tool" and x.get("callID") == call), None)
+    # the last step of that call: a model may give two calls one id
+    at = max((i for i, x in enumerate(parts) if call and x.get("type") == "tool" and x.get("callID") == call),
+             default=None)
     if at is None:  # Hermes names no call: the step that asks is the last, or not stored yet
         last = parts[-1] if parts else {}
         running = last.get("type") == "tool" and (last.get("state") or {}).get("status") in ("pending", "running")
@@ -924,6 +927,18 @@ def risky(p):
         return False
     words = (p.get("metadata") or {}).get("command") or " ".join(p.get("patterns") or [])
     return any((part.split() or [""])[0] in RISKY for part in re.split(r"&&|\|\||[;|\n(){}]", words))
+
+
+def asking_for(p, messages):
+    """What a row, or a notification, that asks says after "Allow": the agent's own words
+    right before the step, as in a chat, with the command under them where a wrong
+    explanation would cost the most (risky); the command alone when it said nothing
+    first, not a blind Allow. The panel shows every step."""
+    what = asked_for(p, messages)
+    words = explained(p, messages)
+    if words:
+        return ": " + shorten_end(words, 240) + ("\n" + what if risky(p) else "")
+    return f" {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
 
 
 def replied(messages, request):
@@ -1090,16 +1105,7 @@ def view(state, elapsed=None, agent="", stop=False):
                                  "dialog-warning", 1.0, "Clears when opencode restarts"))
             continue
         kind = p.get("permission", "this")
-        what = asked_for(p, state["messages"])
-        words = explained(p, state["messages"])
-        if words:
-            # The agent's own words, as in a chat; the command only where a wrong
-            # explanation would cost the most. The panel shows every step.
-            text = "Allow: " + shorten_end(words, 240)
-            if risky(p):
-                text += "\n" + what
-        else:  # it said nothing first: the command, not a blind Allow
-            text = f"Allow {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
+        text = "Allow" + asking_for(p, state["messages"])
         always = always_offered(p)
         if p.get("always") and always:  # opencode's rule for Always: `du *` lets any du through
             # opencode keeps the rule for every conversation, until its server stops
@@ -1217,6 +1223,7 @@ class Kortex:
         self.signature = None  # what KRunner was shown, to compare with what is known now
         self.notified = set()  # the permission requests and questions told of in a notification
         self.answers = {}  # the answers picked so far to a request of several questions, by its id
+        self.replied = set()  # the permission requests answered here, which a fetch begun before may bring back
         self.put_off = False  # told once that the provider puts the request off
         self.logged = set()  # and in the journal
         self.problem = ""
@@ -1437,6 +1444,9 @@ class Kortex:
             self.down = error is not None or state is None
             self.unreachable = str(error) if error else ""
             if state is not None:
+                # A fetch that began before an Allow brings the request back once more: it
+                # was answered, and would show again, or be told of in a notification.
+                state["permissions"] = [p for p in state["permissions"] if p["id"] not in self.replied]
                 self.state = (session, state)
             elif self.asked_at is not None and not self.waiting and self.agent.stopped():
                 # The agent's server exited while it worked on the request: nothing more
@@ -1493,6 +1503,7 @@ class Kortex:
             if action == "allow-always" and asked and not always_offered(asked):
                 action = ""  # not offered for this row; nothing is answered
             if action in REPLIES:
+                self.replied.add(arg)
                 if state:  # answered: KRunner shows it again without it
                     state["permissions"] = [p for p in state["permissions"] if p["id"] != arg]
                 self.work(lambda: self.agent.reply(arg, REPLIES[action]), self.failed)
@@ -1665,7 +1676,7 @@ class Kortex:
         for p in state.get("permissions", []):
             if p["id"] not in self.notified:
                 self.notified.add(p["id"])
-                self.notify(f"{NAME} asks first", f"{asks(p)}: {asked_for(p, state.get('messages', ()))}")
+                self.notify(f"{NAME} asks first", "Allow" + asking_for(p, state.get("messages", ())))
         for q in state.get("questions", []):
             if (q["id"], q["index"]) not in self.notified:
                 self.notified.add((q["id"], q["index"]))
