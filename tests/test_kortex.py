@@ -1496,7 +1496,19 @@ class Files(unittest.TestCase):
         with mock.patch.object(kortex, "find_opencode", return_value="opencode"):
             attach = ["opencode", "attach", "u", "--session", "s"]
             self.assertEqual(kortex.terminal_command(attach, "kitty --single-instance"),
-                             ["kitty", "--single-instance", "opencode", "attach", "u", "--session", "s"])
+                             ["kitty", "--single-instance", "--class", "io.github.patina_os.kortex",
+                              "opencode", "attach", "u", "--session", "s"])
+
+    def test_other_terminals_keep_their_own_app_id(self):
+        attach = ["hermes", "--resume", "s"]
+        self.assertEqual(kortex.terminal_command(attach, "konsole"), ["konsole", "-e", "hermes", "--resume", "s"])
+
+    def test_the_panel_entry_names_kitty_s_class(self):
+        # The taskbar matches the panel's window to the entry installed as <app id>.desktop.
+        entry = (Path(__file__).resolve().parent.parent / "kortex-panel.desktop").read_text()
+        self.assertIn(f"StartupWMClass={kortex.SERVICE}\n", entry)
+        self.assertIn("NoDisplay=true\n", entry)
+        self.assertIn("Icon=kortex\n", entry)
 
 
 if __name__ == "__main__":

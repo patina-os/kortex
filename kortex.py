@@ -1166,10 +1166,13 @@ def ago(ms):
 
 
 def terminal_command(attach, terminal):
-    """The terminal command that runs `attach`, the agent's own interface on a session."""
+    """The terminal command that runs `attach`, the agent's own interface on a session.
+    kitty's window takes kortex's app id, which names kortex's hidden application entry
+    (kortex-panel.desktop), so the taskbar shows the panel as kortex, with its icon, and
+    not among the terminal's other windows; another terminal keeps its own."""
     words = shlex.split(terminal) or ["konsole"]
     if Path(words[0]).name.startswith("kitty"):
-        return words + attach  # kitty takes the program as it is
+        return words + ["--class", SERVICE] + attach  # kitty takes the program as it is
     return words + ["-e"] + attach
 
 

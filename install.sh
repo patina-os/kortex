@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Install kortex for this user: the program, KRunner's metadata, the D-Bus activation
-# file and the icon, under ~/.local/share. No root. Run it again to update.
+# file, the icon and the panel's hidden application entry, under ~/.local/share. No
+# root. Run it again to update.
 set -euo pipefail
 
 here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -21,6 +22,8 @@ fi
 install -D -m 0755 "$here/kortex.py" "$data/kortex/kortex.py"
 install -D -m 0644 "$here/kortex.desktop" "$data/krunner/dbusplugins/kortex.desktop"
 install -D -m 0644 "$here/kortex.svg" "$data/icons/hicolor/scalable/apps/kortex.svg"
+# Named by the app id the panel's kitty window takes, so the taskbar shows it as kortex.
+install -D -m 0644 "$here/kortex-panel.desktop" "$data/applications/$service.desktop"
 # Its mode set, not left to the umask: whoever can write it runs a program as this user.
 printf '[D-BUS Service]\nName=%s\nExec=%s "%s"\n' "$service" "$python" "$data/kortex/kortex.py" |
   install -D -m 0644 /dev/stdin "$data/dbus-1/services/$service.service"
