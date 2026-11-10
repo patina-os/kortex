@@ -20,7 +20,9 @@ its Show reopens the conversation. Hermes gets a folder to remove, since it asks
 only before what it counts as dangerous. It needs `python3-dbus`, `python3-gi` and the
 D-Bus daemon; opencode fetches its provider package from npm on first use.
 
-CI (`.github/workflows/ci.yml`) runs all of them. patina's desktop workflow runs kortex
+CI (`.github/workflows/ci.yml`) runs all of them. For a test by hand with a real agent and
+model, `tests/agent/` has a driver that prints the palette's rows and stand-in services
+(its README says how). patina's desktop workflow runs kortex
 in a real Plasma 6.3 session on Debian 13 and fails when KRunner does not follow the
 conversation.
 

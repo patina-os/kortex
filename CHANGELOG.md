@@ -5,6 +5,35 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Added
+
+- `Open` on kortex's own D-Bus interface (`io.github.patina_os.kortex`), for Meta+A:
+  KRunner on kortex alone, on the conversation while a request runs or a row waits for
+  an answer. KRunner calls no runner for an empty field, so Meta+A showed an empty
+  palette while the agent waited for a yes.
+
+- `tests/agent/`: the driver and the stand-in services of the agent test of November
+  2026, to test an agent by hand with a real model.
+
+### Changed
+
+- The row that says how long shows the start of the last sentence the agent finished
+  writing or thinking, which holds still until the next; it showed the end of what
+  streamed in, half sentences that changed with every word.
+- A request to the agent's server that fails says why in words ("opencode is not
+  running", "did not answer within 10 s", "refused kortex's password (HTTP 401)"),
+  not urllib's (`GET /session/status: <urlopen error [Errno 111] …>`); the journal
+  keeps the details.
+
+### Fixed
+
+- No step row with the tool's bare name while the model is still writing the call.
+- kortex no longer asks the agent for news every 0.7 s for a quarter of an hour after
+  its last use: with KRunner on something else and the agent done, it asks nothing
+  until the next look at the conversation.
+
 ## [0.6.0] - 2026-11-10
 
 ### Added

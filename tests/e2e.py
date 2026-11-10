@@ -137,6 +137,8 @@ def main(agent):
             request, command, asks = "make the file kortex-proof", mock_llm.TOOL_COMMAND, "bash"
         matches = k.Match("ai " + request)
         assert str(matches[0][0]) == "ask" + SEP + request, matches
+        bus.get_object(SERVICE, "/runner").Open(dbus_interface=SERVICE, timeout=5)  # Meta+A
+        wait_for("Meta+A to open an empty field", lambda: record.read_text() == "kortex\t\n", 10)
         print("e2e: ask match ok")
 
         # The agent's server starts with this request (Hermes' takes up to a minute), in
@@ -161,6 +163,12 @@ def main(agent):
         ran = (lambda: not proof.exists()) if agent == "hermes" else proof.exists
         assert not ran(), "the command ran before it was allowed"
         print("e2e: the agent asks first, and nothing ran:", str(asked[1]))
+        # Meta+A while the row waits: KRunner opens on the conversation, not empty
+        before = record.read_text()
+        bus.get_object(SERVICE, "/runner").Open(dbus_interface=SERVICE, timeout=5)
+        wait_for("Meta+A to open the conversation",
+                 lambda: record.read_text()[len(before):] == f"kortex\t{opening}\n", 10)
+        print("e2e: Meta+A opens the conversation while a row waits")
 
         k.Run(str(asked[0]), "allow-once", timeout=30)
         wait_for("the command to run", ran, 60)

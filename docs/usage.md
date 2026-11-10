@@ -20,7 +20,8 @@ kortex ›     ◉ Working · 12 s · …the 5 GHz network is in range   Copy ·
 ## Asking
 
 - **Meta+A** (patina's `ask` key) opens KRunner on kortex alone: whatever you type goes
-  to the agent. Enter on "Ask kortex: …" sends it.
+  to the agent. Enter on "Ask kortex: …" sends it. While a request runs or a row waits
+  for your answer, it opens on the conversation instead.
 - **Any search** of three letters or more, in KRunner (Meta+Space) or in Plasma's start
   menu, ends with "Ask kortex: …", below what Plasma finds. A search that reads as a
   question or a request comes first instead: it ends with `?`, or it has three words
@@ -42,8 +43,9 @@ Enter sends the request and opens KRunner on the conversation, `kortex ›` (`ko
 instead of growing and shrinking with each word. It shows:
 
 - **How long the agent has been at it and what it wrote last**, on one row:
-  "Working · 12 s · …the 5 GHz network is in range", or "Thinking · 12 s · …" while a
-  reasoning model thinks before it answers, so a model that thinks for a minute does
+  "Working · 12 s · The 5 GHz network is in range.", or "Thinking · 12 s · …" while a
+  reasoning model thinks (the start of the last sentence it finished, which holds still
+  until it finishes the next) before it answers, so a model that thinks for a minute does
   not look stuck. While a row asks, it says "Waiting for your answer · Shift+Enter
   allows once" and holds still, so that the row can be clicked.
 - **A row for each step the agent takes** (`bash df -h /`), in the order taken. Four
@@ -102,9 +104,14 @@ patina puts the palette on Meta+A and the agent's own terminal on Meta+Shift+A. 
 another desktop, bind a key (System Settings, Shortcuts, Add New, Command) to:
 
 ```sh
-dbus-send --session --type=method_call --dest=org.kde.krunner /App \
-  org.kde.krunner.App.querySingleRunner string:kortex string:
+dbus-send --session --print-reply --dest=io.github.patina_os.kortex /runner \
+  io.github.patina_os.kortex.Open
 ```
+
+kortex's `Open` opens the palette on kortex alone, or on the conversation while a
+request runs or waits for an answer; D-Bus starts kortex for it. Earlier releases' key
+called KRunner itself (`org.kde.krunner /App querySingleRunner string:kortex string:`),
+which shows an empty field whatever runs.
 
 ## opencode or Hermes
 
