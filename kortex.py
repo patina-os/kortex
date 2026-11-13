@@ -61,6 +61,7 @@ PANEL_SHARE, PANEL_MIN, PANEL_MAX = 0.2, 480, 720  # the panel's width: a fifth 
 MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
+SHOW_PROBLEM = 10  # seconds a failed answer, Stop or panel shows before a fetch that works clears it
 TELL_RETRY = 10  # seconds the provider is retried before a closed KRunner is told
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
@@ -1336,7 +1337,9 @@ class Kortex:
         self.put_off = False  # told once that the provider puts the request off
         self.retrying_since = None  # when the agent began to try its provider again
         self.logged = set()  # and in the journal
-        self.problem = ""
+        self.problem = ""  # why the last request to the agent failed
+        self.problem_was = ""  # and what did not happen: "Not sent", "Not answered" …
+        self.problem_at = None  # and when
         self.last_activity = now()
         self.request = ""  # the request followed until the agent has replied to it
         self.asked_at = None  # when it was made; None once the agent has replied
@@ -1395,9 +1398,16 @@ class Kortex:
 
         self.background(job, done)
 
-    def failed(self, _result, error):
+    def failed(self, _result, error, what="Not sent"):
+        """A request to the agent failed: the conversation shows why, with `what` did
+        not happen. A request not sent stays until the next is; anything else (an
+        answer to a row, Stop, the panel) until the conversation is fetched again."""
         if error:
-            self.problem = str(error)
+            self.problem, self.problem_was, self.problem_at = str(error), what, self.now()
+
+    def failing(self, what):
+        """A `then` for work whose failure says `what` did not happen."""
+        return lambda result, error: self.failed(result, error, what)
 
     def config(self, menu=False):
         # Each program that searches asks for this once. Both send every query, so any
@@ -1508,7 +1518,7 @@ class Kortex:
         elif followup:
             matches.append(match("continue" + SEP + followup, followup, ICON, 1.0, "Continue · Enter"))
         if self.problem:
-            matches.append(match("problem", self.problem, "dialog-error", 0.95, "Not sent", (), True))
+            matches.append(match("problem", self.problem, "dialog-error", 0.95, self.problem_was, (), True))
         if self.waiting:
             return matches + [self.waiting_match()]
         if not self.session:
@@ -1562,6 +1572,9 @@ class Kortex:
                 # was answered, and would show again, or be told of in a notification.
                 state["permissions"] = [p for p in state["permissions"] if p["id"] not in self.replied]
                 self.state = (session, state)
+                if self.problem and self.problem_was != "Not sent" and self.now() - self.problem_at >= SHOW_PROBLEM:
+                    # the agent answers again: an answer or a Stop may go again
+                    self.problem = self.problem_was = ""
             elif self.asked_at is not None and not self.waiting and self.agent.stopped():
                 # The agent's server exited while it worked on the request: nothing more
                 # comes, and "working" would stand until kortex stops.
@@ -1621,7 +1634,12 @@ class Kortex:
                 self.replied.add(arg)
                 if state:  # answered: KRunner shows it again without it
                     state["permissions"] = [p for p in state["permissions"] if p["id"] != arg]
-                self.work(lambda: self.agent.reply(arg, REPLIES[action]), self.failed)
+                def answered(_result, error):
+                    if error:  # not answered: the row comes back with the next fetch, to answer again
+                        self.replied.discard(arg)
+                    self.failed(None, error, "Not answered")
+
+                self.work(lambda: self.agent.reply(arg, REPLIES[action]), answered)
             self.reopen(self.view_query, menu)
         elif kind == "option":
             request, index, label = arg.split(SEP, 2)
@@ -1634,13 +1652,13 @@ class Kortex:
                 if len(picked) >= asked[0]["of"]:  # every question of the request has its answer
                     answers = [picked[i] for i in sorted(picked)]
                     del self.answers[request]
-                    self.work(lambda: self.agent.answer(request, answers), self.failed)
+                    self.work(lambda: self.agent.answer(request, answers), self.failing("Not answered"))
             self.reopen(self.opening, menu)
         elif kind == "question":
             self.reopen(self.view_query, menu)  # the question itself: its answers are the rows below
         elif kind == "answer" and action == "stop" and self.session:
             session = self.session
-            self.work(lambda: self.agent.abort(session), self.failed)
+            self.work(lambda: self.agent.abort(session), self.failing("Not stopped"))
             self.reopen(self.view_query, menu)
         elif kind == "answer" and self.session:
             if action == "terminal":
@@ -1651,7 +1669,7 @@ class Kortex:
                     if messages is not None:
                         said, steps, stopped = reply_of(messages)
                         self.desktop.copy("\n".join(said) or stopped or "\n".join(steps))
-                    self.failed(None, error)
+                    self.failed(None, error, "Not copied")
 
                 self.work(lambda: self.agent.messages(session), read)
 
@@ -1666,7 +1684,9 @@ class Kortex:
             if found:
                 attach, env = found
                 self.desktop.dock(self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env))
-            self.failed(None, error)
+            self.failed(None, error, "The panel did not open")
+            if error and self.shown is None:  # Meta+Shift+A with the palette closed: nothing else would say so
+                self.notify(f"{NAME}: the panel did not open", str(error))
 
         self.work(lambda: self.agent.attach(session), opened)
 

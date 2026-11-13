@@ -54,6 +54,11 @@ What changed in each release of kortex. The format follows
   not start: Config file at ~/.config/opencode/opencode.json is not valid JSON(C):
   ValueExpected at line 1, column 2". The row named the path of the program and of
   its log.
+- Meta+Shift+A with the palette closed says in a notification when the panel does not
+  open; it failed without a word, and its error showed later in the conversation as
+  "Not sent". A failed answer to a row, Stop, Copy or panel says what did not happen
+  ("Not answered", "Not stopped" …) and goes once the agent answers again; a row whose
+  answer did not reach the agent comes back, to answer again.
 
 ## [0.7.2] - 2026-11-10
 

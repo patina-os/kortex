@@ -846,6 +846,34 @@ class Runner(unittest.TestCase):
         self.assertEqual(desk.launched[0][0], ["konsole", "-e", "/usr/bin/opencode", "attach", oc.url])
         self.assertEqual(desk.docked, [4242])
 
+    def test_a_panel_that_does_not_open_says_so(self):
+        # Meta+Shift+A failed without a word, and its error showed later in the
+        # conversation as "Not sent", for good.
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "x", "", menu=True)
+        oc.history = [user("x"), assistant(text("Hello."))]
+        k.tick()
+        with mock.patch.object(kortex, "find_opencode", side_effect=kortex.AgentError("opencode is not installed")):
+            k.panel()
+        self.assertEqual(desk.launched, [])
+        self.assertEqual(desk.notes[-1][:2], ("kortex: the panel did not open", "opencode is not installed"))
+        rows = k.match("kortex › ")
+        self.assertEqual([(m[1], m[4]["subtext"]) for m in rows][0], ("opencode is not installed", "The panel did not open"))
+        clock.t += kortex.SHOW_PROBLEM
+        k.tick()
+        self.assertEqual([m[0] for m in k.match("kortex › ")], ["answer"])  # gone once the agent answers again
+
+    def test_a_failed_answer_shows_its_row_again(self):
+        k, oc, _desk, _clock = new()
+        k.run("ask" + SEP + "x", "")
+        oc.history, oc.state, oc.pending = [user("x")], ("busy", ""), [PERMISSION]
+        k.match("kortex › ")
+        oc.reply = mock.Mock(side_effect=kortex.AgentError("opencode is not running"))
+        k.run("permission" + SEP + "per_1", "allow-once")
+        rows = k.match("kortex › ")
+        self.assertEqual([(m[0], m[4]["subtext"]) for m in rows][:2],
+                         [("problem", "Not answered"), ("permission" + SEP + "per_1", "Asks first")])
+
     def test_list(self):
         k, *_ = new()
         ids = [m[0] for m in k.match("ai")]
