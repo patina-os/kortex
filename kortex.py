@@ -881,6 +881,22 @@ def why_stopped(messages, error):
 # A model may end its turn after it thought, without a word or a step (Qwen 3.6 did it
 # again and again): the palette showed nothing, and the notification "Done.".
 NO_ANSWER = "The agent stopped without an answer."
+# A reply whose message never completed although the agent is idle: its server stopped
+# (or was killed) mid-answer and a new one read the conversation; the text it has is cut
+# off, and showed as a finished answer.
+CUT_OFF = "Cut off: the agent stopped before it finished, and what follows is all it wrote. Ask again."
+
+
+def cut_off(messages):
+    """True when the agent's last message of the reply never completed: opencode stamps
+    `time.completed` on each that does. Hermes stamps none, and is never taken as cut off."""
+    last = next((m for m in reversed(messages[last_user(messages) + 1:]) if m["info"].get("role") == "assistant"), None)
+    if last is None:
+        return False
+    info = last["info"]
+    return isinstance(info.get("time"), dict) and not info["time"].get("completed") and not info.get("error")
+
+
 # A turn that ends after a step without a word, or on words that announce more ("I'll
 # clean what's safe now:"): what it said before read as done ("I'll add the cron job…"
 # with no cron job).
@@ -896,12 +912,14 @@ def answer_of(messages):
     step and that it stopped there: opencode ends the turn on a Deny, and the words
     before read as if it went on."""
     said, steps, _error = reply_of(messages)
-    if not said and not steps:
-        return [NO_ANSWER]
     parts = [p for p in reply_parts(messages) if p.get("type") in ("text", "tool")
              and not p.get("synthetic") and not p.get("ignored") and (p.get("type") == "tool" or p.get("text", "").strip())]
     if parts and parts[-1]["type"] == "tool" and denied(parts[-1]):
         return said[-1:] + [DENIED]
+    if cut_off(messages):
+        return [CUT_OFF] + said[-1:]
+    if not said and not steps:
+        return [NO_ANSWER]
     last = max((i for i, p in enumerate(parts) if p["type"] == "tool"), default=-1)
     after = [p["text"].strip() for p in parts[last + 1:]]
     if after:
@@ -1232,13 +1250,13 @@ def view(state, elapsed=None, agent="", stop=False):
             if words:
                 line += " · " + head(words)
         matches.append(match("answer", line, ICON, 0.9, agent, ["copy", "terminal"] + (["stop"] if stop else [])))
-    elif not said and not steps and replied(state["messages"], ""):
+    elif not said and not steps and replied(state["messages"], "") and not cut_off(state["messages"]):
         # it thought, and stopped: Enter asks the same again
         request = " ".join(p.get("text", "") for p in state["messages"][last_user(state["messages"])].get("parts", [])
                            if p.get("type") == "text" and not p.get("synthetic")).strip()
         matches.append(match(("continue" + SEP + request) if request else "answer", NO_ANSWER, "dialog-warning", 0.9,
                              (agent + " · " if agent else "") + ("Enter asks again" if request else "Ask again")))
-    elif said or steps:
+    elif said or steps or cut_off(state["messages"]):
         took = f" · {len(steps)} step{'s' if len(steps) > 1 else ''}" if steps else ""
         matches.append(match("answer", rich(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9,
                              (agent + " · " if agent else "") + "Enter copies" + took, ["copy", "terminal"], True,
@@ -1254,6 +1272,8 @@ def ending(messages):
     if error:
         return f"{NAME} stopped", why_stopped(messages, error)
     end = answer_of(messages)[-1]
+    if answer_of(messages)[0] == CUT_OFF:
+        return f"{NAME} stopped", CUT_OFF
     if end == NO_ANSWER:
         return f"{NAME} stopped", NO_ANSWER + " Show opens the conversation, to ask again."
     last = (said or steps or [""])[-1]
@@ -1339,6 +1359,7 @@ class Kortex:
         self.replied = set()  # the permission requests answered here, which a fetch begun before may bring back
         self.put_off = False  # told once that the provider puts the request off
         self.retrying_since = None  # when the agent began to try its provider again
+        self.cut_seen = False  # the reply followed read as cut off once
         self.logged = set()  # and in the journal
         self.problem = ""  # why the last request to the agent failed
         self.problem_was = ""  # and what did not happen: "Not sent", "Not answered" …
@@ -1777,8 +1798,15 @@ class Kortex:
             return
         error = reply_of(state["messages"])[2]
         if replied(state["messages"], self.request) and (error or state["status"][0] == "idle"):
-            self.finish(*ending(state["messages"]))
+            summary, body = ending(state["messages"])
+            if body == CUT_OFF and not self.cut_seen:
+                # opencode may say idle a moment before it stamps the message complete:
+                # cut off only when the next fetch says so too
+                self.cut_seen = True
+                return
+            self.finish(summary, body)
             return
+        self.cut_seen = False
         status, why = state["status"]
         if status != "retry":
             self.retrying_since = None

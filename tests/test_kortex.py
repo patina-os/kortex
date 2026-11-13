@@ -659,6 +659,28 @@ class View(unittest.TestCase):
         k.run(row[0], "")  # Enter asks the same again, in the conversation
         self.assertEqual(oc.asked[-1], ("ses_1", "how much zram?"))
 
+    def test_an_answer_cut_off_by_its_server_says_so(self):
+        # opencode killed mid-essay: after its restart the text read as the whole answer.
+        essay = assistant(text("Franconia's history begins … The Treaty of Verdun in 8"))
+        essay["info"]["time"] = {"created": 1}
+        state = {"messages": [user("an essay"), essay], "status": ("idle", ""), "permissions": []}
+        self.assertEqual(kortex.view(state)[0][1].split("<br>"),
+                         [kortex.CUT_OFF, "Franconia's history begins … The Treaty of Verdun in 8"])
+        self.assertEqual(kortex.ending(state["messages"]), ("kortex stopped", kortex.CUT_OFF))
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "an essay", "", menu=True)
+        oc.history = state["messages"]
+        k.tick()
+        self.assertEqual(desk.notes, [])  # it may be stamped complete a moment later
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex stopped", kortex.CUT_OFF))
+        essay["parts"] = []  # nothing written yet
+        self.assertEqual(kortex.view(state)[0][1], kortex.CUT_OFF)
+        essay["info"]["time"]["completed"] = 2  # done: a reply without a word
+        self.assertEqual(kortex.view(state)[0][1], kortex.NO_ANSWER)
+        essay["parts"] = [text("The whole essay.")]
+        self.assertEqual(kortex.view(state)[0][1], "The whole essay.")
+
     def test_the_agent_stopped(self):
         state = busy(tool("bash", command="ls"), error={"name": "APIError", "data": {"message": "rate limited"}})
         state["status"] = ("idle", "")

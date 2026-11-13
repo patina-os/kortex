@@ -63,6 +63,9 @@ What changed in each release of kortex. The format follows
   (docked again, if it was moved) in place of a second panel; on another conversation
   the panel shows the current one in its place. Each press opened one more, and a
   quick second press left the first undocked.
+- An answer cut off because the agent's server stopped mid-answer says so ("Cut off:
+  the agent stopped before it finished …") above what it wrote; after the server
+  started again, the half essay read as the whole answer.
 
 ## [0.7.2] - 2026-11-10
 
