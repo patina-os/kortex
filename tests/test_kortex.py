@@ -534,8 +534,8 @@ class View(unittest.TestCase):
         state = {"messages": [user("x"), reply], "status": ("idle", ""), "permissions": []}
         [row] = kortex.view(state)
         self.assertEqual(row[1].split("<br>"), [
-            "The agent could not reach its provider (custom). Check its address and key: patina ai on patina, "
-            "else the agent's own settings.", "Cannot connect to API: connect ECONNREFUSED 127.0.0.1:9"])
+            ("The agent could not reach its provider (custom). Check its address and key: patina ai on patina, "
+             "else the agent's own settings."), "Cannot connect to API: connect ECONNREFUSED 127.0.0.1:9"])
         self.assertEqual(kortex.why_stopped([], "Proxy refused to open a tunnel: 502 Bad Gateway").split("\n")[0],
                          "The agent could not reach its provider. Check its address and key: patina ai on patina, "
                          "else the agent's own settings.")
@@ -909,7 +909,7 @@ class Runner(unittest.TestCase):
         self.assertEqual(desk.launched, [])
         self.assertEqual(desk.notes[-1][:2], ("kortex: the panel did not open", "opencode is not installed"))
         rows = k.match("kortex › ")
-        self.assertEqual([(m[1], m[4]["subtext"]) for m in rows][0], ("opencode is not installed", "The panel did not open"))
+        self.assertEqual((rows[0][1], rows[0][4]["subtext"]), ("opencode is not installed", "The panel did not open"))
         clock.t += kortex.SHOW_PROBLEM
         k.tick()
         self.assertEqual([m[0] for m in k.match("kortex › ")], ["answer"])  # gone once the agent answers again
@@ -928,7 +928,7 @@ class Runner(unittest.TestCase):
     def test_one_panel_at_a_time(self):
         # Each Meta+Shift+A opened another full-height panel, and a quick second press
         # left the first undocked.
-        k, oc, desk, _clock = new()
+        k, _oc, desk, _clock = new()
         with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
             k.panel()
             k.panel()  # open on it: docked and brought to the front again
@@ -1228,8 +1228,8 @@ class Runner(unittest.TestCase):
         oc.pending = [dict(PERMISSION, sessionID="ses_1")]
         histories["ses_1"].append(assistant(text("I'll save it.")))
         k.tick()
-        self.assertEqual(desk.notes[-1][:2], ("kortex asks first", "write an essay<br>Allow: I'll save it.<br>"
-                                                                    "patina theme mode light"))
+        self.assertEqual(desk.notes[-1][:2], ("kortex asks first", ("write an essay<br>Allow: I'll save it.<br>"
+                                                                     "patina theme mode light")))
         oc.pending = []
         histories["ses_1"][-1]["parts"].append(text("Here is the essay."))
         states["ses_1"] = ("idle", "")
@@ -1241,7 +1241,7 @@ class Runner(unittest.TestCase):
         self.assertIsNone(k.asked_at)  # what was asked in ses_2 was answered already
 
     def test_a_conversation_picked_from_the_list_keeps_following_the_one_left(self):
-        k, oc, desk, clock = new()
+        k, oc, _desk, clock = new()
         k.run("ask" + SEP + "why is my wifi slow", "")
         oc.history, oc.state = [user("why is my wifi slow")], ("busy", "")
         k.run("session" + SEP + "ses_old", "")
