@@ -112,7 +112,8 @@ notification says that it works on your request; the same notification then says
 it answered (its last words, which after a task say how it went) or why it stopped. A
 row that asks, and a question of the agent's, come as notifications of their own, and
 so does a provider that puts the request off for more than a minute (a free limit
-used up), with the time of its next try. Show, or a click on the notification, opens
+used up), with the time of its next try, or that the agent has tried for ten seconds
+without reaching it. Show, or a click on the notification, opens
 the conversation in KRunner. A request you leave for a new one, or for a conversation
 from the list, while the agent works on it is followed on: a notification says when
 it asks first and what it answered, and its Show opens that conversation.

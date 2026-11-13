@@ -497,7 +497,39 @@ class View(unittest.TestCase):
 
     def test_retrying(self):
         state = dict(busy(text("x")), status=("retry", "rate limited"))
-        self.assertEqual(kortex.view(state, 5)[0][1], "Retrying: rate limited")
+        self.assertEqual(kortex.view(state, 5)[0][1], "Retrying · 5 s · rate limited")  # the seconds go on
+
+    def test_a_provider_that_cannot_be_reached_is_named(self):
+        # A minute of "working", then a raw transport error with no hint what to do.
+        error = {"name": "APIError", "data": {"message": "Cannot connect to API: connect ECONNREFUSED 127.0.0.1:9"}}
+        reply = assistant(error=error)
+        reply["info"]["providerID"] = "custom"
+        state = {"messages": [user("x"), reply], "status": ("idle", ""), "permissions": []}
+        [row] = kortex.view(state)
+        self.assertEqual(row[1].split("<br>"), [
+            "The agent could not reach its provider (custom). Check its address and key: patina ai on patina, "
+            "else the agent's own settings.", "Cannot connect to API: connect ECONNREFUSED 127.0.0.1:9"])
+        self.assertEqual(kortex.why_stopped([], "Proxy refused to open a tunnel: 502 Bad Gateway").split("\n")[0],
+                         "The agent could not reach its provider. Check its address and key: patina ai on patina, "
+                         "else the agent's own settings.")
+        self.assertEqual(kortex.why_stopped([], "The model ran out of context"), "The model ran out of context")
+        self.assertEqual(kortex.retry_message({"type": "retry", "attempt": 3, "message": "ECONNREFUSED"}),
+                         "ECONNREFUSED · try 3")
+        # a closed palette is told after a while of retries, not only of a limit that lasts
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "x", "", menu=True)
+        oc.history, oc.state = [user("x")], ("retry", "ECONNREFUSED · try 2")
+        k.tick()
+        clock.t += kortex.TELL_RETRY
+        k.tick()
+        self.assertEqual(desk.notes[-1][0], "kortex waits for the provider")
+        self.assertIn("ECONNREFUSED", desk.notes[-1][1])
+        k.tick()
+        self.assertEqual(sum(n[0] == "kortex waits for the provider" for n in desk.notes), 1)
+        oc.history, oc.state = state["messages"], ("idle", "")
+        k.tick()
+        self.assertEqual(desk.notes[-1][0], "kortex stopped")
+        self.assertIn("could not reach its provider (custom)", desk.notes[-1][1])
 
     def test_a_step_of_a_service_says_what_it_was_given(self):
         step = tool("tracker_update_issue", id="DES-103", priority="high", labels=["x"])

@@ -61,6 +61,7 @@ PANEL_SHARE, PANEL_MIN, PANEL_MAX = 0.2, 480, 720  # the panel's width: a fifth 
 MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
+TELL_RETRY = 10  # seconds the provider is retried before a closed KRunner is told
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
 CATEGORY_RELEVANCE = 100  # KRunner::QueryMatch::CategoryRelevance::Highest
@@ -290,6 +291,8 @@ def retry_message(status, now=time.time):
         at = 0
     if at - now() >= 60:
         words += (" · " if words else "") + "next try " + time.strftime("%H:%M", time.localtime(at))
+    elif isinstance(status.get("attempt"), int) and status["attempt"] > 1:
+        words += (" · " if words else "") + f"try {status['attempt']}"
     return words
 
 
@@ -833,6 +836,26 @@ def denied(part):
 
 
 DENIED = "Stopped: you denied the last step, so it did not run. Say what to do instead."
+# What an agent's provider that cannot be reached, or refuses its key, says (opencode
+# passes the provider's or the network's words on): the palette names the provider and
+# where to check it, the words go under that.
+UNREACHABLE = re.compile(r"cannot connect|connection|econn\w+|enotfound|etimedout|getaddrinfo|fetch failed|tunnel"
+                         r"|bad gateway|unauthori[sz]ed|api key|\b40[13]\b|forbidden|certificate", re.IGNORECASE)
+
+
+def why_stopped(messages, error):
+    """The error that stopped the agent, in words for the palette and the notification:
+    for a provider it cannot reach or that refuses its key, which provider and where to
+    check it, with the error under it; a raw "Cannot connect to API: ECONNREFUSED" after a
+    minute of retries said neither."""
+    if error == "Aborted":
+        return "Stopped. Say what to do instead."
+    if not UNREACHABLE.search(error):
+        return error
+    provider = next((m["info"].get("providerID") for m in reversed(messages)
+                     if m["info"].get("role") == "assistant" and m["info"].get("providerID")), "")
+    return (f"The agent could not reach its provider{f' ({provider})' if provider else ''}. Check its address and "
+            f"key: patina ai on patina, else the agent's own settings.\n{error}")
 # A model may end its turn after it thought, without a word or a step (Qwen 3.6 did it
 # again and again): the palette showed nothing, and the notification "Done.".
 NO_ANSWER = "The agent stopped without an answer."
@@ -1169,9 +1192,8 @@ def view(state, elapsed=None, agent="", stop=False):
     status, retry = state["status"]
     working = status != "idle"
     if error:
-        if error == "Aborted":
-            error = "Stopped. Say what to do instead."
-        matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
+        matches.append(match("answer", why_stopped(state["messages"], error), "dialog-error", 0.95, "The agent stopped",
+                             ["terminal"], True))
     elif working:
         if state["permissions"]:
             # holds still while a row asks, to be clicked; KRunner runs a row's first
@@ -1180,7 +1202,7 @@ def view(state, elapsed=None, agent="", stop=False):
         elif questions:
             line = "Waiting for your answer"
         elif status == "retry":
-            line = f"Retrying: {retry}"
+            line = "Retrying" + (f" · {seconds(elapsed)}" if elapsed is not None else "") + (f" · {retry}" if retry else "")
         else:
             thinking, words = latest_of(state["messages"])
             line = ("Thinking" if thinking else "Working") + (f" · {seconds(elapsed)}" if elapsed is not None else "")
@@ -1208,7 +1230,7 @@ def ending(messages):
     and a plain answer is its last words anyway."""
     said, steps, error = reply_of(messages)
     if error:
-        return f"{NAME} stopped", error
+        return f"{NAME} stopped", why_stopped(messages, error)
     end = answer_of(messages)[-1]
     if end == NO_ANSWER:
         return f"{NAME} stopped", NO_ANSWER + " Show opens the conversation, to ask again."
@@ -1294,6 +1316,7 @@ class Kortex:
         self.answers = {}  # the answers picked so far to a request of several questions, by its id
         self.replied = set()  # the permission requests answered here, which a fetch begun before may bring back
         self.put_off = False  # told once that the provider puts the request off
+        self.retrying_since = None  # when the agent began to try its provider again
         self.logged = set()  # and in the journal
         self.problem = ""
         self.last_activity = now()
@@ -1545,7 +1568,7 @@ class Kortex:
             self.problem = ""
             self.waiting = arg
             self.request, self.asked_at, self.told, self.followed = arg, self.now(), 0, False
-            self.put_off = False
+            self.put_off, self.retrying_since = False, None
             log(f"asking {self.agent.title}" + (" in the conversation" if kind == "continue" else ""))
 
             def send():
@@ -1708,10 +1731,18 @@ class Kortex:
             self.finish(*ending(state["messages"]))
             return
         status, why = state["status"]
-        if status == "retry" and "next try" in why and self.shown is None and not self.put_off:
-            # A limit that lasts: said once, in a notification that stays in the history.
+        if status != "retry":
+            self.retrying_since = None
+        elif self.retrying_since is None:
+            self.retrying_since = self.now()
+        if (status == "retry" and self.shown is None and not self.put_off
+                and ("next try" in why or self.now() - self.retrying_since >= TELL_RETRY)):
+            # A limit that lasts, or a provider that cannot be reached: said once, in a
+            # notification that stays in the history; "working on it" said nothing of it
+            # for over a minute.
             self.put_off = True
-            self.notify(f"{NAME} waits for the provider", f"{why}\n{self.request}", max(self.told, 0), follows=True)
+            self.notify(f"{NAME} waits for the provider", f"{why}\n{self.request}\nIt tries again by itself; "
+                        "Stop on the row that says how long ends it.", max(self.told, 0), follows=True)
             return
         if self.shown is None and not self.told and self.now() - self.asked_at >= TELL_AFTER:
             log("KRunner closed while the agent works; a notification follows the request")

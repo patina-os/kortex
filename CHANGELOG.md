@@ -44,6 +44,12 @@ What changed in each release of kortex. The format follows
   notification says when it asks first and what the agent answered, and its Show opens
   that conversation. Only the last request was followed, so a long essay asked before
   "what is 3+3?" ended without a word.
+- A provider that cannot be reached, or refuses the key, is named: "The agent could not
+  reach its provider (custom). Check its address and key: patina ai on patina, else the
+  agent's own settings.", with the error under it; it ended in a raw "Cannot connect to
+  API: ECONNREFUSED" after a minute of retries. The row that retries keeps counting the
+  seconds and says which try it is, and a closed palette is told after ten seconds of
+  retries, not only of a limit that lasts a minute or more.
 
 ## [0.7.2] - 2026-11-10
 
