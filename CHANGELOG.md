@@ -23,6 +23,9 @@ What changed in each release of kortex. The format follows
 - A reply without a word or a step (a model that thinks and then ends its turn) says
   "The agent stopped without an answer", with Enter to ask the same again; the palette
   stayed empty, and the notification said "kortex answered: Done.".
+- A row that asks for a change to a file shows its path and the changed lines under
+  the agent's words, and one for a service's tool what the tool is given: "I'll set
+  both Platform tickets to Done." named no ticket, and asked for only one of them.
 
 ## [0.7.2] - 2026-11-10
 

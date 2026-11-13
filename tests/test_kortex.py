@@ -347,7 +347,15 @@ class View(unittest.TestCase):
         edit = {"id": "per_2", "sessionID": "ses_1", "permission": "edit", "patterns": ["/home/u/.bashrc"],
                 "metadata": {"filepath": "/home/u/.bashrc", "diff": "+alias ll='ls -l'"}, "always": []}
         state = busy(text("I'll add the alias."), permissions=[edit])
-        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll add the alias.")
+        # the words name no file and no line: the path and the change show under them
+        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll add the alias.<br>a change to: /home/u/.bashrc"
+                                                   "<br>+alias ll='ls -l'")
+        call = dict(tool("tracker_update_issue", "running", id="PLA-101", state="Done"), callID="c9")
+        service = {"id": "per_3", "sessionID": "ses_1", "permission": "tracker_update_issue", "patterns": ["*"],
+                   "always": ["*"], "tool": {"callID": "c9"}}
+        state = busy(text("I'll set both Platform tickets to Done."), call, permissions=[service])
+        self.assertEqual(kortex.view(state)[0][1].split("<br>")[:2],
+                         ["Allow: I'll set both Platform tickets to Done.", "tracker_update_issue: id=PLA-101, state=Done"])
         # opencode names the call: the words right before that step
         called = dict(safe, tool={"callID": "c2"})
         first = dict(tool("bash", command="ls"), callID="c1")

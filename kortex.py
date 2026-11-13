@@ -967,14 +967,19 @@ def risky(p):
 
 def asking_for(p, messages):
     """What a row, or a notification, that asks says after "Allow": the agent's own words
-    right before the step, as in a chat, with the command under them where a wrong
-    explanation would cost the most (risky); the command alone when it said nothing
-    first, not a blind Allow. The panel shows every step."""
+    right before the step, as in a chat, with what the step does under them: a risky
+    command, the path and the changed lines of a file, what a service's tool is given,
+    since words can be wrong and name no file or ticket ("I'll set both tickets to
+    Done." over the first of them). What the step does alone when the agent said
+    nothing first, not a blind Allow. The panel shows every step."""
     what = asked_for(p, messages)
+    told = f"{asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
     words = explained(p, messages)
-    if words:
+    if not words:
+        return " " + told
+    if p.get("permission") in ("bash", None):
         return ": " + shorten_end(words, 240) + ("\n" + what if risky(p) else "")
-    return f" {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
+    return ": " + shorten_end(words, 240) + "\n" + told
 
 
 def replied(messages, request):
