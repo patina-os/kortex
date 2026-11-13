@@ -899,9 +899,14 @@ def last_sentence(text):
     """The last sentence of `text` that is complete, on one line, or "" before the
     first is: what streams in is cut off mid-sentence, and its end changes with every
     word."""
-    # a stop ends a sentence only before a space or the end: "8.0G" and "df.py" go on
-    done = re.findall(r"(?:[^.!?]|[.!?](?!\s|$))*[.!?](?=\s|$)", " ".join(text.split()))
-    return done[-1].strip() if done else ""
+    # a stop ends a sentence only before a space or the end: "8.0G" and "df.py" go on.
+    # Only the ends are searched for, the last two of them, in linear time: a pattern
+    # for the whole sentence took seconds on a long answer, on the D-Bus thread.
+    text = " ".join(text.split())
+    ends = [m.end() for m in re.finditer(r"[.!?](?= |$)", text)]
+    if not ends:
+        return ""
+    return text[ends[-2] if len(ends) > 1 else 0:ends[-1]].strip()
 
 
 DOING = {"bash": "running a command", "read": "reading a file", "edit": "changing a file",

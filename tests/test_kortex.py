@@ -281,6 +281,14 @@ class Answer(unittest.TestCase):
         self.assertEqual(kortex.last_sentence("It has 8.0G free of 252G. Version 1.19.5 is"),
                          "It has 8.0G free of 252G.")  # nor a stop inside a number
         self.assertEqual(kortex.last_sentence("One.  Two!\nThree? fo"), "Three?")
+        self.assertEqual(kortex.last_sentence(". Hi there?! x"), "Hi there?!")
+
+    def test_the_last_sentence_of_a_long_answer_is_found_at_once(self):
+        # It took seconds on a long code answer, on the thread that answers KRunner.
+        started = time.monotonic()
+        kortex.last_sentence("Here is the script:\n```python\n" + "x = f(a, b)  # abc def\n" * 2000)
+        self.assertEqual(kortex.last_sentence("Hello. " + "abc def " * 2500), "Hello.")
+        self.assertLess(time.monotonic() - started, 0.5)
 
     def test_a_tool_call_being_written_is_no_step(self):
         messages = [user("hi"), assistant(tool("bash", "pending"))]

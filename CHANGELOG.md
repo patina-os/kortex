@@ -16,6 +16,10 @@ What changed in each release of kortex. The format follows
   `find -exec sudo …` run unasked later, in a new conversation, and others let
   `flatpak install`, `crontab -` and `cat` on any file through. kortex cannot narrow
   opencode's rule, so such a row offers Allow once and Deny.
+- The palette no longer lags for seconds while the agent writes a long answer: finding
+  the last sentence for the row that says how long took time that grew with the square
+  of the answer's length (3 s for 14,000 characters of code), on the thread that
+  answers KRunner.
 
 ## [0.7.2] - 2026-11-10
 
