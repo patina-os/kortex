@@ -53,8 +53,8 @@ KRunner's window holds still instead of growing and shrinking with each word. It
   it said after its last step (what it said between the steps is how it got there),
   with how many steps it took beside it ("Enter copies · 3 steps"). The Markdown a
   model writes is read as far as a row can show it: bold, lists, a table's rows. An
-  answer longer than 1,500 characters shows its start and says that the panel has the
-  rest. Enter or Copy puts the answer on the clipboard.
+  answer longer than twelve lines (as the row wraps them) or 1,500 characters shows
+  its start, and a row below it, Show the whole answer, opens the panel on it. Enter or Copy puts the answer on the clipboard.
 - **A row for each action the agent asks to take** (a command, a file change, a web
   request, a service's tool its permissions put on `ask`), in what the agent said right
   before that step ("Allow: I'll add the alias to your .bashrc, after a copy of it as

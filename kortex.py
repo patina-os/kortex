@@ -55,7 +55,10 @@ VIEW_MARK = "›"  # after kortex's name (`kortex ›`), or `ai`: the current co
 JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
-MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
+MAX_ANSWER = 1500  # characters of an answer KRunner shows; the panel has the rest
+# and lines: twelve, a line of the answer as long as it wraps to at about LINE characters,
+# so the answer's row stays well inside a screen 768 px high
+MAX_LINES, LINE = 12, 90
 MAX_LATEST = 40  # characters of what the agent wrote or thought last, after the seconds
 PANEL_SHARE, PANEL_MIN, PANEL_MAX = 0.2, 480, 720  # the panel's width: a fifth of the screen, in px
 MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
@@ -1057,12 +1060,21 @@ def replied(messages, request):
     return request.strip() in said
 
 
-MORE = "… Show what the agent does has the rest."
+MORE = "… (the rest: Show the whole answer, below)"
 
 
-def shorten(text, most=MAX_ANSWER):
+def shorten(text, most=MAX_ANSWER, lines=MAX_LINES):
     """The start of an answer KRunner can show, cut at a line's or a word's end: an
-    answer starts with what matters, and a list cut at its head is no list."""
+    answer starts with what matters, and a list cut at its head is no list. At most
+    `most` characters and `lines` lines as the row wraps them: a long answer was a
+    row taller than a 768-px screen, with a scrollbar."""
+    used, end = 0, 0
+    for line in text.split("\n"):
+        rows = max(1, -(-len(line) // LINE))
+        if used + rows > lines:  # what of this line still fits
+            most = min(most, end + (lines - used) * LINE)
+            break
+        used, end = used + rows, end + len(line) + 1
     if len(text) <= most:
         return text
     start = text[:most]
@@ -1258,9 +1270,14 @@ def view(state, elapsed=None, agent="", stop=False):
                              (agent + " · " if agent else "") + ("Enter asks again" if request else "Ask again")))
     elif said or steps or cut_off(state["messages"]):
         took = f" · {len(steps)} step{'s' if len(steps) > 1 else ''}" if steps else ""
-        matches.append(match("answer", rich(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9,
+        said = "\n".join(answer_of(state["messages"]))
+        shown = shorten(said)
+        matches.append(match("answer", rich(shown), ICON, 0.9,
                              (agent + " · " if agent else "") + "Enter copies" + took, ["copy", "terminal"], True,
                              styled=True))
+        if shown != said:  # a row of its own: the row's icon for the panel says nothing of the rest
+            matches.append(match("more", "Show the whole answer", "view-right-new", 0.89,
+                                 "Enter opens the conversation in the panel beside your windows"))
     return matches
 
 
@@ -1681,6 +1698,8 @@ class Kortex:
             self.reopen(self.opening, menu)
         elif kind == "question":
             self.reopen(self.view_query, menu)  # the question itself: its answers are the rows below
+        elif kind == "more":
+            self.panel()
         elif kind == "answer" and action == "stop" and self.session:
             session = self.session
             self.work(lambda: self.agent.abort(session), self.failing("Not stopped"))

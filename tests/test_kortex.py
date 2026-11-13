@@ -696,6 +696,26 @@ class View(unittest.TestCase):
         self.assertTrue(shown.endswith("word<br>" + kortex.MORE))
         self.assertLessEqual(len(shown), kortex.MAX_ANSWER + len(kortex.MORE) + 4)
 
+    def test_a_long_answer_fits_a_small_screen(self):
+        # 1,500 characters of an essay with headings and a list were a row taller than a
+        # 768-px screen, and "Show what the agent does has the rest" named an icon.
+        essay = "\n".join(f"- point {i}" for i in range(40))
+        state = {"messages": [user("an essay"), assistant(text(essay))], "status": ("idle", ""), "permissions": []}
+        answer, more = kortex.view(state, None, "opencode")
+        lines = answer[1].split("<br>")
+        self.assertEqual((len(lines), lines[-1]), (kortex.MAX_LINES + 1, kortex.MORE))
+        self.assertEqual((more[0], more[1]), ("more", "Show the whole answer"))
+        wrapped = "\n".join(["x " * 200] * 3)  # long lines count as the lines they wrap to
+        self.assertLessEqual(len(kortex.shorten(wrapped)), kortex.MAX_LINES * kortex.LINE + len(kortex.MORE) + 1)
+        self.assertEqual(kortex.shorten("short\nanswer"), "short\nanswer")
+        self.assertEqual(len(kortex.view(dict(state, messages=[user("x"), assistant(text("Short."))]))), 1)
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "an essay", "")
+        oc.history = state["messages"]
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
+            k.run("more", "")  # Enter on it opens the panel
+        self.assertEqual(desk.launched[0][0][-2:], ["--session", "ses_1"])
+
     def test_an_answer_s_markdown_is_read(self):
         said = ("Your home is 1.6 GB:\n\n| Path | Size |\n|---|---|\n| `~/.npm` | 506 MB |\n\n### Next\n"
                 "- **npm cache**: run `npm cache clean`\n```\nnpm cache clean --force\n```\na < b * c")

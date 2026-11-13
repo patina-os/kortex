@@ -66,6 +66,10 @@ What changed in each release of kortex. The format follows
 - An answer cut off because the agent's server stopped mid-answer says so ("Cut off:
   the agent stopped before it finished …") above what it wrote; after the server
   started again, the half essay read as the whole answer.
+- A long answer fits a small screen: the palette shows at most twelve lines of it, as
+  the row wraps them, and a row below it, "Show the whole answer", opens the panel on
+  it. On a 768-px screen a long answer was a row taller than the screen, with a
+  scrollbar, and the note that the panel had the rest pointed at an unlabelled icon.
 
 ## [0.7.2] - 2026-11-10
 
