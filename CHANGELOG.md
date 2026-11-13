@@ -39,7 +39,9 @@ What changed in each release of kortex. The format follows
 - A service's tool that asks offers no Always: its rule was any call of the tool, in
   every conversation ("any cloud_delete_note"), so one click let every later deletion
   through, one asked for by text inside a ticket too. A tool that only reads does not
-  ask (patina's rules), so one that asks changes something.
+  ask (patina's rules), so one that asks changes something. Neither does opencode's
+  grep tool, which prints what it finds in a file: one Always would let it read token
+  files and private keys in every later conversation.
 - A request left for a new one while the agent works on it is followed on: a
   notification says when it asks first and what the agent answered, and its Show opens
   that conversation. Only the last request was followed, so a long essay asked before

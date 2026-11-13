@@ -433,14 +433,14 @@ class View(unittest.TestCase):
                             # a service's tool that asks changes something: any later call
                             # of it, a deletion too, would run unasked
                             ("cloud_delete_note", ["*"]), ("tracker_update_issue", ["*"]), ("read", ["*"]),
-                            ("doom_loop", ["*"])):
+                            ("grep", ["*"]), ("doom_loop", ["*"])):
             asked = dict(PERMISSION, permission=kind, always=rules)
             self.assertFalse(kortex.always_offered(asked), rules)
             [row, _status] = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
             self.assertEqual(row[4]["actions"], ["allow-once", "deny"])
             self.assertNotIn("Always", row[1])
         for kind, rules in (("bash", ["du *", "wc *"]), ("bash", ["systemctl status *", "git status *"]),
-                            ("bash", ["apt-cache *"]), ("webfetch", ["*"]), ("grep", ["*"]), ("bash", [])):
+                            ("bash", ["apt-cache *"]), ("webfetch", ["*"]), ("glob", ["*"]), ("bash", [])):
             self.assertTrue(kortex.always_offered(dict(PERMISSION, permission=kind, always=rules)), rules)
         k, oc, _desk, _clock = new()
         k.run("ask" + SEP + "x", "")

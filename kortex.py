@@ -109,8 +109,10 @@ LOOK_ONLY = frozenset({
 # look and change nothing. Not a change to a file, a folder outside the home folder
 # (its rule holds for any step in it) or a service's tool: a service's tools that only
 # read are allowed without asking (patina's rules), so one that asks changes something,
-# and its rule is any call of it ("any cloud_delete_note"), in every conversation.
-ALWAYS_KINDS = frozenset({"webfetch", "websearch", "codesearch", "glob", "grep", "list", "lsp"})
+# and its rule is any call of it ("any cloud_delete_note"), in every conversation. Not
+# grep either: it prints what it finds in a file, so one Always would let it read token
+# files and private keys in every later conversation (the test round of November 2026).
+ALWAYS_KINDS = frozenset({"webfetch", "websearch", "codesearch", "glob", "list", "lsp"})
 
 
 def looks_only(command):
