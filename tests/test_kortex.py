@@ -308,6 +308,24 @@ class Answer(unittest.TestCase):
                          "failed on the request (HTTP 500)")
         self.assertEqual(kortex.failure(ValueError("bad json"), 10), "sent an answer kortex cannot read")
 
+    def test_an_agent_that_does_not_start_says_why(self):
+        # opencode on a broken opencode.json: the row named the program's and the log's
+        # path, "Not sent", and the reason was in the log.
+        said = ("Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.\n"
+                "\x1b[91m\x1b[1mError: \x1b[0mConfig file at /home/u/.config/opencode/opencode.json is not valid "
+                "JSON(C): \n--- JSONC Input ---\n{,\n  \"x\": 1\n}\n--- Errors ---\nValueExpected at line 1, column 2\n"
+                "   Line 1: {,\n           ^\n--- End ---\n")
+        with (tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {"XDG_STATE_HOME": home}),
+              mock.patch.object(kortex, "log")):
+            (Path(home) / "kortex").mkdir()
+            (Path(home) / "kortex/opencode.log").write_text("Error: an older start\n")  # not this start's
+            with self.assertRaises(kortex.AgentError) as raised:
+                kortex.Opencode("http://127.0.0.1:1", None).launch(["sh", "-c", 'printf "%s" "$0"; exit 1', said], {},
+                                                   "opencode.log", "/global/health", wait=5)
+        self.assertEqual(str(raised.exception), "opencode did not start: Config file at "
+                         "/home/u/.config/opencode/opencode.json is not valid JSON(C): ValueExpected at line 1, column 2")
+        self.assertEqual(kortex.start_error("boom\n"), "boom")
+
     def test_what_the_agent_does_in_words(self):
         self.assertEqual(kortex.doing([user("x"), assistant(text("Looking."), tool("bash", "running", command="ls"))]),
                          "running a command")

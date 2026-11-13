@@ -330,13 +330,17 @@ class Server:
         state_dir().mkdir(parents=True, exist_ok=True)
         log(f"starting {' '.join(command)}")
         with open(state_dir() / log_name, "ab") as output:
+            begun = output.tell()
             self.process = subprocess.Popen(
                 command, cwd=Path.home(), env=dict(os.environ, **env), stdin=subprocess.DEVNULL,
                 stdout=output, stderr=output, start_new_session=True)
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                raise AgentError(f"{command[0]} exited; see {state_dir() / log_name}")
+                with open(state_dir() / log_name, "rb") as output:
+                    output.seek(begun)
+                    said = output.read().decode("utf-8", "replace")
+                raise AgentError(f"{self.title} did not start: {start_error(said)}")
             try:
                 # opencode leaves the first connection it accepts while it starts
                 # unanswered; a short wait per try moves on to the next one.
@@ -376,6 +380,20 @@ class Server:
             if not quiet:  # the details, for the journal; not each try while a server starts
                 log(f"{method} {path}: {e}")
             raise AgentError(f"{self.title} {failure(e, timeout)}") from e
+
+
+def start_error(output):
+    """Why an agent's server exited as it started, from what it wrote: its error line and
+    the details under it (opencode on a broken opencode.json: "Config file at … is not
+    valid JSON(C)", then "ValueExpected at line 1, column 2"). The palette showed the
+    path of the program and of its log."""
+    lines = [line.strip() for line in re.sub(r"\x1b\[[0-9;]*m", "", output).splitlines() if line.strip()]
+    error = next((line for line in lines if line.startswith("Error:")), lines[-1] if lines else "")
+    error = error.removeprefix("Error:").strip().rstrip(":")
+    if "--- Errors ---" in lines:
+        details = lines[lines.index("--- Errors ---") + 1:][:1]
+        error += "".join(f": {d}" for d in details if not d.startswith("---"))
+    return shorten_end(error, 300) if error else "it exited without a word (its log is in ~/.local/state/kortex)"
 
 
 def failure(error, timeout):
@@ -1490,7 +1508,7 @@ class Kortex:
         elif followup:
             matches.append(match("continue" + SEP + followup, followup, ICON, 1.0, "Continue · Enter"))
         if self.problem:
-            matches.append(match("problem", self.problem, "dialog-error", 0.95, "Not sent"))
+            matches.append(match("problem", self.problem, "dialog-error", 0.95, "Not sent", (), True))
         if self.waiting:
             return matches + [self.waiting_match()]
         if not self.session:

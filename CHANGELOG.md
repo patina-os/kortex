@@ -50,6 +50,10 @@ What changed in each release of kortex. The format follows
   API: ECONNREFUSED" after a minute of retries. The row that retries keeps counting the
   seconds and says which try it is, and a closed palette is told after ten seconds of
   retries, not only of a limit that lasts a minute or more.
+- An agent that does not start says why, in a row that shows all of it: "opencode did
+  not start: Config file at ~/.config/opencode/opencode.json is not valid JSON(C):
+  ValueExpected at line 1, column 2". The row named the path of the program and of
+  its log.
 
 ## [0.7.2] - 2026-11-10
 
