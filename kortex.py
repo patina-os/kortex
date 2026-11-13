@@ -84,16 +84,41 @@ ASKING = frozenset({
 # With one of these, two words are a request: "install photocraft" would else leave
 # KRunner's own "Run install photocraft" first, which runs coreutils' install.
 ASKING_TWO = frozenset({"install", "installiere"})
-# A rule for Always that starts with one of these lets through far more than the
-# command that asks: any command as root, any script, any deletion. Always is not
-# offered for it, nor for a change to any file. git, apt and patina are here for the
-# width of their rules: "git -C *", "patina *" hold every subcommand.
+# A command that starts with one of these, and runs, deletes, writes or prints a file's
+# content with no argument, shows under the agent's words in a row that asks: words can
+# be wrong.
 RISKY = frozenset({
     "sudo", "su", "doas", "pkexec", "rm", "sh", "bash", "zsh", "fish", "dash", "python",
     "python3", "perl", "ruby", "node", "curl", "wget", "env", "xargs", "eval", "dd",
     "chmod", "chown", "mv", "tee", "nohup", "kill", "pkill", "killall", "git", "apt",
     "apt-get", "dpkg", "patina",
 })
+# Always is offered only for a command that looks and nothing else, whatever it is
+# given: opencode's rule for Always is the command's start and `*` ("find *"), so it
+# lets any of its arguments through later, in every conversation; one Always on a
+# `find … | wc -l` let `find -delete` and `find -exec sudo …` run unasked. None of
+# these writes a file, prints one's content (cat, head and grep would read the secrets
+# opencode's read tool keeps back) or changes the system. A command of two words is
+# one of opencode's rules of two words ("git status *").
+LOOK_ONLY = frozenset({
+    "df", "du", "free", "lsblk", "findmnt", "uname", "uptime", "whoami", "id", "locale",
+    "lscpu", "lsusb", "lspci", "lsmod", "nproc", "ls", "stat", "pwd", "which", "type",
+    "wc", "ps", "pgrep", "ss", "realpath", "basename", "dirname", "readlink",
+    "apt-cache", "dpkg-query", "systemctl status", "systemctl is-active",
+    "systemctl is-enabled", "systemctl list-units", "systemctl list-timers",
+    "git status",
+})
+
+
+def looks_only(command):
+    """True for a command that only looks (LOOK_ONLY), with any arguments; a rule's
+    `*` is any arguments. A redirect, a substitution or a second command is more."""
+    command = command.strip().removesuffix("*").strip()
+    if not command or re.search(r"[<>`$;&|(){}\n]", command):
+        return False
+    words = command.split()
+    return any(" ".join(words[:n]) in LOOK_ONLY for n in (1, 2))
+
 
 # The KWin script that docks the panel (Desktop.dock): the window of one process, at
 # the right edge of the screen it opens on, as high as the work area, kept above.
@@ -1073,20 +1098,22 @@ def asks(p):
 
 
 def always_offered(p):
-    """False when Always would let through far more than what asks: a change to any
-    file, any bash command, or commands that start with sudo, rm, a shell and the like
-    (RISKY). Such a row offers Allow once and Deny. opencode says what its rule would
-    be (`always`); Hermes does not, so there the command itself decides."""
+    """True when Always may be offered: only for commands that look and nothing else
+    (LOOK_ONLY), since opencode's rule for it lets any arguments through, in every
+    conversation. A change to a file and any other command offer Allow once and Deny.
+    opencode says what its rule would be (`always`); Hermes does not, so there the
+    command itself decides, each of its parts, cut where a shell would cut it."""
     rules = p.get("always")
     if rules is None:
         # Hermes names no rule. Its Always is kept for good, for every command of the
-        # kind that asked ("sudo with privilege flag": every sudo), so what counts is
-        # the command: each of its parts, cut where a shell would cut it.
-        commands = re.split(r"&&|\|\||[;|\n]", " ".join(p.get("patterns") or []))
-        return not any((part.split() or [""])[0] in RISKY for part in commands)
-    if p.get("permission") == "edit" or (p.get("permission") == "bash" and "*" in rules):
+        # kind that asked ("sudo with privilege flag": every sudo).
+        command = " ".join(p.get("patterns") or [])
+        return all(looks_only(part) for part in re.split(r"&&|\|\||[;|\n]", command))
+    if p.get("permission") == "edit":
         return False
-    return not any((rule.split() or [""])[0] in RISKY for rule in rules)
+    if p.get("permission") == "bash":
+        return all(looks_only(rule) for rule in rules)
+    return True
 
 
 def view(state, elapsed=None, agent="", stop=False):

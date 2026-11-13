@@ -365,9 +365,9 @@ class View(unittest.TestCase):
     def test_always_says_what_it_lets_through(self):
         asked = dict(PERMISSION, patterns=["echo one", "sh"], metadata={"command": "echo one | sh"},
                      always=["echo *", "sh *"])
-        asked = dict(asked, always=["echo *", "tail *"])
+        asked = dict(asked, always=["du *", "wc *"])
         shown = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
-        self.assertEqual(shown[0][1], "Allow bash: echo one | sh<br>Always allows, in every conversation: echo *, tail *")
+        self.assertEqual(shown[0][1], "Allow bash: echo one | sh<br>Always allows, in every conversation: du *, wc *")
         self.assertEqual(shown[0][4]["actions"], ["allow-once", "allow-always", "deny"])
 
     def test_always_is_not_offered_where_it_lets_too_much_through(self):
@@ -375,13 +375,19 @@ class View(unittest.TestCase):
         # conversation: such a rule cannot be given from the palette.
         for kind, rules in (("bash", ["du *", "sudo *"]), ("bash", ["echo *", "sh *"]), ("bash", ["rm *"]),
                             ("bash", ["*"]), ("edit", ["*"]), ("bash", ["python3 *"]), ("bash", ["patina *"]),
-                            ("bash", ["git -C *"])):
+                            ("bash", ["git -C *"]),
+                            # what the test round let through: find -delete and find -exec
+                            # sudo, flatpak install, crontab -, and cat or head on a secret
+                            ("bash", ["find *", "wc *"]), ("bash", ["flatpak *"]), ("bash", ["crontab *", "echo *"]),
+                            ("bash", ["cat *", "head *"]), ("bash", ["sort *"]), ("bash", ["timeout *"]),
+                            ("bash", ["systemctl *"]), ("bash", ["git *"])):
             asked = dict(PERMISSION, permission=kind, always=rules)
             self.assertFalse(kortex.always_offered(asked), rules)
             [row, _status] = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
             self.assertEqual(row[4]["actions"], ["allow-once", "deny"])
             self.assertNotIn("Always", row[1])
-        for kind, rules in (("bash", ["du *", "sort *"]), ("webfetch", ["*"]), ("tracker_create_issue", ["*"]), ("bash", [])):
+        for kind, rules in (("bash", ["du *", "wc *"]), ("bash", ["systemctl status *", "git status *"]),
+                            ("bash", ["apt-cache *"]), ("webfetch", ["*"]), ("tracker_create_issue", ["*"]), ("bash", [])):
             self.assertTrue(kortex.always_offered(dict(PERMISSION, permission=kind, always=rules)), rules)
         k, oc, _desk, _clock = new()
         k.run("ask" + SEP + "x", "")
@@ -1329,7 +1335,12 @@ class HermesBackend(unittest.TestCase):
             self.assertFalse(kortex.always_offered(asked(command)), command)
             row = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked(command)]})[0]
             self.assertEqual(row[4]["actions"], ["allow-once", "deny"])
-        for command in ("update_issue {\"id\":\"PLA-1\"}", "cp ~/.bashrc ~/.bashrc.bak", "flatpak install --user -y flathub org.kde.kalk"):
+        # Only a command that looks, whatever it is given: a copy, a flatpak install or a
+        # service's tool are changes.
+        for command in ("update_issue {\"id\":\"PLA-1\"}", "cp ~/.bashrc ~/.bashrc.bak",
+                        "flatpak install --user -y flathub org.kde.kalk", "find ~ -delete"):
+            self.assertFalse(kortex.always_offered(asked(command, "tracker")), command)
+        for command in ("du -sh ~/.cache", "ls -la /tmp | wc -l", "systemctl status ssh"):
             self.assertTrue(kortex.always_offered(asked(command, "tracker")), command)
 
     def test_a_question_hermes_gave_up_on_leaves_the_palette(self):

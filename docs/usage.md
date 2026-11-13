@@ -66,11 +66,13 @@ KRunner's window holds still instead of growing and shrinking with each word. It
   script through, in this conversation and the next ones, until the agent's server
   stops). Allow once, Always or Deny answer it, with the mouse; from the keyboard,
   Shift+Enter is Allow once (KRunner runs a row's first action with it). Enter alone
-  answers nothing, and nothing runs before you choose. Always is not offered where
-  its rule would let far more through than what asks: a change to any file, or
-  commands that start with `sudo`, `rm`, a shell, `python3`, `curl` and the like;
-  one Always on such a row let every later `sudo` run unasked. With Hermes, which
-  names no rule, the command that asks decides, and a question it gives up on after
+  answers nothing, and nothing runs before you choose. Always is offered only
+  for commands that look and change nothing whatever they are given (`du`, `ls`,
+  `wc`, `apt-cache`, `systemctl status` and the like): its rule is the command's start
+  and `*`, so one Always on a `find … | wc -l` let `find -delete` run unasked later,
+  and one on a `sudo` every later `sudo`. A change to a file and every other command
+  offer Allow once and Deny. With Hermes, which names no rule, the command that asks
+  decides, and a question it gives up on after
   five minutes (`approvals.timeout`) leaves the palette. opencode asks before
   every change (patina's permissions); Hermes only before what it counts as
   dangerous.

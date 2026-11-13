@@ -12,7 +12,8 @@
   "Always" is the agent's own rule, which the row spells out (`Always allows, in every conversation: sh *`
   lets any script through): with opencode it holds for every conversation until its
   server stops, after a quiet quarter of an hour, and is not written into its
-  configuration. A request opencode cannot list comes from its event stream and is
+  configuration. Since that rule takes any arguments, Always is offered only for
+  commands that look and change nothing whatever they are given. A request opencode cannot list comes from its event stream and is
   answered like any other.
 - **Root through a dialog.** The agent has no terminal, so `sudo` cannot ask for a
   password there. patina sets the session's `SUDO_ASKPASS` to a password dialog in the

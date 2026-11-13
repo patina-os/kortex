@@ -5,6 +5,18 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Fixed
+
+- Always is offered only for a command that looks and changes nothing whatever it is
+  given (`du`, `ls`, `wc`, `apt-cache`, `systemctl status` and the like), with
+  opencode and with Hermes. opencode's rule for Always is the command's start and `*`:
+  one Always on a row that counted files (`find *, wc *`) let `find -delete` and
+  `find -exec sudo …` run unasked later, in a new conversation, and others let
+  `flatpak install`, `crontab -` and `cat` on any file through. kortex cannot narrow
+  opencode's rule, so such a row offers Allow once and Deny.
+
 ## [0.7.2] - 2026-11-10
 
 ### Fixed
