@@ -31,6 +31,11 @@ What changed in each release of kortex. The format follows
   notification say that it stopped without saying it is done, and to say "go on" if it
   is not. They showed its plan ("I'll add a weekly cron job") as the answer, and there
   was no cron job.
+- Every command a row asks for shows under the agent's words, not only one that
+  deletes or runs as root: the words may describe a later step ("I'll install it from
+  Debian's archive" over an `apt-cache show`). A command that reaches outside the home
+  folder says so, and where ("access outside your home folder (/tmp/*)"), and such a
+  row offers no Always, whose rule would hold for any step in that folder.
 
 ## [0.7.2] - 2026-11-10
 

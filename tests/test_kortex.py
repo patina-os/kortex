@@ -338,7 +338,13 @@ class View(unittest.TestCase):
     def test_a_row_in_the_agents_words(self):
         safe = dict(PERMISSION, patterns=["apt-cache policy firefox-esr"], metadata={"command": "apt-cache policy firefox-esr"})
         state = busy(text("I'll check which Firefox version is installed."), permissions=[safe])
-        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll check which Firefox version is installed.")
+        # the command under the words, which may describe a later step
+        self.assertEqual(kortex.view(state)[0][1], "Allow: I'll check which Firefox version is installed."
+                                                   "<br>apt-cache policy firefox-esr")
+        flatseal = dict(safe, patterns=["apt-cache show flatseal", "grep -E '^Version'"],
+                        metadata={"command": "apt-cache show flatseal | grep -E '^Version'"})
+        state = busy(text("Debian has flatseal. I'll install it from Debian's archive."), permissions=[flatseal])
+        self.assertEqual(kortex.view(state)[0][1].split("<br>")[1], "apt-cache show flatseal | grep -E '^Version'")
         state = busy(text("Checking."), tool("bash", command="ls"), permissions=[safe])  # nothing said since
         self.assertEqual(kortex.view(state)[0][1], "Allow bash: apt-cache policy firefox-esr")
         root = dict(safe, patterns=["sudo -A apt install x"], metadata={"command": "sudo -A apt install x"})
@@ -361,9 +367,9 @@ class View(unittest.TestCase):
         first = dict(tool("bash", command="ls"), callID="c1")
         second = dict(tool("bash", "running", command="apt-cache policy firefox-esr"), callID="c2")
         state = busy(text("Looking."), first, text("Now the version."), second, permissions=[called])
-        self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.")
+        self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.<br>apt-cache policy firefox-esr")
         second["callID"] = called["tool"]["callID"] = "c1"  # one id for both calls: the later one asks
-        self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.")
+        self.assertEqual(kortex.view(state)[0][1], "Allow: Now the version.<br>apt-cache policy firefox-esr")
 
     def test_the_whole_command_shows_as_written(self):
         # opencode cuts a command at `;`, `|` and `&&` for its patterns; KRunner reads a
@@ -437,8 +443,16 @@ class View(unittest.TestCase):
         nothing = dict(asked, permission="tracker_list_teams", always=[], tool={"messageID": "msg_1", "callID": "call_8"})
         self.assertEqual(kortex.view(dict(state, permissions=[nothing]))[0][1], "Allow tracker_list_teams")
         outside = dict(PERMISSION, permission="external_directory", patterns=["/etc/*"], always=["/etc/*"])
-        self.assertTrue(kortex.view(dict(state, permissions=[outside]))[0][1].startswith(
-            "Allow access outside your home folder: /etc/*"))
+        [row, _status] = kortex.view(dict(state, permissions=[outside]))
+        self.assertEqual(row[1], "Allow access outside your home folder: /etc/*")
+        self.assertEqual(row[4]["actions"], ["allow-once", "deny"])  # Always would hold for any step in it
+        # a command that reaches outside: where, and the command, under the agent's words
+        clean = "rm -rf ~/.cache/thumbnails && rm -rf /tmp/*"
+        outside = dict(outside, patterns=["/tmp/*"], always=["/tmp/*"], metadata={"command": clean})
+        state["messages"][1]["parts"].insert(0, text("I'll clear the thumbnail cache."))
+        self.assertEqual(kortex.view(dict(state, permissions=[outside]))[0][1],
+                         "Allow: I'll clear the thumbnail cache.<br>access outside your home folder (/tmp/*): "
+                         + kortex.markup(clean))
 
     def test_the_agent_asks_the_user(self):
         # opencode's `question` tool: kortex showed "Working" until the user gave up.
@@ -971,7 +985,7 @@ class Runner(unittest.TestCase):
                                            tool("bash", "running", command="kwriteconfig6 --key x y"))]
         oc.pending = [dict(PERMISSION, id="per_3", metadata={"command": "kwriteconfig6 --key x y"})]
         k.tick()
-        self.assertEqual(desk.notes[-1][1], "Allow: I'll switch to the light theme.")  # its words, as in the palette
+        self.assertEqual(desk.notes[-1][1], "Allow: I'll switch to the light theme.<br>kwriteconfig6 --key x y")  # as in the palette
         k.show(2)  # its Show
         self.assertEqual(desk.queries[-1], "kortex › ")
         k.show(99)  # another program's notification

@@ -84,15 +84,6 @@ ASKING = frozenset({
 # With one of these, two words are a request: "install photocraft" would else leave
 # KRunner's own "Run install photocraft" first, which runs coreutils' install.
 ASKING_TWO = frozenset({"install", "installiere"})
-# A command that starts with one of these, and runs, deletes, writes or prints a file's
-# content with no argument, shows under the agent's words in a row that asks: words can
-# be wrong.
-RISKY = frozenset({
-    "sudo", "su", "doas", "pkexec", "rm", "sh", "bash", "zsh", "fish", "dash", "python",
-    "python3", "perl", "ruby", "node", "curl", "wget", "env", "xargs", "eval", "dd",
-    "chmod", "chown", "mv", "tee", "nohup", "kill", "pkill", "killall", "git", "apt",
-    "apt-get", "dpkg", "patina",
-})
 # Always is offered only for a command that looks and nothing else, whatever it is
 # given: opencode's rule for Always is the command's start and `*` ("find *"), so it
 # lets any of its arguments through later, in every conversation; one Always on a
@@ -963,30 +954,24 @@ def explained(p, messages):
     return ""
 
 
-def risky(p):
-    """True for a command that deletes, runs as root or the like (RISKY): its row shows
-    the command under the agent's words, which can be wrong (the test's thesis was
-    "one stale cache file")."""
-    if p.get("permission") not in ("bash", None) and not (p.get("metadata") or {}).get("command"):
-        return False
-    words = (p.get("metadata") or {}).get("command") or " ".join(p.get("patterns") or [])
-    return any((part.split() or [""])[0] in RISKY for part in re.split(r"&&|\|\||[;|\n(){}]", words))
-
-
 def asking_for(p, messages):
     """What a row, or a notification, that asks says after "Allow": the agent's own words
-    right before the step, as in a chat, with what the step does under them: a risky
-    command, the path and the changed lines of a file, what a service's tool is given,
+    right before the step, as in a chat, with what the step does under them: the
+    command (the words may describe the next step: "I'll install it" over an
+    `apt-cache show`), the path and the changed lines of a file, what a service's tool is given,
     since words can be wrong and name no file or ticket ("I'll set both tickets to
     Done." over the first of them). What the step does alone when the agent said
     nothing first, not a blind Allow. The panel shows every step."""
     what = asked_for(p, messages)
     told = f"{asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
+    if p.get("permission") == "external_directory" and (p.get("metadata") or {}).get("command"):
+        # the command reaches outside the home folder: where, then the command
+        told = f"{asks(p)} ({', '.join(p.get('patterns') or [])}): {what}"
     words = explained(p, messages)
     if not words:
         return " " + told
     if p.get("permission") in ("bash", None):
-        return ": " + shorten_end(words, 240) + ("\n" + what if risky(p) else "")
+        return ": " + shorten_end(words, 240) + "\n" + what
     return ": " + shorten_end(words, 240) + "\n" + told
 
 
@@ -1133,7 +1118,7 @@ def always_offered(p):
         # kind that asked ("sudo with privilege flag": every sudo).
         command = " ".join(p.get("patterns") or [])
         return all(looks_only(part) for part in re.split(r"&&|\|\||[;|\n]", command))
-    if p.get("permission") == "edit":
+    if p.get("permission") in ("edit", "external_directory"):  # any file; any folder the rule names
         return False
     if p.get("permission") == "bash":
         return all(looks_only(rule) for rule in rules)
@@ -1145,7 +1130,7 @@ def view(state, elapsed=None, agent="", stop=False):
     asks to do, in its own words, and what it asks the user; while it works, a status
     row (how long it has been at it, `elapsed` seconds or None, and what it wrote or
     thought or does last); then its answer. The steps and their commands are the
-    panel's (Show what the agent does), but for a risky command a row asks for. The
+    panel's (Show what the agent does), but for the one a row asks for. The
     status row is one line, which KRunner gives a fixed height, so its window holds
     still. `stop`: the agent's work can be stopped, so the status row offers it."""
     said, steps, error = reply_of(state["messages"])

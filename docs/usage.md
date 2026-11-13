@@ -12,7 +12,8 @@ Meta+A       why is my wifi slow?
              ◉ Ask kortex: why is my wifi slow?                 Enter
              ─────────────────────────────────────────────────────────
 kortex ›     ◉ Working · 12 s · running a command                Copy · Show what the agent does · Stop
-             ⚠ Allow: I'll switch you to the 5 GHz network.     Allow once · Always · Deny
+             ⚠ Allow: I'll switch you to the 5 GHz network.     Allow once · Deny
+               nmcli connection up home-5G
 ```
 
 ## Asking
@@ -57,11 +58,13 @@ KRunner's window holds still instead of growing and shrinking with each word. It
 - **A row for each action the agent asks to take** (a command, a file change, a web
   request, a service's tool its permissions put on `ask`), in what the agent said right
   before that step ("Allow: I'll add the alias to your .bashrc, after a copy of it as
-  .bashrc.bak."). A command that deletes, runs as root or the like (`sudo`, `rm`, a
-  shell, `kill`, `apt` …) shows, whole, under the words: words can be wrong, and in a
-  test an agent called a folder that held a thesis "one stale cache file". A step the
-  agent did not explain shows as before: the whole command as it will run, the path
-  and the changed lines of a file, or what a service's tool is given. And with
+  .bashrc.bak."). Under the words is what the step does: the whole command as it
+  will run, the path and the changed lines of a file, what a service's tool is given,
+  or the folder outside your home it reaches ("access outside your home folder").
+  Words can be wrong: in a test an agent called a folder that held a thesis "one
+  stale cache file", and words may describe the step after this one ("I'll install
+  it" over a command that only looks it up). A step the agent did not explain shows
+  as what it does alone. And with
   what Always would let through (`Always allows, in every conversation: sh *` lets any
   script through, in this conversation and the next ones, until the agent's server
   stops). Allow once, Always or Deny answer it, with the mouse; from the keyboard,
