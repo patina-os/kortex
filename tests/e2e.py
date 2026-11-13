@@ -156,9 +156,9 @@ def main(agent):
                     return m
         asked = wait_for("the agent to ask first", permission)
         assert str(asked[1]).split("<br>")[0] == f"Allow {asks}: {command}", asked[1]
-        # Hermes asks before it removes a folder: Always is not offered for rm (kortex.RISKY)
-        offered = ["allow-once", "deny"] if agent == "hermes" else ["allow-once", "allow-always", "deny"]
-        assert list(asked[5]["actions"]) == offered, asked[5]["actions"]
+        # Always only for a command that only looks (kortex.LOOK_ONLY): not for rm, nor
+        # for the command that makes the file
+        assert list(asked[5]["actions"]) == ["allow-once", "deny"], asked[5]["actions"]
         time.sleep(1)
         ran = (lambda: not proof.exists()) if agent == "hermes" else proof.exists
         assert not ran(), "the command ran before it was allowed"
