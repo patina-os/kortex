@@ -96,7 +96,9 @@ agent's own interface on the conversation (`opencode attach`, `hermes --resume`)
 terminal Plasma names, docked at the screen's right edge: as high as the screen's work
 area, a fifth of its width but at least 480 and at most 720 pixels, above your other
 windows. Every step is there, whole, and the conversation goes on there too, for
-longer work such as code; close it when you have seen enough. patina puts it on
+longer work such as code; close it when you have seen enough. There is one panel:
+opening it again brings it to the front, or shows the current conversation in place
+of another. patina puts it on
 Meta+Shift+A, which opens the agent's interface alone when there is no conversation
 yet. The docking is a small KWin script kortex loads over D-Bus for the moment the
 window takes to appear (Plasma lets no program place its own window on Wayland);

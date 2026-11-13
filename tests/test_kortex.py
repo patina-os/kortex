@@ -112,6 +112,7 @@ class FakeDesktop:
     def __init__(self):
         self.queries, self.copied, self.launched, self.notes = [], [], [], []
         self.docked = []
+        self.running, self.closed = set(), []  # the programs launched that run; those closed
         self.still = None  # whether the last refresh is still wanted when it goes out
 
     def query(self, t, still=None):
@@ -126,7 +127,15 @@ class FakeDesktop:
 
     def launch(self, command, env):
         self.launched.append((command, env))
-        return 4242
+        self.running.add(4242 + len(self.launched) - 1)
+        return 4242 + len(self.launched) - 1
+
+    def alive(self, pid):
+        return pid in self.running
+
+    def close(self, pid):
+        self.running.discard(pid)
+        self.closed.append(pid)
 
     def dock(self, pid):
         self.docked.append(pid)
@@ -873,6 +882,29 @@ class Runner(unittest.TestCase):
         rows = k.match("kortex › ")
         self.assertEqual([(m[0], m[4]["subtext"]) for m in rows][:2],
                          [("problem", "Not answered"), ("permission" + SEP + "per_1", "Asks first")])
+
+    def test_one_panel_at_a_time(self):
+        # Each Meta+Shift+A opened another full-height panel, and a quick second press
+        # left the first undocked.
+        k, oc, desk, _clock = new()
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
+            k.panel()
+            k.panel()  # open on it: docked and brought to the front again
+            self.assertEqual((len(desk.launched), desk.docked), (1, [4242, 4242]))
+            k.run("ask" + SEP + "x", "")
+            k.panel()  # a conversation now: the panel shows it in place of the other
+            self.assertEqual((len(desk.launched), desk.closed, desk.docked[-1]), (2, [4242], 4243))
+            desk.running.clear()  # closed by the user
+            k.panel()
+            self.assertEqual(len(desk.launched), 3)
+        later = Later()
+        k.background = later
+        with mock.patch.object(kortex, "find_opencode", return_value="/usr/bin/opencode"):
+            desk.running.clear()
+            k.panel()
+            k.panel()  # pressed again while the first starts
+            later.run()
+        self.assertEqual(len(desk.launched), 4)
 
     def test_list(self):
         k, *_ = new()

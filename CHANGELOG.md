@@ -59,6 +59,10 @@ What changed in each release of kortex. The format follows
   "Not sent". A failed answer to a row, Stop, Copy or panel says what did not happen
   ("Not answered", "Not stopped" …) and goes once the agent answers again; a row whose
   answer did not reach the agent comes back, to answer again.
+- Meta+Shift+A, or Show what the agent does, on an open panel brings it to the front
+  (docked again, if it was moved) in place of a second panel; on another conversation
+  the panel shows the current one in its place. Each press opened one more, and a
+  quick second press left the first undocked.
 
 ## [0.7.2] - 2026-11-10
 

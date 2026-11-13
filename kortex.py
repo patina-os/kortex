@@ -121,7 +121,8 @@ def looks_only(command):
 
 
 # The KWin script that docks the panel (Desktop.dock): the window of one process, at
-# the right edge of the screen it opens on, as high as the work area, kept above.
+# the right edge of the screen it opens on, as high as the work area, kept above and
+# active (a second Meta+Shift+A brings it back).
 PANEL_SCRIPT = """
 const pid = %d, share = %s, least = %d, most = %d;
 function dock(window) {
@@ -132,6 +133,8 @@ function dock(window) {
     const width = Math.round(Math.min(most, Math.max(least, area.width * share)));
     window.frameGeometry = {x: area.x + area.width - width, y: area.y, width: width, height: area.height};
     window.keepAbove = true;
+    window.minimized = false;
+    workspace.activeWindow = window;
     return true;
 }
 if (!workspace.windowList().some(dock)) {
@@ -1345,6 +1348,7 @@ class Kortex:
         self.asked_at = None  # when it was made; None once the agent has replied
         self.told = 0  # the notification that follows it, once there is one
         self.followed = False  # KRunner showed the news of it once (logged once)
+        self.panel_of = None  # the panel open last: (its process id, the session it shows)
         self.shows = {}  # the notifications whose Show opens a conversation: its session, or None for the current
         # Requests followed in a conversation left for another (a new request, one picked
         # from the list) while the agent worked on them: (request, asked_at) by session,
@@ -1679,16 +1683,23 @@ class Kortex:
         interface alone when there is no conversation (Meta+Shift+A)."""
         self.last_activity = self.now()
         session = self.session
+        if self.panel_of and self.desktop.alive(self.panel_of[0]):
+            if self.panel_of[1] == session:  # open on this conversation: docked and brought to the front
+                self.desktop.dock(self.panel_of[0])
+                return
+            self.desktop.close(self.panel_of[0])  # on another: one panel, on this one
 
         def opened(found, error):
             if found:
                 attach, env = found
-                self.desktop.dock(self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env))
+                pid = self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env)
+                self.panel_of = (pid, session)
+                self.desktop.dock(pid)
             self.failed(None, error, "The panel did not open")
             if error and self.shown is None:  # Meta+Shift+A with the palette closed: nothing else would say so
                 self.notify(f"{NAME}: the panel did not open", str(error))
 
-        self.work(lambda: self.agent.attach(session), opened)
+        self.work(lambda: self.agent.attach(session), opened, "panel")  # a second press while it starts adds none
 
     def reopen(self, query, menu=False):
         """After a run, which closes KRunner, or the start menu (`menu`): open KRunner
@@ -1929,10 +1940,24 @@ def main():
                 return out
             return next((t for t in ("konsole", "kitty", "x-terminal-emulator") if shutil.which(t)), "konsole")
 
+        def __init__(self):
+            self.started = {}  # the programs launched, by process id
+
         def launch(self, command, env):
-            return subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
-                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL).pid
+            process = subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL)
+            self.started[process.pid] = process
+            return process.pid
+
+        def alive(self, pid):
+            process = self.started.get(pid)
+            return process is not None and process.poll() is None
+
+        def close(self, pid):
+            process = self.started.pop(pid, None)
+            if process is not None:
+                process.terminate()
 
         def dock(self, pid):
             """Place the window of process `pid` at the screen's right edge, full height, a
