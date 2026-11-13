@@ -537,6 +537,24 @@ class View(unittest.TestCase):
         state["status"] = ("idle", "")
         self.assertEqual([m[1] for m in kortex.view(state)], ["Done."])
 
+    def test_a_reply_without_a_word_says_so(self):
+        # The model thought and ended its turn: the palette showed nothing for minutes,
+        # and the notification "kortex answered: Done.".
+        state = {"messages": [user("how much zram?"), assistant(reasoning("The user is asking"))],
+                 "status": ("idle", ""), "permissions": []}
+        [row] = kortex.view(state, None, "opencode")
+        self.assertEqual((row[0], row[1]), ("continue" + SEP + "how much zram?", kortex.NO_ANSWER))
+        self.assertEqual(row[4]["subtext"], "opencode · Enter asks again")
+        self.assertEqual(kortex.view(dict(state, messages=[user("x")])), [])  # not begun yet
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "how much zram?", "", menu=True)
+        oc.history = state["messages"]
+        k.tick()
+        self.assertEqual(desk.notes[-1][0], "kortex stopped")
+        self.assertTrue(desk.notes[-1][1].startswith(kortex.NO_ANSWER))
+        k.run(row[0], "")  # Enter asks the same again, in the conversation
+        self.assertEqual(oc.asked[-1], ("ses_1", "how much zram?"))
+
     def test_the_agent_stopped(self):
         state = busy(tool("bash", command="ls"), error={"name": "APIError", "data": {"message": "rate limited"}})
         state["status"] = ("idle", "")

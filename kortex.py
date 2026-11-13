@@ -835,16 +835,22 @@ def denied(part):
 
 
 DENIED = "Stopped: you denied the last step, so it did not run. Say what to do instead."
+# A model may end its turn after it thought, without a word or a step (Qwen 3.6 did it
+# again and again): the palette showed nothing, and the notification "Done.".
+NO_ANSWER = "The agent stopped without an answer."
 
 
 def answer_of(messages):
     """The agent's reply to the last request as the palette gives it: what it said
     after its last step, since what it said between the steps ("let me check…") is how
     it got there, not the answer; all it said when nothing follows the last step;
-    "Done." when it took steps and said nothing. When the last thing in the reply is a
-    step the user denied, what it said before that step and that it stopped there:
-    opencode ends the turn on a Deny, and the words before read as if it went on."""
-    said, _steps, _error = reply_of(messages)
+    "Done." when it took steps and said nothing; NO_ANSWER when it did neither. When
+    the last thing in the reply is a step the user denied, what it said before that
+    step and that it stopped there: opencode ends the turn on a Deny, and the words
+    before read as if it went on."""
+    said, steps, _error = reply_of(messages)
+    if not said and not steps:
+        return [NO_ANSWER]
     parts = [p for p in reply_parts(messages) if p.get("type") in ("text", "tool")
              and not p.get("synthetic") and not p.get("ignored") and (p.get("type") == "tool" or p.get("text", "").strip())]
     if parts and parts[-1]["type"] == "tool" and denied(parts[-1]):
@@ -1178,6 +1184,12 @@ def view(state, elapsed=None, agent="", stop=False):
             if words:
                 line += " · " + head(words)
         matches.append(match("answer", line, ICON, 0.9, agent, ["copy", "terminal"] + (["stop"] if stop else [])))
+    elif not said and not steps and replied(state["messages"], ""):
+        # it thought, and stopped: Enter asks the same again
+        request = " ".join(p.get("text", "") for p in state["messages"][last_user(state["messages"])].get("parts", [])
+                           if p.get("type") == "text" and not p.get("synthetic")).strip()
+        matches.append(match(("continue" + SEP + request) if request else "answer", NO_ANSWER, "dialog-warning", 0.9,
+                             (agent + " · " if agent else "") + ("Enter asks again" if request else "Ask again")))
     elif said or steps:
         took = f" · {len(steps)} step{'s' if len(steps) > 1 else ''}" if steps else ""
         matches.append(match("answer", rich(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9,
@@ -1658,7 +1670,11 @@ class Kortex:
                 # Its last words, not the steps it took: after a task they say how it went,
                 # and a plain answer is its last words anyway.
                 last = (said or steps or [""])[-1]
-                if answer_of(state["messages"])[-1] == DENIED:
+                end = answer_of(state["messages"])[-1]
+                if end == NO_ANSWER:
+                    self.finish(f"{NAME} stopped", NO_ANSWER + " Show opens the conversation, to ask again.")
+                    return
+                if end == DENIED:
                     last = DENIED
                 self.finish(f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…")
             return

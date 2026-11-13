@@ -20,6 +20,9 @@ What changed in each release of kortex. The format follows
   the last sentence for the row that says how long took time that grew with the square
   of the answer's length (3 s for 14,000 characters of code), on the thread that
   answers KRunner.
+- A reply without a word or a step (a model that thinks and then ends its turn) says
+  "The agent stopped without an answer", with Enter to ask the same again; the palette
+  stayed empty, and the notification said "kortex answered: Done.".
 
 ## [0.7.2] - 2026-11-10
 
