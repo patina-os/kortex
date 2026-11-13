@@ -36,6 +36,10 @@ What changed in each release of kortex. The format follows
   Debian's archive" over an `apt-cache show`). A command that reaches outside the home
   folder says so, and where ("access outside your home folder (/tmp/*)"), and such a
   row offers no Always, whose rule would hold for any step in that folder.
+- A service's tool that asks offers no Always: its rule was any call of the tool, in
+  every conversation ("any cloud_delete_note"), so one click let every later deletion
+  through, one asked for by text inside a ticket too. A tool that only reads does not
+  ask (patina's rules), so one that asks changes something.
 
 ## [0.7.2] - 2026-11-10
 

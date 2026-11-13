@@ -100,6 +100,13 @@ LOOK_ONLY = frozenset({
     "git status",
 })
 
+# The kinds of step besides bash for which Always may be offered: opencode's tools that
+# look and change nothing. Not a change to a file, a folder outside the home folder
+# (its rule holds for any step in it) or a service's tool: a service's tools that only
+# read are allowed without asking (patina's rules), so one that asks changes something,
+# and its rule is any call of it ("any cloud_delete_note"), in every conversation.
+ALWAYS_KINDS = frozenset({"webfetch", "websearch", "codesearch", "glob", "grep", "list", "lsp"})
+
 
 def looks_only(command):
     """True for a command that only looks (LOOK_ONLY), with any arguments; a rule's
@@ -1109,7 +1116,8 @@ def asks(p):
 def always_offered(p):
     """True when Always may be offered: only for commands that look and nothing else
     (LOOK_ONLY), since opencode's rule for it lets any arguments through, in every
-    conversation. A change to a file and any other command offer Allow once and Deny.
+    conversation, and for opencode's tools that only look (ALWAYS_KINDS). A change to a
+    file, a service's tool and any other command offer Allow once and Deny.
     opencode says what its rule would be (`always`); Hermes does not, so there the
     command itself decides, each of its parts, cut where a shell would cut it."""
     rules = p.get("always")
@@ -1118,11 +1126,9 @@ def always_offered(p):
         # kind that asked ("sudo with privilege flag": every sudo).
         command = " ".join(p.get("patterns") or [])
         return all(looks_only(part) for part in re.split(r"&&|\|\||[;|\n]", command))
-    if p.get("permission") in ("edit", "external_directory"):  # any file; any folder the rule names
-        return False
     if p.get("permission") == "bash":
         return all(looks_only(rule) for rule in rules)
-    return True
+    return p.get("permission") in ALWAYS_KINDS
 
 
 def view(state, elapsed=None, agent="", stop=False):

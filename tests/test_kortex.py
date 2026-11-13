@@ -402,14 +402,18 @@ class View(unittest.TestCase):
                             # sudo, flatpak install, crontab -, and cat or head on a secret
                             ("bash", ["find *", "wc *"]), ("bash", ["flatpak *"]), ("bash", ["crontab *", "echo *"]),
                             ("bash", ["cat *", "head *"]), ("bash", ["sort *"]), ("bash", ["timeout *"]),
-                            ("bash", ["systemctl *"]), ("bash", ["git *"])):
+                            ("bash", ["systemctl *"]), ("bash", ["git *"]),
+                            # a service's tool that asks changes something: any later call
+                            # of it, a deletion too, would run unasked
+                            ("cloud_delete_note", ["*"]), ("tracker_update_issue", ["*"]), ("read", ["*"]),
+                            ("doom_loop", ["*"])):
             asked = dict(PERMISSION, permission=kind, always=rules)
             self.assertFalse(kortex.always_offered(asked), rules)
             [row, _status] = kortex.view({"messages": [], "status": ("busy", ""), "permissions": [asked]})
             self.assertEqual(row[4]["actions"], ["allow-once", "deny"])
             self.assertNotIn("Always", row[1])
         for kind, rules in (("bash", ["du *", "wc *"]), ("bash", ["systemctl status *", "git status *"]),
-                            ("bash", ["apt-cache *"]), ("webfetch", ["*"]), ("tracker_create_issue", ["*"]), ("bash", [])):
+                            ("bash", ["apt-cache *"]), ("webfetch", ["*"]), ("grep", ["*"]), ("bash", [])):
             self.assertTrue(kortex.always_offered(dict(PERMISSION, permission=kind, always=rules)), rules)
         k, oc, _desk, _clock = new()
         k.run("ask" + SEP + "x", "")
@@ -437,8 +441,9 @@ class View(unittest.TestCase):
         asked = dict(PERMISSION, permission="tracker_create_issue", patterns=["*"], always=["*"],
                      tool={"messageID": "msg_1", "callID": "call_7"})
         state = {"messages": [user("x"), assistant(call)], "status": ("busy", ""), "permissions": [asked]}
-        self.assertEqual(kortex.view(state)[0][1], "Allow tracker_create_issue: team=Design, title=Favicon is blurry"
-                                                   "<br>Always allows, in every conversation: any tracker_create_issue")
+        [row, _status] = kortex.view(state)
+        self.assertEqual(row[1], "Allow tracker_create_issue: team=Design, title=Favicon is blurry")
+        self.assertEqual(row[4]["actions"], ["allow-once", "deny"])  # a service's change asks every time
         self.assertEqual(kortex.asked_for(asked), "*")  # without the conversation
         nothing = dict(asked, permission="tracker_list_teams", always=[], tool={"messageID": "msg_1", "callID": "call_8"})
         self.assertEqual(kortex.view(dict(state, permissions=[nothing]))[0][1], "Allow tracker_list_teams")
