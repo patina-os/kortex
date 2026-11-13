@@ -838,6 +838,10 @@ DENIED = "Stopped: you denied the last step, so it did not run. Say what to do i
 # A model may end its turn after it thought, without a word or a step (Qwen 3.6 did it
 # again and again): the palette showed nothing, and the notification "Done.".
 NO_ANSWER = "The agent stopped without an answer."
+# A turn that ends after a step without a word, or on words that announce more ("I'll
+# clean what's safe now:"): what it said before read as done ("I'll add the cron job…"
+# with no cron job).
+UNFINISHED = "The agent stopped here without saying it is done. If it is not, say “go on”."
 
 
 def answer_of(messages):
@@ -857,7 +861,11 @@ def answer_of(messages):
         return said[-1:] + [DENIED]
     last = max((i for i, p in enumerate(parts) if p["type"] == "tool"), default=-1)
     after = [p["text"].strip() for p in parts[last + 1:]]
-    return after or said or ["Done."]
+    if after:
+        return after + ([UNFINISHED] if after[-1].endswith(":") else [])
+    if said:  # it said what it would do, then took a step, and ended without a word
+        return [said[-1], UNFINISHED]
+    return ["Done."]
 
 
 def last_user(messages):
@@ -1681,6 +1689,8 @@ class Kortex:
                     return
                 if end == DENIED:
                     last = DENIED
+                elif end == UNFINISHED:
+                    last = shorten_end(last, MAX_NOTE - len(UNFINISHED) - 1) + "\n" + UNFINISHED
                 self.finish(f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…")
             return
         status, why = state["status"]

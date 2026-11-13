@@ -540,6 +540,24 @@ class View(unittest.TestCase):
         self.assertEqual(matches[0][1], "Your disk is full of &lt;caches&gt;.")
         self.assertEqual(matches[0][4]["subtext"], "Enter copies · 2 steps")
 
+    def test_an_agent_that_stops_after_a_step_did_not_say_it_is_done(self):
+        # "schedule a weekly cleanup": the palette showed the plan with the cron job, and
+        # there was none.
+        plan = "I'll create a cleanup script and add a weekly cron job."
+        state = {"messages": [user("x"), assistant(text(plan), tool("write", filePath="/home/u/c.sh"))],
+                 "status": ("idle", ""), "permissions": []}
+        self.assertEqual(kortex.view(state)[0][1], plan + "<br>" + kortex.UNFINISHED)
+        state["messages"] = [user("x"), assistant(text("Looking."), tool("bash", command="ls"),
+                                                  text("I'll clean what's safe to clean now:"))]
+        self.assertEqual(kortex.answer_of(state["messages"]), ["I'll clean what's safe to clean now:", kortex.UNFINISHED])
+        state["messages"] = [user("x"), assistant(text("Looking."), tool("bash", command="ls"), text("All clean."))]
+        self.assertEqual(kortex.answer_of(state["messages"]), ["All clean."])
+        k, oc, desk, _clock = new()
+        k.run("ask" + SEP + "x", "", menu=True)
+        oc.history = [user("x"), assistant(text(plan), tool("write", filePath="/home/u/c.sh"))]
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", kortex.markup(plan + "\n" + kortex.UNFINISHED)))
+
     def test_done_with_steps_alone(self):
         state = busy(tool("bash", command="patina theme mode light"))
         state["status"] = ("idle", "")

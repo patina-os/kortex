@@ -26,6 +26,11 @@ What changed in each release of kortex. The format follows
 - A row that asks for a change to a file shows its path and the changed lines under
   the agent's words, and one for a service's tool what the tool is given: "I'll set
   both Platform tickets to Done." named no ticket, and asked for only one of them.
+- An agent that ends its turn after a step without a word, or on words that announce
+  more ("I'll clean what's safe now:"), no longer reads as done: the palette and the
+  notification say that it stopped without saying it is done, and to say "go on" if it
+  is not. They showed its plan ("I'll add a weekly cron job") as the answer, and there
+  was no cron job.
 
 ## [0.7.2] - 2026-11-10
 
