@@ -5,6 +5,16 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Added
+
+- Edit the agent's instructions, an action on the hint row: with patina it runs
+  `patina ai prompt` in a terminal, which keeps your own instructions beside patina's
+  for opencode and Hermes alike; without patina it opens the agent's own file
+  (opencode's `~/.config/opencode/AGENTS.md`, Hermes' `~/.hermes/SOUL.md`). The
+  instructions could only be found by knowing where they were.
+
 ## [0.7.2] - 2026-11-10
 
 ### Fixed

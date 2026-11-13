@@ -41,6 +41,9 @@ def tool(name, status="completed", **given):
 class FakeOpencode:
     title = "opencode"
 
+    def instructions_file(self):
+        return Path("/home/u/.config/opencode/AGENTS.md")
+
     def __init__(self):
         self.url = "http://127.0.0.1:4096"
         self.password = "secret"
@@ -113,6 +116,14 @@ class FakeDesktop:
         self.queries, self.copied, self.launched, self.notes = [], [], [], []
         self.docked = []
         self.still = None  # whether the last refresh is still wanted when it goes out
+        self.has_patina = None  # patina's command, when this desktop has patina
+        self.edited = []
+
+    def patina(self):
+        return self.has_patina
+
+    def edit(self, path):
+        self.edited.append(path)
 
     def query(self, t, still=None):
         self.queries.append(t)
@@ -703,6 +714,36 @@ class Runner(unittest.TestCase):
         self.assertEqual(env, {"OPENCODE_SERVER_PASSWORD": "secret"})
         self.assertNotIn("secret", command)
         self.assertEqual(desk.docked, [4242])  # the terminal's window goes to the right edge
+
+    def test_the_hint_edits_the_agent_s_instructions(self):
+        # With patina, its own command in a terminal, which keeps the user's instructions
+        # beside patina's for either agent; without it, the agent's own file.
+        k, _oc, desk, _ = new()
+        self.assertEqual(k.hint()[4]["actions"], ["instructions"])
+        self.assertIn("instructions", [a[0] for a in kortex.ACTIONS])
+        k.run("hint", "instructions")
+        self.assertEqual(desk.edited, [Path("/home/u/.config/opencode/AGENTS.md")])
+        self.assertEqual(desk.launched, [])
+        desk.has_patina = "/home/u/.local/share/patina/bin/patina"
+        k.run("hint", "instructions")
+        self.assertEqual(desk.launched, [(["konsole", "-e", desk.has_patina, "ai", "prompt"], {})])
+        self.assertEqual(desk.docked, [])  # an editor, not the panel
+        k.run("hint", "")  # Enter on the hint does nothing, as before
+        self.assertEqual(len(desk.launched), 1)
+
+    def test_the_agents_own_instructions_files(self):
+        with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": "/c", "HERMES_HOME": "/h"}):
+            self.assertEqual(kortex.Opencode("u").instructions_file(), Path("/c/opencode/AGENTS.md"))
+            self.assertEqual(kortex.Hermes("u").instructions_file(), Path("/h/SOUL.md"))
+
+    def test_patina_is_found_by_its_checkout(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bin").mkdir()
+            (Path(d) / "bin/patina").write_text("")
+            with mock.patch.dict(os.environ, {"PATINA_PATH": d}):
+                self.assertEqual(kortex.find_patina(), str(Path(d) / "bin/patina"))
+            with mock.patch.dict(os.environ, {"PATINA_PATH": "", "PATH": "", "HOME": d}):
+                self.assertIsNone(kortex.find_patina())
 
     def test_the_panel_without_a_conversation(self):
         oc = kortex.Opencode("http://127.0.0.1:4096", "secret")
