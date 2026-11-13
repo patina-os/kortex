@@ -1056,6 +1056,47 @@ class Runner(unittest.TestCase):
         k.tick()
         self.assertEqual(desk.notes, [])  # no "working on it" for a conversation that is not asked
 
+    def test_a_request_left_for_a_new_one_is_still_told_of(self):
+        # An essay asked, then "what is 3+3?" in a new conversation: the essay's end was
+        # told of nowhere.
+        k, oc, desk, clock = new()
+        histories = {"ses_1": [user("write an essay")], "ses_2": [user("what is 3+3?")]}
+        states = {"ses_1": ("busy", ""), "ses_2": ("busy", "")}
+        oc.messages, oc.status = histories.get, states.get
+        k.run("ask" + SEP + "write an essay", "", menu=True)
+        clock.t += 6
+        k.tick()
+        self.assertEqual(desk.notes[-1][0], "kortex is working on it")
+        k.run("ask" + SEP + "what is 3+3?", "", menu=True)
+        self.assertEqual((k.session, k.request, list(k.earlier)), ("ses_2", "what is 3+3?", ["ses_1"]))
+        histories["ses_2"].append(assistant(text("6")))
+        states["ses_2"] = ("idle", "")
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", "6"))
+        oc.pending = [dict(PERMISSION, sessionID="ses_1")]
+        histories["ses_1"].append(assistant(text("I'll save it.")))
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex asks first", "write an essay<br>Allow: I'll save it.<br>"
+                                                                    "patina theme mode light"))
+        oc.pending = []
+        histories["ses_1"][-1]["parts"].append(text("Here is the essay."))
+        states["ses_1"] = ("idle", "")
+        k.tick()
+        self.assertEqual(desk.notes[-1][:2], ("kortex answered", "write an essay<br>Here is the essay."))
+        self.assertEqual(k.earlier, {})
+        k.show(len(desk.notes))  # its Show opens that conversation
+        self.assertEqual((k.session, desk.queries[-1]), ("ses_1", "kortex › "))
+        self.assertIsNone(k.asked_at)  # what was asked in ses_2 was answered already
+
+    def test_a_conversation_picked_from_the_list_keeps_following_the_one_left(self):
+        k, oc, desk, clock = new()
+        k.run("ask" + SEP + "why is my wifi slow", "")
+        oc.history, oc.state = [user("why is my wifi slow")], ("busy", "")
+        k.run("session" + SEP + "ses_old", "")
+        self.assertEqual(k.earlier, {"ses_1": ("why is my wifi slow", clock.t)})
+        k.run("session" + SEP + "ses_1", "")  # back to it: it is followed here again
+        self.assertEqual((k.earlier, k.request, k.asked_at), ({}, "why is my wifi slow", clock.t))
+
     def test_the_journal_tells_how_a_request_went(self):
         k, oc, desk, clock = new()
         with mock.patch.object(kortex, "log") as logged:

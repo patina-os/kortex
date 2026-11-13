@@ -1202,6 +1202,24 @@ def view(state, elapsed=None, agent="", stop=False):
     return matches
 
 
+def ending(messages):
+    """How the agent's reply to the last request ended, for a notification: its summary
+    and body. Its last words, not the steps it took: after a task they say how it went,
+    and a plain answer is its last words anyway."""
+    said, steps, error = reply_of(messages)
+    if error:
+        return f"{NAME} stopped", error
+    end = answer_of(messages)[-1]
+    if end == NO_ANSWER:
+        return f"{NAME} stopped", NO_ANSWER + " Show opens the conversation, to ask again."
+    last = (said or steps or [""])[-1]
+    if end == DENIED:
+        last = DENIED
+    elif end == UNFINISHED:
+        last = shorten_end(last, MAX_NOTE - len(UNFINISHED) - 1) + "\n" + UNFINISHED
+    return f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…"
+
+
 def ago(ms):
     minutes = int((time.time() - ms / 1000) // 60)
     if minutes < 1:
@@ -1283,7 +1301,11 @@ class Kortex:
         self.asked_at = None  # when it was made; None once the agent has replied
         self.told = 0  # the notification that follows it, once there is one
         self.followed = False  # KRunner showed the news of it once (logged once)
-        self.shows = set()  # the notifications whose Show opens the conversation
+        self.shows = {}  # the notifications whose Show opens a conversation: its session, or None for the current
+        # Requests followed in a conversation left for another (a new request, one picked
+        # from the list) while the agent worked on them: (request, asked_at) by session,
+        # until the agent has replied; a notification says so then.
+        self.earlier = {}
 
     @property
     def marker(self):
@@ -1517,6 +1539,9 @@ class Kortex:
         kind, _, arg = match_id.partition(SEP)
         self.last_activity = self.now()
         if kind in ("ask", "continue"):
+            if kind == "ask" and self.asked_at is not None and self.session and not self.waiting:
+                # a new conversation: the request of this one is followed on in the background
+                self.earlier[self.session] = (self.request, self.asked_at)
             self.problem = ""
             self.waiting = arg
             self.request, self.asked_at, self.told, self.followed = arg, self.now(), 0, False
@@ -1542,9 +1567,7 @@ class Kortex:
             self.reopen(self.opening, menu)
             self.work(send, sent)
         elif kind == "session":
-            if arg != self.session:
-                self.asked_at = None  # the request followed was made in another conversation
-            self.session = arg
+            self.switch(arg)
             self.reopen(self.opening, menu)
         elif kind == "show":
             self.reopen(self.opening, menu)
@@ -1635,16 +1658,30 @@ class Kortex:
         self.desktop.query(self.opening if busy and self.session else "")
 
     def show(self, note):
-        """A notification's Show: KRunner opens on the conversation."""
+        """A notification's Show: KRunner opens on the conversation, or on the one the
+        notification is of."""
         if note in self.shows:
+            if self.shows[note]:
+                self.switch(self.shows[note])
             self.desktop.query(self.opening)
 
-    def notify(self, summary, body, replaces=0, transient=False, follows=False):
-        """A notification with Show, which opens the conversation. Its body is markup to
-        the notification server, as a multiline match is to KRunner. One that `follows`
-        the request is the one the next replaces."""
+    def switch(self, session):
+        """Show another conversation: the request followed in this one is followed on
+        in the background (`earlier`), and one followed so in that one is followed here."""
+        if session == self.session:
+            return
+        if self.asked_at is not None and self.session and not self.waiting:
+            self.earlier[self.session] = (self.request, self.asked_at)
+        self.session = session
+        self.request, self.asked_at = self.earlier.pop(session, ("", None))
+        self.told, self.followed, self.put_off = 0, False, False
+
+    def notify(self, summary, body, replaces=0, transient=False, follows=False, session=None):
+        """A notification with Show, which opens the conversation (or `session`). Its
+        body is markup to the notification server, as a multiline match is to KRunner.
+        One that `follows` the request is the one the next replaces."""
         def sent(note):
-            self.shows.add(note)
+            self.shows[note] = session
             if follows:
                 self.told = note
 
@@ -1666,23 +1703,9 @@ class Kortex:
         state = self.current()
         if self.asked_at is None or self.waiting or not state:
             return
-        said, steps, error = reply_of(state["messages"])
+        error = reply_of(state["messages"])[2]
         if replied(state["messages"], self.request) and (error or state["status"][0] == "idle"):
-            if error:
-                self.finish(f"{NAME} stopped", error)
-            else:
-                # Its last words, not the steps it took: after a task they say how it went,
-                # and a plain answer is its last words anyway.
-                last = (said or steps or [""])[-1]
-                end = answer_of(state["messages"])[-1]
-                if end == NO_ANSWER:
-                    self.finish(f"{NAME} stopped", NO_ANSWER + " Show opens the conversation, to ask again.")
-                    return
-                if end == DENIED:
-                    last = DENIED
-                elif end == UNFINISHED:
-                    last = shorten_end(last, MAX_NOTE - len(UNFINISHED) - 1) + "\n" + UNFINISHED
-                self.finish(f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…")
+            self.finish(*ending(state["messages"]))
             return
         status, why = state["status"]
         if status == "retry" and "next try" in why and self.shown is None and not self.put_off:
@@ -1696,12 +1719,44 @@ class Kortex:
             self.notify(f"{NAME} is working on it", f"{self.request}\nA notification follows when it answers.",
                         transient=True, follows=True)
 
+    def follow_earlier(self):
+        """The requests of conversations left while the agent worked on them: a
+        notification when one asks first and when the agent has replied, whose Show
+        opens that conversation. One whose server stopped is dropped: nothing comes."""
+        for session, (request, _at) in list(self.earlier.items()):
+            def fetch(session=session):
+                if not self.agent.url or self.agent.stopped():
+                    return None
+                return {"messages": self.agent.messages(session), "status": self.agent.status(session),
+                        "permissions": self.agent.permissions(session)}
+
+            def fetched(state, error, session=session, request=request):
+                if error:
+                    return  # asked again on the next tick
+                if state is None:
+                    self.earlier.pop(session, None)
+                    return
+                for p in state["permissions"]:
+                    if p["id"] not in self.notified:
+                        self.notified.add(p["id"])
+                        self.notify(f"{NAME} asks first", f"{head(request, 60)}\nAllow" + asking_for(p, state["messages"]),
+                                    session=session)
+                if (replied(state["messages"], request)
+                        and (reply_of(state["messages"])[2] or state["status"][0] == "idle")):
+                    self.earlier.pop(session, None)
+                    summary, body = ending(state["messages"])
+                    log(f"{summary} in an earlier conversation")
+                    self.notify(summary, f"{head(request, 60)}\n{body}", session=session)
+
+            self.work(fetch, fetched, "earlier" + SEP + session)
+
     def tick(self):
         """Every REFRESH_MS: ask the agent for news; while KRunner shows kortex's matches
         and what they are made of changed, show them again; while it is closed, notify
         of a new permission request, and follow the request with a notification. With
         KRunner on something else and the agent done, there is nothing to ask it: the
         next look at the conversation fetches it."""
+        self.follow_earlier()
         state = self.current() or {}
         if (self.shown is not None or self.asked_at is not None or self.waiting or not state
                 or state["status"][0] != "idle" or state.get("permissions") or state.get("questions")):
@@ -1742,7 +1797,7 @@ class Kortex:
     def idle(self):
         """True when kortex may stop: nothing asked for a while, nothing on its way to the
         agent and no request of the conversation running there."""
-        if self.now() - self.last_activity < IDLE_EXIT or self.jobs:
+        if self.now() - self.last_activity < IDLE_EXIT or self.jobs or self.earlier:
             return False
         state = self.current()
         return self.down or not state or state["status"][0] == "idle"

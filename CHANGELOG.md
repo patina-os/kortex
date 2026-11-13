@@ -40,6 +40,10 @@ What changed in each release of kortex. The format follows
   every conversation ("any cloud_delete_note"), so one click let every later deletion
   through, one asked for by text inside a ticket too. A tool that only reads does not
   ask (patina's rules), so one that asks changes something.
+- A request left for a new one while the agent works on it is followed on: a
+  notification says when it asks first and what the agent answered, and its Show opens
+  that conversation. Only the last request was followed, so a long essay asked before
+  "what is 3+3?" ended without a word.
 
 ## [0.7.2] - 2026-11-10
 
