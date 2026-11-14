@@ -13,7 +13,8 @@ Meta+A       why is my wifi slow?
              ◉ Ask kortex: why is my wifi slow?                 Enter
              ─────────────────────────────────────────────────────────
 kortex ›     ◉ Working · 12 s · running a command                Copy · Show what the agent does · Stop
-             ⚠ Allow: I'll switch you to the 5 GHz network.     Allow once · Always · Deny
+             ⚠ Allow: I'll switch you to the 5 GHz network.     Allow once · Deny
+               nmcli connection up home-5G
 ```
 
 ## Asking
@@ -53,25 +54,31 @@ KRunner's window holds still instead of growing and shrinking with each word. It
   it said after its last step (what it said between the steps is how it got there),
   with how many steps it took beside it ("Enter copies · 3 steps"). The Markdown a
   model writes is read as far as a row can show it: bold, lists, a table's rows. An
-  answer longer than 1,500 characters shows its start and says that the panel has the
-  rest. Enter or Copy puts the answer on the clipboard.
+  answer longer than twelve lines (as the row wraps them) or 1,500 characters shows
+  its start, and a row below it, Show the whole answer, opens the panel on it. Enter or Copy puts the answer on the clipboard.
 - **A row for each action the agent asks to take** (a command, a file change, a web
   request, a service's tool its permissions put on `ask`), in what the agent said right
   before that step ("Allow: I'll add the alias to your .bashrc, after a copy of it as
-  .bashrc.bak."). A command that deletes, runs as root or the like (`sudo`, `rm`, a
-  shell, `kill`, `apt` …) shows, whole, under the words: words can be wrong, and in a
-  test an agent called a folder that held a thesis "one stale cache file". A step the
-  agent did not explain shows as before: the whole command as it will run, the path
-  and the changed lines of a file, or what a service's tool is given. And with
-  what Always would let through (`Always allows, in every conversation: sh *` lets any
-  script through, in this conversation and the next ones, until the agent's server
+  .bashrc.bak."). Under the words is what the step does: the whole command as it
+  will run, the path and the changed lines of a file, what a service's tool is given,
+  or the folder outside your home it reaches ("access outside your home folder").
+  Words can be wrong: in a test an agent called a folder that held a thesis "one
+  stale cache file", and words may describe the step after this one ("I'll install
+  it" over a command that only looks it up). A step the agent did not explain shows
+  as what it does alone. And with
+  what Always would let through (`Always allows, in every conversation: du *` lets any
+  `du` through, in this conversation and the next ones, until the agent's server
   stops). Allow once, Always or Deny answer it, with the mouse; from the keyboard,
   Shift+Enter is Allow once (KRunner runs a row's first action with it). Enter alone
-  answers nothing, and nothing runs before you choose. Always is not offered where
-  its rule would let far more through than what asks: a change to any file, or
-  commands that start with `sudo`, `rm`, a shell, `python3`, `curl` and the like;
-  one Always on such a row let every later `sudo` run unasked. With Hermes, which
-  names no rule, the command that asks decides, and a question it gives up on after
+  answers nothing, and nothing runs before you choose. Always is offered only
+  for commands that look and change nothing whatever they are given (`du`, `ls`,
+  `wc`, `apt-cache`, `systemctl status` and the like): its rule is the command's start
+  and `*`, so one Always on a `find … | wc -l` let `find -delete` run unasked later,
+  and one on a `sudo` every later `sudo`. A change to a file, a folder outside your
+  home, a service's tool (one that only reads does not ask) and every other command
+  offer Allow once and Deny: one Always on a service's delete would let every later
+  delete of it through. With Hermes, which names no rule, the command that asks
+  decides, and a question it gives up on after
   five minutes (`approvals.timeout`) leaves the palette. opencode asks before
   every change (patina's permissions); Hermes only before what it counts as
   dangerous.
@@ -90,7 +97,9 @@ agent's own interface on the conversation (`opencode attach`, `hermes --resume`)
 terminal Plasma names, docked at the screen's right edge: as high as the screen's work
 area, a fifth of its width but at least 480 and at most 720 pixels, above your other
 windows. Every step is there, whole, and the conversation goes on there too, for
-longer work such as code; close it when you have seen enough. patina puts it on
+longer work such as code; close it when you have seen enough. There is one panel:
+opening it again brings it to the front, or shows the current conversation in place
+of another. patina puts it on
 Meta+Shift+A, which opens the agent's interface alone when there is no conversation
 yet. The docking is a small KWin script kortex loads over D-Bus for the moment the
 window takes to appear (Plasma lets no program place its own window on Wayland);
@@ -106,8 +115,11 @@ notification says that it works on your request; the same notification then says
 it answered (its last words, which after a task say how it went) or why it stopped. A
 row that asks, and a question of the agent's, come as notifications of their own, and
 so does a provider that puts the request off for more than a minute (a free limit
-used up), with the time of its next try. Show, or a click on the notification, opens
-the conversation in KRunner.
+used up), with the time of its next try, or that the agent has tried for ten seconds
+without reaching it. Show, or a click on the notification, opens
+the conversation in KRunner. A request you leave for a new one, or for a conversation
+from the list, while the agent works on it is followed on: a notification says when
+it asks first and what it answered, and its Show opens that conversation.
 
 The start menu shows neither a long answer nor a row's actions, so a request sent from
 there opens the conversation in KRunner.

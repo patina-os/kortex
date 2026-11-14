@@ -61,9 +61,9 @@ proposes before you allow it.
 - **Nothing changes without a yes.** Every command, file change, web request or
   service's tool the agent's permissions hold back is a row of its own, in the
   agent's words ("I'll add the alias to your .bashrc, after a copy of it"): Allow
-  once, Always or Deny. A command that deletes, runs as root or the like shows under
-  the words, since words can be wrong; a step the agent did not explain shows as
-  the command, the changed lines or what a service's tool is given. What the permissions hold back is the agent's configuration: patina's asks
+  once, Always or Deny. Under the words is what the step does, since words can be
+  wrong: the command, the file and its changed lines, or what a service's tool is
+  given; a step the agent did not explain shows as that alone. What the permissions hold back is the agent's configuration: patina's asks
   before every change, on the machine and in a connected service.
 - **It asks you, too.** A question of the agent's is a row with its answers; pick
   one or type your own.

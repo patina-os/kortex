@@ -55,12 +55,17 @@ VIEW_MARK = "›"  # after kortex's name (`kortex ›`), or `ai`: the current co
 JOINER = "\u2060"
 ICON = "kortex"
 SEP = "\x1f"  # between the kind of a match and its argument in a match id
-MAX_ANSWER = 1500  # characters of an answer KRunner shows; the terminal has the rest
+MAX_ANSWER = 1500  # characters of an answer KRunner shows; the panel has the rest
+# and lines: twelve, a line of the answer as long as it wraps to at about LINE characters,
+# so the answer's row stays well inside a screen 768 px high
+MAX_LINES, LINE = 12, 90
 MAX_LATEST = 40  # characters of what the agent wrote or thought last, after the seconds
 PANEL_SHARE, PANEL_MIN, PANEL_MAX = 0.2, 480, 720  # the panel's width: a fifth of the screen, in px
 MAX_NOTE = 300  # characters a notification shows of what the agent said last; Show has the rest
 MIN_SEARCH = 3  # letters a search needs before it is offered to the agent
 TELL_AFTER = 3  # seconds a request runs before a closed KRunner gets a notification
+SHOW_PROBLEM = 10  # seconds a failed answer, Stop or panel shows before a fetch that works clears it
+TELL_RETRY = 10  # seconds the provider is retried before a closed KRunner is told
 REFRESH_MS = 700
 IDLE_EXIT = 15 * 60  # seconds without a request before kortex and its server stop
 CATEGORY_RELEVANCE = 100  # KRunner::QueryMatch::CategoryRelevance::Highest
@@ -84,19 +89,45 @@ ASKING = frozenset({
 # With one of these, two words are a request: "install photocraft" would else leave
 # KRunner's own "Run install photocraft" first, which runs coreutils' install.
 ASKING_TWO = frozenset({"install", "installiere"})
-# A rule for Always that starts with one of these lets through far more than the
-# command that asks: any command as root, any script, any deletion. Always is not
-# offered for it, nor for a change to any file. git, apt and patina are here for the
-# width of their rules: "git -C *", "patina *" hold every subcommand.
-RISKY = frozenset({
-    "sudo", "su", "doas", "pkexec", "rm", "sh", "bash", "zsh", "fish", "dash", "python",
-    "python3", "perl", "ruby", "node", "curl", "wget", "env", "xargs", "eval", "dd",
-    "chmod", "chown", "mv", "tee", "nohup", "kill", "pkill", "killall", "git", "apt",
-    "apt-get", "dpkg", "patina",
+# Always is offered only for a command that looks and nothing else, whatever it is
+# given: opencode's rule for Always is the command's start and `*` ("find *"), so it
+# lets any of its arguments through later, in every conversation; one Always on a
+# `find … | wc -l` let `find -delete` and `find -exec sudo …` run unasked. None of
+# these writes a file, prints one's content (cat, head and grep would read the secrets
+# opencode's read tool keeps back) or changes the system. A command of two words is
+# one of opencode's rules of two words ("git status *").
+LOOK_ONLY = frozenset({
+    "df", "du", "free", "lsblk", "findmnt", "uname", "uptime", "whoami", "id", "locale",
+    "lscpu", "lsusb", "lspci", "lsmod", "nproc", "ls", "stat", "pwd", "which", "type",
+    "wc", "ps", "pgrep", "ss", "realpath", "basename", "dirname", "readlink",
+    "apt-cache", "dpkg-query", "systemctl status", "systemctl is-active",
+    "systemctl is-enabled", "systemctl list-units", "systemctl list-timers",
+    "git status",
 })
 
+# The kinds of step besides bash for which Always may be offered: opencode's tools that
+# look and change nothing. Not a change to a file, a folder outside the home folder
+# (its rule holds for any step in it) or a service's tool: a service's tools that only
+# read are allowed without asking (patina's rules), so one that asks changes something,
+# and its rule is any call of it ("any cloud_delete_note"), in every conversation. Not
+# grep either: it prints what it finds in a file, so one Always would let it read token
+# files and private keys in every later conversation (the test round of November 2026).
+ALWAYS_KINDS = frozenset({"webfetch", "websearch", "codesearch", "glob", "list", "lsp"})
+
+
+def looks_only(command):
+    """True for a command that only looks (LOOK_ONLY), with any arguments; a rule's
+    `*` is any arguments. A redirect, a substitution or a second command is more."""
+    command = command.strip().removesuffix("*").strip()
+    if not command or re.search(r"[<>`$;&|(){}\n]", command):
+        return False
+    words = command.split()
+    return any(" ".join(words[:n]) in LOOK_ONLY for n in (1, 2))
+
+
 # The KWin script that docks the panel (Desktop.dock): the window of one process, at
-# the right edge of the screen it opens on, as high as the work area, kept above.
+# the right edge of the screen it opens on, as high as the work area, kept above and
+# active (a second Meta+Shift+A brings it back).
 PANEL_SCRIPT = """
 const pid = %d, share = %s, least = %d, most = %d;
 function dock(window) {
@@ -107,6 +138,8 @@ function dock(window) {
     const width = Math.round(Math.min(most, Math.max(least, area.width * share)));
     window.frameGeometry = {x: area.x + area.width - width, y: area.y, width: width, height: area.height};
     window.keepAbove = true;
+    window.minimized = false;
+    workspace.activeWindow = window;
     return true;
 }
 if (!workspace.windowList().some(dock)) {
@@ -279,6 +312,8 @@ def retry_message(status, now=time.time):
         at = 0
     if at - now() >= 60:
         words += (" · " if words else "") + "next try " + time.strftime("%H:%M", time.localtime(at))
+    elif isinstance(status.get("attempt"), int) and status["attempt"] > 1:
+        words += (" · " if words else "") + f"try {status['attempt']}"
     return words
 
 
@@ -316,13 +351,17 @@ class Server:
         state_dir().mkdir(parents=True, exist_ok=True)
         log(f"starting {' '.join(command)}")
         with open(state_dir() / log_name, "ab") as output:
+            begun = output.tell()
             self.process = subprocess.Popen(
                 command, cwd=Path.home(), env=dict(os.environ, **env), stdin=subprocess.DEVNULL,
                 stdout=output, stderr=output, start_new_session=True)
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                raise AgentError(f"{command[0]} exited; see {state_dir() / log_name}")
+                with open(state_dir() / log_name, "rb") as output:
+                    output.seek(begun)
+                    said = output.read().decode("utf-8", "replace")
+                raise AgentError(f"{self.title} did not start: {start_error(said)}")
             try:
                 # opencode leaves the first connection it accepts while it starts
                 # unanswered; a short wait per try moves on to the next one.
@@ -362,6 +401,20 @@ class Server:
             if not quiet:  # the details, for the journal; not each try while a server starts
                 log(f"{method} {path}: {e}")
             raise AgentError(f"{self.title} {failure(e, timeout)}") from e
+
+
+def start_error(output):
+    """Why an agent's server exited as it started, from what it wrote: its error line and
+    the details under it (opencode on a broken opencode.json: "Config file at … is not
+    valid JSON(C)", then "ValueExpected at line 1, column 2"). The palette showed the
+    path of the program and of its log."""
+    lines = [line.strip() for line in re.sub(r"\x1b\[[0-9;]*m", "", output).splitlines() if line.strip()]
+    error = next((line for line in lines if line.startswith("Error:")), lines[-1] if lines else "")
+    error = error.removeprefix("Error:").strip().rstrip(":")
+    if "--- Errors ---" in lines:
+        details = lines[lines.index("--- Errors ---") + 1:][:1]
+        error += "".join(f": {d}" for d in details if not d.startswith("---"))
+    return shorten_end(error, 300) if error else "it exited without a word (its log is in ~/.local/state/kortex)"
 
 
 def failure(error, timeout):
@@ -830,23 +883,75 @@ def denied(part):
 
 
 DENIED = "Stopped: you denied the last step, so it did not run. Say what to do instead."
+# What an agent's provider that cannot be reached, or refuses its key, says (opencode
+# passes the provider's or the network's words on): the palette names the provider and
+# where to check it, the words go under that.
+UNREACHABLE = re.compile(r"cannot connect|connection|econn\w+|enotfound|etimedout|getaddrinfo|fetch failed|tunnel"
+                         r"|bad gateway|unauthori[sz]ed|api key|\b40[13]\b|forbidden|certificate", re.IGNORECASE)
+
+
+def why_stopped(messages, error):
+    """The error that stopped the agent, in words for the palette and the notification:
+    for a provider it cannot reach or that refuses its key, which provider and where to
+    check it, with the error under it; a raw "Cannot connect to API: ECONNREFUSED" after a
+    minute of retries said neither."""
+    if error == "Aborted":
+        return "Stopped. Say what to do instead."
+    if not UNREACHABLE.search(error):
+        return error
+    provider = next((m["info"].get("providerID") for m in reversed(messages)
+                     if m["info"].get("role") == "assistant" and m["info"].get("providerID")), "")
+    return (f"The agent could not reach its provider{f' ({provider})' if provider else ''}. Check its address and "
+            f"key: patina ai on patina, else the agent's own settings.\n{error}")
+# A model may end its turn after it thought, without a word or a step (Qwen 3.6 did it
+# again and again): the palette showed nothing, and the notification "Done.".
+NO_ANSWER = "The agent stopped without an answer."
+# A reply whose message never completed although the agent is idle: its server stopped
+# (or was killed) mid-answer and a new one read the conversation; the text it has is cut
+# off, and showed as a finished answer.
+CUT_OFF = "Cut off: the agent stopped before it finished, and what follows is all it wrote. Ask again."
+
+
+def cut_off(messages):
+    """True when the agent's last message of the reply never completed: opencode stamps
+    `time.completed` on each that does. Hermes stamps none, and is never taken as cut off."""
+    last = next((m for m in reversed(messages[last_user(messages) + 1:]) if m["info"].get("role") == "assistant"), None)
+    if last is None:
+        return False
+    info = last["info"]
+    return isinstance(info.get("time"), dict) and not info["time"].get("completed") and not info.get("error")
+
+
+# A turn that ends after a step without a word, or on words that announce more ("I'll
+# clean what's safe now:"): what it said before read as done ("I'll add the cron job…"
+# with no cron job).
+UNFINISHED = "The agent stopped here without saying it is done. If it is not, say “go on”."
 
 
 def answer_of(messages):
     """The agent's reply to the last request as the palette gives it: what it said
     after its last step, since what it said between the steps ("let me check…") is how
     it got there, not the answer; all it said when nothing follows the last step;
-    "Done." when it took steps and said nothing. When the last thing in the reply is a
-    step the user denied, what it said before that step and that it stopped there:
-    opencode ends the turn on a Deny, and the words before read as if it went on."""
-    said, _steps, _error = reply_of(messages)
+    "Done." when it took steps and said nothing; NO_ANSWER when it did neither. When
+    the last thing in the reply is a step the user denied, what it said before that
+    step and that it stopped there: opencode ends the turn on a Deny, and the words
+    before read as if it went on."""
+    said, steps, _error = reply_of(messages)
     parts = [p for p in reply_parts(messages) if p.get("type") in ("text", "tool")
              and not p.get("synthetic") and not p.get("ignored") and (p.get("type") == "tool" or p.get("text", "").strip())]
     if parts and parts[-1]["type"] == "tool" and denied(parts[-1]):
         return said[-1:] + [DENIED]
+    if cut_off(messages):
+        return [CUT_OFF] + said[-1:]
+    if not said and not steps:
+        return [NO_ANSWER]
     last = max((i for i, p in enumerate(parts) if p["type"] == "tool"), default=-1)
     after = [p["text"].strip() for p in parts[last + 1:]]
-    return after or said or ["Done."]
+    if after:
+        return after + ([UNFINISHED] if after[-1].endswith(":") else [])
+    if said:  # it said what it would do, then took a step, and ended without a word
+        return [said[-1], UNFINISHED]
+    return ["Done."]
 
 
 def last_user(messages):
@@ -894,9 +999,14 @@ def last_sentence(text):
     """The last sentence of `text` that is complete, on one line, or "" before the
     first is: what streams in is cut off mid-sentence, and its end changes with every
     word."""
-    # a stop ends a sentence only before a space or the end: "8.0G" and "df.py" go on
-    done = re.findall(r"(?:[^.!?]|[.!?](?!\s|$))*[.!?](?=\s|$)", " ".join(text.split()))
-    return done[-1].strip() if done else ""
+    # a stop ends a sentence only before a space or the end: "8.0G" and "df.py" go on.
+    # Only the ends are searched for, the last two of them, in linear time: a pattern
+    # for the whole sentence took seconds on a long answer, on the D-Bus thread.
+    text = " ".join(text.split())
+    ends = [m.end() for m in re.finditer(r"[.!?](?= |$)", text)]
+    if not ends:
+        return ""
+    return text[ends[-2] if len(ends) > 1 else 0:ends[-1]].strip()
 
 
 DOING = {"bash": "running a command", "read": "reading a file", "edit": "changing a file",
@@ -939,26 +1049,25 @@ def explained(p, messages):
     return ""
 
 
-def risky(p):
-    """True for a command that deletes, runs as root or the like (RISKY): its row shows
-    the command under the agent's words, which can be wrong (the test's thesis was
-    "one stale cache file")."""
-    if p.get("permission") not in ("bash", None) and not (p.get("metadata") or {}).get("command"):
-        return False
-    words = (p.get("metadata") or {}).get("command") or " ".join(p.get("patterns") or [])
-    return any((part.split() or [""])[0] in RISKY for part in re.split(r"&&|\|\||[;|\n(){}]", words))
-
-
 def asking_for(p, messages):
     """What a row, or a notification, that asks says after "Allow": the agent's own words
-    right before the step, as in a chat, with the command under them where a wrong
-    explanation would cost the most (risky); the command alone when it said nothing
-    first, not a blind Allow. The panel shows every step."""
+    right before the step, as in a chat, with what the step does under them: the
+    command (the words may describe the next step: "I'll install it" over an
+    `apt-cache show`), the path and the changed lines of a file, what a service's tool is given,
+    since words can be wrong and name no file or ticket ("I'll set both tickets to
+    Done." over the first of them). What the step does alone when the agent said
+    nothing first, not a blind Allow. The panel shows every step."""
     what = asked_for(p, messages)
+    told = f"{asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
+    if p.get("permission") == "external_directory" and (p.get("metadata") or {}).get("command"):
+        # the command reaches outside the home folder: where, then the command
+        told = f"{asks(p)} ({', '.join(p.get('patterns') or [])}): {what}"
     words = explained(p, messages)
-    if words:
-        return ": " + shorten_end(words, 240) + ("\n" + what if risky(p) else "")
-    return f" {asks(p)}" + ("" if what == "*" else f": {what}")  # a tool that is given nothing
+    if not words:
+        return " " + told
+    if p.get("permission") in ("bash", None):
+        return ": " + shorten_end(words, 240) + "\n" + what
+    return ": " + shorten_end(words, 240) + "\n" + told
 
 
 def replied(messages, request):
@@ -973,12 +1082,21 @@ def replied(messages, request):
     return request.strip() in said
 
 
-MORE = "… Show what the agent does has the rest."
+MORE = "… (the rest: Show the whole answer, below)"
 
 
-def shorten(text, most=MAX_ANSWER):
+def shorten(text, most=MAX_ANSWER, lines=MAX_LINES):
     """The start of an answer KRunner can show, cut at a line's or a word's end: an
-    answer starts with what matters, and a list cut at its head is no list."""
+    answer starts with what matters, and a list cut at its head is no list. At most
+    `most` characters and `lines` lines as the row wraps them: a long answer was a
+    row taller than a 768-px screen, with a scrollbar."""
+    used, end = 0, 0
+    for line in text.split("\n"):
+        rows = max(1, -(-len(line) // LINE))
+        if used + rows > lines:  # what of this line still fits
+            most = min(most, end + (lines - used) * LINE)
+            break
+        used, end = used + rows, end + len(line) + 1
     if len(text) <= most:
         return text
     start = text[:most]
@@ -1093,20 +1211,21 @@ def asks(p):
 
 
 def always_offered(p):
-    """False when Always would let through far more than what asks: a change to any
-    file, any bash command, or commands that start with sudo, rm, a shell and the like
-    (RISKY). Such a row offers Allow once and Deny. opencode says what its rule would
-    be (`always`); Hermes does not, so there the command itself decides."""
+    """True when Always may be offered: only for commands that look and nothing else
+    (LOOK_ONLY), since opencode's rule for it lets any arguments through, in every
+    conversation, and for opencode's tools that only look (ALWAYS_KINDS). A change to a
+    file, a service's tool and any other command offer Allow once and Deny.
+    opencode says what its rule would be (`always`); Hermes does not, so there the
+    command itself decides, each of its parts, cut where a shell would cut it."""
     rules = p.get("always")
     if rules is None:
         # Hermes names no rule. Its Always is kept for good, for every command of the
-        # kind that asked ("sudo with privilege flag": every sudo), so what counts is
-        # the command: each of its parts, cut where a shell would cut it.
-        commands = re.split(r"&&|\|\||[;|\n]", " ".join(p.get("patterns") or []))
-        return not any((part.split() or [""])[0] in RISKY for part in commands)
-    if p.get("permission") == "edit" or (p.get("permission") == "bash" and "*" in rules):
-        return False
-    return not any((rule.split() or [""])[0] in RISKY for rule in rules)
+        # kind that asked ("sudo with privilege flag": every sudo).
+        command = " ".join(p.get("patterns") or [])
+        return all(looks_only(part) for part in re.split(r"&&|\|\||[;|\n]", command))
+    if p.get("permission") == "bash":
+        return all(looks_only(rule) for rule in rules)
+    return p.get("permission") in ALWAYS_KINDS
 
 
 def view(state, elapsed=None, agent="", stop=False):
@@ -1114,7 +1233,7 @@ def view(state, elapsed=None, agent="", stop=False):
     asks to do, in its own words, and what it asks the user; while it works, a status
     row (how long it has been at it, `elapsed` seconds or None, and what it wrote or
     thought or does last); then its answer. The steps and their commands are the
-    panel's (Show what the agent does), but for a risky command a row asks for. The
+    panel's (Show what the agent does), but for the one a row asks for. The
     status row is one line, which KRunner gives a fixed height, so its window holds
     still. `stop`: the agent's work can be stopped, so the status row offers it."""
     said, steps, error = reply_of(state["messages"])
@@ -1147,9 +1266,8 @@ def view(state, elapsed=None, agent="", stop=False):
     status, retry = state["status"]
     working = status != "idle"
     if error:
-        if error == "Aborted":
-            error = "Stopped. Say what to do instead."
-        matches.append(match("answer", error, "dialog-error", 0.95, "The agent stopped", ["terminal"], True))
+        matches.append(match("answer", why_stopped(state["messages"], error), "dialog-error", 0.95, "The agent stopped",
+                             ["terminal"], True))
     elif working:
         if state["permissions"]:
             # holds still while a row asks, to be clicked; KRunner runs a row's first
@@ -1158,7 +1276,7 @@ def view(state, elapsed=None, agent="", stop=False):
         elif questions:
             line = "Waiting for your answer"
         elif status == "retry":
-            line = f"Retrying: {retry}"
+            line = "Retrying" + (f" · {seconds(elapsed)}" if elapsed is not None else "") + (f" · {retry}" if retry else "")
         else:
             thinking, words = latest_of(state["messages"])
             line = ("Thinking" if thinking else "Working") + (f" · {seconds(elapsed)}" if elapsed is not None else "")
@@ -1166,12 +1284,43 @@ def view(state, elapsed=None, agent="", stop=False):
             if words:
                 line += " · " + head(words)
         matches.append(match("answer", line, ICON, 0.9, agent, ["copy", "terminal"] + (["stop"] if stop else [])))
-    elif said or steps:
+    elif not said and not steps and replied(state["messages"], "") and not cut_off(state["messages"]):
+        # it thought, and stopped: Enter asks the same again
+        request = " ".join(p.get("text", "") for p in state["messages"][last_user(state["messages"])].get("parts", [])
+                           if p.get("type") == "text" and not p.get("synthetic")).strip()
+        matches.append(match(("continue" + SEP + request) if request else "answer", NO_ANSWER, "dialog-warning", 0.9,
+                             (agent + " · " if agent else "") + ("Enter asks again" if request else "Ask again")))
+    elif said or steps or cut_off(state["messages"]):
         took = f" · {len(steps)} step{'s' if len(steps) > 1 else ''}" if steps else ""
-        matches.append(match("answer", rich(shorten("\n".join(answer_of(state["messages"])))), ICON, 0.9,
+        said = "\n".join(answer_of(state["messages"]))
+        shown = shorten(said)
+        matches.append(match("answer", rich(shown), ICON, 0.9,
                              (agent + " · " if agent else "") + "Enter copies" + took, ["copy", "terminal"], True,
                              styled=True))
+        if shown != said:  # a row of its own: the row's icon for the panel says nothing of the rest
+            matches.append(match("more", "Show the whole answer", "view-right-new", 0.89,
+                                 "Enter opens the conversation in the panel beside your windows"))
     return matches
+
+
+def ending(messages):
+    """How the agent's reply to the last request ended, for a notification: its summary
+    and body. Its last words, not the steps it took: after a task they say how it went,
+    and a plain answer is its last words anyway."""
+    said, steps, error = reply_of(messages)
+    if error:
+        return f"{NAME} stopped", why_stopped(messages, error)
+    end = answer_of(messages)[-1]
+    if answer_of(messages)[0] == CUT_OFF:
+        return f"{NAME} stopped", CUT_OFF
+    if end == NO_ANSWER:
+        return f"{NAME} stopped", NO_ANSWER + " Show opens the conversation, to ask again."
+    last = (said or steps or [""])[-1]
+    if end == DENIED:
+        last = DENIED
+    elif end == UNFINISHED:
+        last = shorten_end(last, MAX_NOTE - len(UNFINISHED) - 1) + "\n" + UNFINISHED
+    return f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…"
 
 
 def ago(ms):
@@ -1248,14 +1397,23 @@ class Kortex:
         self.answers = {}  # the answers picked so far to a request of several questions, by its id
         self.replied = set()  # the permission requests answered here, which a fetch begun before may bring back
         self.put_off = False  # told once that the provider puts the request off
+        self.retrying_since = None  # when the agent began to try its provider again
+        self.cut_seen = False  # the reply followed read as cut off once
         self.logged = set()  # and in the journal
-        self.problem = ""
+        self.problem = ""  # why the last request to the agent failed
+        self.problem_was = ""  # and what did not happen: "Not sent", "Not answered" …
+        self.problem_at = None  # and when
         self.last_activity = now()
         self.request = ""  # the request followed until the agent has replied to it
         self.asked_at = None  # when it was made; None once the agent has replied
         self.told = 0  # the notification that follows it, once there is one
         self.followed = False  # KRunner showed the news of it once (logged once)
-        self.shows = set()  # the notifications whose Show opens the conversation
+        self.panel_of = None  # the panel open last: (its process id, the session it shows)
+        self.shows = {}  # the notifications whose Show opens a conversation: its session, or None for the current
+        # Requests followed in a conversation left for another (a new request, one picked
+        # from the list) while the agent worked on them: (request, asked_at) by session,
+        # until the agent has replied; a notification says so then.
+        self.earlier = {}
 
     @property
     def marker(self):
@@ -1304,9 +1462,16 @@ class Kortex:
 
         self.background(job, done)
 
-    def failed(self, _result, error):
+    def failed(self, _result, error, what="Not sent"):
+        """A request to the agent failed: the conversation shows why, with `what` did
+        not happen. A request not sent stays until the next is; anything else (an
+        answer to a row, Stop, the panel) until the conversation is fetched again."""
         if error:
-            self.problem = str(error)
+            self.problem, self.problem_was, self.problem_at = str(error), what, self.now()
+
+    def failing(self, what):
+        """A `then` for work whose failure says `what` did not happen."""
+        return lambda result, error: self.failed(result, error, what)
 
     def config(self, menu=False):
         # Each program that searches asks for this once. Both send every query, so any
@@ -1418,7 +1583,7 @@ class Kortex:
         elif followup:
             matches.append(match("continue" + SEP + followup, followup, ICON, 1.0, "Continue · Enter"))
         if self.problem:
-            matches.append(match("problem", self.problem, "dialog-error", 0.95, "Not sent"))
+            matches.append(match("problem", self.problem, "dialog-error", 0.95, self.problem_was, (), True))
         if self.waiting:
             return matches + [self.waiting_match()]
         if not self.session:
@@ -1472,6 +1637,9 @@ class Kortex:
                 # was answered, and would show again, or be told of in a notification.
                 state["permissions"] = [p for p in state["permissions"] if p["id"] not in self.replied]
                 self.state = (session, state)
+                if self.problem and self.problem_was != "Not sent" and self.now() - self.problem_at >= SHOW_PROBLEM:
+                    # the agent answers again: an answer or a Stop may go again
+                    self.problem = self.problem_was = ""
             elif self.asked_at is not None and not self.waiting and self.agent.stopped():
                 # The agent's server exited while it worked on the request: nothing more
                 # comes, and "working" would stand until kortex stops.
@@ -1490,10 +1658,13 @@ class Kortex:
         kind, _, arg = match_id.partition(SEP)
         self.last_activity = self.now()
         if kind in ("ask", "continue"):
+            if kind == "ask" and self.asked_at is not None and self.session and not self.waiting:
+                # a new conversation: the request of this one is followed on in the background
+                self.earlier[self.session] = (self.request, self.asked_at)
             self.problem = ""
             self.waiting = arg
             self.request, self.asked_at, self.told, self.followed = arg, self.now(), 0, False
-            self.put_off = False
+            self.put_off, self.retrying_since = False, None
             log(f"asking {self.agent.title}" + (" in the conversation" if kind == "continue" else ""))
 
             def send():
@@ -1515,9 +1686,7 @@ class Kortex:
             self.reopen(self.opening, menu)
             self.work(send, sent)
         elif kind == "session":
-            if arg != self.session:
-                self.asked_at = None  # the request followed was made in another conversation
-            self.session = arg
+            self.switch(arg)
             self.reopen(self.opening, menu)
         elif kind == "show":
             self.reopen(self.opening, menu)
@@ -1530,7 +1699,12 @@ class Kortex:
                 self.replied.add(arg)
                 if state:  # answered: KRunner shows it again without it
                     state["permissions"] = [p for p in state["permissions"] if p["id"] != arg]
-                self.work(lambda: self.agent.reply(arg, REPLIES[action]), self.failed)
+                def answered(_result, error):
+                    if error:  # not answered: the row comes back with the next fetch, to answer again
+                        self.replied.discard(arg)
+                    self.failed(None, error, "Not answered")
+
+                self.work(lambda: self.agent.reply(arg, REPLIES[action]), answered)
             self.reopen(self.view_query, menu)
         elif kind == "option":
             request, index, label = arg.split(SEP, 2)
@@ -1543,15 +1717,17 @@ class Kortex:
                 if len(picked) >= asked[0]["of"]:  # every question of the request has its answer
                     answers = [picked[i] for i in sorted(picked)]
                     del self.answers[request]
-                    self.work(lambda: self.agent.answer(request, answers), self.failed)
+                    self.work(lambda: self.agent.answer(request, answers), self.failing("Not answered"))
             self.reopen(self.opening, menu)
         elif kind == "question":
             self.reopen(self.view_query, menu)  # the question itself: its answers are the rows below
+        elif kind == "more":
+            self.panel()
         elif kind == "hint" and action == "instructions":
             self.instructions()
         elif kind == "answer" and action == "stop" and self.session:
             session = self.session
-            self.work(lambda: self.agent.abort(session), self.failed)
+            self.work(lambda: self.agent.abort(session), self.failing("Not stopped"))
             self.reopen(self.view_query, menu)
         elif kind == "answer" and self.session:
             if action == "terminal":
@@ -1562,7 +1738,7 @@ class Kortex:
                     if messages is not None:
                         said, steps, stopped = reply_of(messages)
                         self.desktop.copy("\n".join(said) or stopped or "\n".join(steps))
-                    self.failed(None, error)
+                    self.failed(None, error, "Not copied")
 
                 self.work(lambda: self.agent.messages(session), read)
 
@@ -1584,14 +1760,23 @@ class Kortex:
         interface alone when there is no conversation (Meta+Shift+A)."""
         self.last_activity = self.now()
         session = self.session
+        if self.panel_of and self.desktop.alive(self.panel_of[0]):
+            if self.panel_of[1] == session:  # open on this conversation: docked and brought to the front
+                self.desktop.dock(self.panel_of[0])
+                return
+            self.desktop.close(self.panel_of[0])  # on another: one panel, on this one
 
         def opened(found, error):
             if found:
                 attach, env = found
-                self.desktop.dock(self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env))
-            self.failed(None, error)
+                pid = self.desktop.launch(terminal_command(attach, self.desktop.terminal()), env)
+                self.panel_of = (pid, session)
+                self.desktop.dock(pid)
+            self.failed(None, error, "The panel did not open")
+            if error and self.shown is None:  # Meta+Shift+A with the palette closed: nothing else would say so
+                self.notify(f"{NAME}: the panel did not open", str(error))
 
-        self.work(lambda: self.agent.attach(session), opened)
+        self.work(lambda: self.agent.attach(session), opened, "panel")  # a second press while it starts adds none
 
     def reopen(self, query, menu=False):
         """After a run, which closes KRunner, or the start menu (`menu`): open KRunner
@@ -1622,16 +1807,30 @@ class Kortex:
         self.desktop.query(self.opening if busy and self.session else "")
 
     def show(self, note):
-        """A notification's Show: KRunner opens on the conversation."""
+        """A notification's Show: KRunner opens on the conversation, or on the one the
+        notification is of."""
         if note in self.shows:
+            if self.shows[note]:
+                self.switch(self.shows[note])
             self.desktop.query(self.opening)
 
-    def notify(self, summary, body, replaces=0, transient=False, follows=False):
-        """A notification with Show, which opens the conversation. Its body is markup to
-        the notification server, as a multiline match is to KRunner. One that `follows`
-        the request is the one the next replaces."""
+    def switch(self, session):
+        """Show another conversation: the request followed in this one is followed on
+        in the background (`earlier`), and one followed so in that one is followed here."""
+        if session == self.session:
+            return
+        if self.asked_at is not None and self.session and not self.waiting:
+            self.earlier[self.session] = (self.request, self.asked_at)
+        self.session = session
+        self.request, self.asked_at = self.earlier.pop(session, ("", None))
+        self.told, self.followed, self.put_off = 0, False, False
+
+    def notify(self, summary, body, replaces=0, transient=False, follows=False, session=None):
+        """A notification with Show, which opens the conversation (or `session`). Its
+        body is markup to the notification server, as a multiline match is to KRunner.
+        One that `follows` the request is the one the next replaces."""
         def sent(note):
-            self.shows.add(note)
+            self.shows[note] = session
             if follows:
                 self.told = note
 
@@ -1653,23 +1852,30 @@ class Kortex:
         state = self.current()
         if self.asked_at is None or self.waiting or not state:
             return
-        said, steps, error = reply_of(state["messages"])
+        error = reply_of(state["messages"])[2]
         if replied(state["messages"], self.request) and (error or state["status"][0] == "idle"):
-            if error:
-                self.finish(f"{NAME} stopped", error)
-            else:
-                # Its last words, not the steps it took: after a task they say how it went,
-                # and a plain answer is its last words anyway.
-                last = (said or steps or [""])[-1]
-                if answer_of(state["messages"])[-1] == DENIED:
-                    last = DENIED
-                self.finish(f"{NAME} answered", last if len(last) <= MAX_NOTE else last[:MAX_NOTE] + "…")
+            summary, body = ending(state["messages"])
+            if body == CUT_OFF and not self.cut_seen:
+                # opencode may say idle a moment before it stamps the message complete:
+                # cut off only when the next fetch says so too
+                self.cut_seen = True
+                return
+            self.finish(summary, body)
             return
+        self.cut_seen = False
         status, why = state["status"]
-        if status == "retry" and "next try" in why and self.shown is None and not self.put_off:
-            # A limit that lasts: said once, in a notification that stays in the history.
+        if status != "retry":
+            self.retrying_since = None
+        elif self.retrying_since is None:
+            self.retrying_since = self.now()
+        if (status == "retry" and self.shown is None and not self.put_off
+                and ("next try" in why or self.now() - self.retrying_since >= TELL_RETRY)):
+            # A limit that lasts, or a provider that cannot be reached: said once, in a
+            # notification that stays in the history; "working on it" said nothing of it
+            # for over a minute.
             self.put_off = True
-            self.notify(f"{NAME} waits for the provider", f"{why}\n{self.request}", max(self.told, 0), follows=True)
+            self.notify(f"{NAME} waits for the provider", f"{why}\n{self.request}\nIt tries again by itself; "
+                        "Stop on the row that says how long ends it.", max(self.told, 0), follows=True)
             return
         if self.shown is None and not self.told and self.now() - self.asked_at >= TELL_AFTER:
             log("KRunner closed while the agent works; a notification follows the request")
@@ -1677,12 +1883,44 @@ class Kortex:
             self.notify(f"{NAME} is working on it", f"{self.request}\nA notification follows when it answers.",
                         transient=True, follows=True)
 
+    def follow_earlier(self):
+        """The requests of conversations left while the agent worked on them: a
+        notification when one asks first and when the agent has replied, whose Show
+        opens that conversation. One whose server stopped is dropped: nothing comes."""
+        for session, (request, _at) in list(self.earlier.items()):
+            def fetch(session=session):
+                if not self.agent.url or self.agent.stopped():
+                    return None
+                return {"messages": self.agent.messages(session), "status": self.agent.status(session),
+                        "permissions": self.agent.permissions(session)}
+
+            def fetched(state, error, session=session, request=request):
+                if error:
+                    return  # asked again on the next tick
+                if state is None:
+                    self.earlier.pop(session, None)
+                    return
+                for p in state["permissions"]:
+                    if p["id"] not in self.notified:
+                        self.notified.add(p["id"])
+                        self.notify(f"{NAME} asks first", f"{head(request, 60)}\nAllow" + asking_for(p, state["messages"]),
+                                    session=session)
+                if (replied(state["messages"], request)
+                        and (reply_of(state["messages"])[2] or state["status"][0] == "idle")):
+                    self.earlier.pop(session, None)
+                    summary, body = ending(state["messages"])
+                    log(f"{summary} in an earlier conversation")
+                    self.notify(summary, f"{head(request, 60)}\n{body}", session=session)
+
+            self.work(fetch, fetched, "earlier" + SEP + session)
+
     def tick(self):
         """Every REFRESH_MS: ask the agent for news; while KRunner shows kortex's matches
         and what they are made of changed, show them again; while it is closed, notify
         of a new permission request, and follow the request with a notification. With
         KRunner on something else and the agent done, there is nothing to ask it: the
         next look at the conversation fetches it."""
+        self.follow_earlier()
         state = self.current() or {}
         if (self.shown is not None or self.asked_at is not None or self.waiting or not state
                 or state["status"][0] != "idle" or state.get("permissions") or state.get("questions")):
@@ -1723,7 +1961,7 @@ class Kortex:
     def idle(self):
         """True when kortex may stop: nothing asked for a while, nothing on its way to the
         agent and no request of the conversation running there."""
-        if self.now() - self.last_activity < IDLE_EXIT or self.jobs:
+        if self.now() - self.last_activity < IDLE_EXIT or self.jobs or self.earlier:
             return False
         state = self.current()
         return self.down or not state or state["status"][0] == "idle"
@@ -1786,6 +2024,9 @@ def main():
                 return out
             return next((t for t in ("konsole", "kitty", "x-terminal-emulator") if shutil.which(t)), "konsole")
 
+        def __init__(self):
+            self.started = {}  # the programs launched, by process id
+
         def patina(self):
             return find_patina()
 
@@ -1796,9 +2037,20 @@ def main():
             self.launch(["xdg-open", str(path)], {})
 
         def launch(self, command, env):
-            return subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
-                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL).pid
+            process = subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL)
+            self.started[process.pid] = process
+            return process.pid
+
+        def alive(self, pid):
+            process = self.started.get(pid)
+            return process is not None and process.poll() is None
+
+        def close(self, pid):
+            process = self.started.pop(pid, None)
+            if process is not None:
+                process.terminate()
 
         def dock(self, pid):
             """Place the window of process `pid` at the screen's right edge, full height, a

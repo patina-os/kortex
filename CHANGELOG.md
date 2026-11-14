@@ -15,6 +15,72 @@ What changed in each release of kortex. The format follows
   (opencode's `~/.config/opencode/AGENTS.md`, Hermes' `~/.hermes/SOUL.md`). The
   instructions could only be found by knowing where they were.
 
+### Fixed
+
+- Always is offered only for a command that looks and changes nothing whatever it is
+  given (`du`, `ls`, `wc`, `apt-cache`, `systemctl status` and the like), with
+  opencode and with Hermes. opencode's rule for Always is the command's start and `*`:
+  one Always on a row that counted files (`find *, wc *`) let `find -delete` and
+  `find -exec sudo …` run unasked later, in a new conversation, and others let
+  `flatpak install`, `crontab -` and `cat` on any file through. kortex cannot narrow
+  opencode's rule, so such a row offers Allow once and Deny.
+- The palette no longer lags for seconds while the agent writes a long answer: finding
+  the last sentence for the row that says how long took time that grew with the square
+  of the answer's length (3 s for 14,000 characters of code), on the thread that
+  answers KRunner.
+- A reply without a word or a step (a model that thinks and then ends its turn) says
+  "The agent stopped without an answer", with Enter to ask the same again; the palette
+  stayed empty, and the notification said "kortex answered: Done.".
+- A row that asks for a change to a file shows its path and the changed lines under
+  the agent's words, and one for a service's tool what the tool is given: "I'll set
+  both Platform tickets to Done." named no ticket, and asked for only one of them.
+- An agent that ends its turn after a step without a word, or on words that announce
+  more ("I'll clean what's safe now:"), no longer reads as done: the palette and the
+  notification say that it stopped without saying it is done, and to say "go on" if it
+  is not. They showed its plan ("I'll add a weekly cron job") as the answer, and there
+  was no cron job.
+- Every command a row asks for shows under the agent's words, not only one that
+  deletes or runs as root: the words may describe a later step ("I'll install it from
+  Debian's archive" over an `apt-cache show`). A command that reaches outside the home
+  folder says so, and where ("access outside your home folder (/tmp/*)"), and such a
+  row offers no Always, whose rule would hold for any step in that folder.
+- A service's tool that asks offers no Always: its rule was any call of the tool, in
+  every conversation ("any cloud_delete_note"), so one click let every later deletion
+  through, one asked for by text inside a ticket too. A tool that only reads does not
+  ask (patina's rules), so one that asks changes something. Neither does opencode's
+  grep tool, which prints what it finds in a file: one Always would let it read token
+  files and private keys in every later conversation.
+- A request left for a new one while the agent works on it is followed on: a
+  notification says when it asks first and what the agent answered, and its Show opens
+  that conversation. Only the last request was followed, so a long essay asked before
+  "what is 3+3?" ended without a word.
+- A provider that cannot be reached, or refuses the key, is named: "The agent could not
+  reach its provider (custom). Check its address and key: patina ai on patina, else the
+  agent's own settings.", with the error under it; it ended in a raw "Cannot connect to
+  API: ECONNREFUSED" after a minute of retries. The row that retries keeps counting the
+  seconds and says which try it is, and a closed palette is told after ten seconds of
+  retries, not only of a limit that lasts a minute or more.
+- An agent that does not start says why, in a row that shows all of it: "opencode did
+  not start: Config file at ~/.config/opencode/opencode.json is not valid JSON(C):
+  ValueExpected at line 1, column 2". The row named the path of the program and of
+  its log.
+- Meta+Shift+A with the palette closed says in a notification when the panel does not
+  open; it failed without a word, and its error showed later in the conversation as
+  "Not sent". A failed answer to a row, Stop, Copy or panel says what did not happen
+  ("Not answered", "Not stopped" …) and goes once the agent answers again; a row whose
+  answer did not reach the agent comes back, to answer again.
+- Meta+Shift+A, or Show what the agent does, on an open panel brings it to the front
+  (docked again, if it was moved) in place of a second panel; on another conversation
+  the panel shows the current one in its place. Each press opened one more, and a
+  quick second press left the first undocked.
+- An answer cut off because the agent's server stopped mid-answer says so ("Cut off:
+  the agent stopped before it finished …") above what it wrote; after the server
+  started again, the half essay read as the whole answer.
+- A long answer fits a small screen: the palette shows at most twelve lines of it, as
+  the row wraps them, and a row below it, "Show the whole answer", opens the panel on
+  it. On a 768-px screen a long answer was a row taller than the screen, with a
+  scrollbar, and the note that the panel had the rest pointed at an unlabelled icon.
+
 ## [0.7.2] - 2026-11-10
 
 ### Fixed
