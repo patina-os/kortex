@@ -5,7 +5,7 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
-## [Unreleased]
+## [0.8.0] - 2026-11-14
 
 ### Added
 
@@ -411,6 +411,7 @@ What changed in each release of kortex. The format follows
 - The first kortex: the AI agent as a KRunner runner, `ai` and a request, the answer in
   the palette, Allow once, Always and Deny for every action the agent asks to take.
 
+[0.8.0]: https://github.com/patina-os/kortex/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/patina-os/kortex/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/patina-os/kortex/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/patina-os/kortex/compare/v0.6.0...v0.7.0
