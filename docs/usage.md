@@ -3,9 +3,10 @@
 What kortex shows, where, and what each row does. The agent behind it is
 [opencode](https://opencode.ai) or [Hermes Agent](https://github.com/NousResearch/hermes-agent);
 kortex adds no prompt of its own beyond a conversation's title, so the agent's
-instructions (patina's `defaults/agent.md`, or your own `AGENTS.md`) decide how it
-answers. The palette calls itself kortex whichever agent answers; the hint row of `ai`
-and the row that says how long name the agent.
+instructions decide how it answers: patina's `defaults/agent.md` and your own, which
+the hint row's Edit the agent's instructions opens
+([below](#the-agents-instructions)). The palette calls itself kortex whichever agent
+answers; the hint row of `ai` and the row that says how long name the agent.
 
 ```text
 Meta+A       why is my wifi slow?
@@ -150,6 +151,21 @@ stops when the file names the other agent, and D-Bus starts one for it.
 `KORTEX_HERMES_KEY`), points kortex at a server that runs already, which it then never
 stops. `KORTEX_OPENCODE` and `KORTEX_HERMES` name the programs when they are not on
 `PATH` or where their installers put them.
+
+## The agent's instructions
+
+The hint row ("Ask kortex: type your request") has one action, **Edit the agent's
+instructions**: what the agent should always keep to, such as the language it answers
+in, how short, or what it leaves alone.
+
+- **With patina**, it runs `patina ai prompt` in a terminal: your editor opens
+  `~/.config/patina/agent.md`, your instructions in addition to patina's own
+  (`defaults/agent.md`, which keeps coming with each `patina update`). patina hands
+  them to opencode or Hermes alike and stops kortex, so the next request starts the
+  agent with them.
+- **Without patina**, it opens the agent's own file of your instructions in the
+  desktop's editor: `~/.config/opencode/AGENTS.md` for opencode, `~/.hermes/SOUL.md`
+  for Hermes, empty when it was not there.
 
 ## When it seems stuck
 

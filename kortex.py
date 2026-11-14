@@ -155,6 +155,7 @@ ACTIONS = [
     ("copy", "Copy the answer", "edit-copy"),
     ("terminal", "Show what the agent does", "view-right-new"),  # the panel, docked on the right
     ("stop", "Stop", "process-stop"),
+    ("instructions", "Edit the agent's instructions", "document-edit"),  # on the hint row
 ]
 REPLIES = {"allow-once": "once", "allow-always": "always", "deny": "reject"}
 HERMES_CHOICES = {"once": "once", "always": "always", "reject": "deny"}  # Hermes' words for them
@@ -249,6 +250,17 @@ def find_opencode():
     if not found:
         raise AgentError("opencode is not installed (https://opencode.ai)")
     return found
+
+
+def find_patina():
+    """patina's command, when this desktop has patina, or None: it keeps the user's own
+    instructions for the agent beside its own (`patina ai prompt`). PATINA_PATH names
+    its checkout."""
+    given = os.environ.get("PATINA_PATH")
+    if given and (Path(given) / "bin/patina").is_file():
+        return str(Path(given) / "bin/patina")
+    path = os.pathsep.join([os.environ.get("PATH", ""), str(Path.home() / ".local/bin")])
+    return shutil.which("patina", path=path)
 
 
 def find_hermes():
@@ -511,6 +523,10 @@ class Opencode(Server):
     def new_session(self, title):
         return self.request("POST", "/session", {"title": title})["id"]
 
+    def instructions_file(self):
+        """The user's own instructions for opencode, which it reads beside a project's."""
+        return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "opencode" / "AGENTS.md"
+
     def ask(self, session, text):
         self.request("POST", f"/session/{session}/prompt_async", {"parts": [{"type": "text", "text": text}]})
 
@@ -638,6 +654,10 @@ class Hermes(Server):
     def stop(self):
         super().stop()
         self.runs.clear()  # a new gateway knows none of them
+
+    def instructions_file(self):
+        """Hermes' own file of the user's instructions, its persona."""
+        return hermes_config().parent / "SOUL.md"
 
     def add_services(self):
         """Hermes reads its MCP servers (`mcp_servers` in config.yaml) when its gateway
@@ -1514,7 +1534,8 @@ class Kortex:
 
     def hint(self):
         # The one place outside the conversation that names the agent behind kortex.
-        return match("hint", f"Ask {NAME}: type your request", ICON, 1.0, f"{self.agent.title} answers")
+        return match("hint", f"Ask {NAME}: type your request", ICON, 1.0, f"{self.agent.title} answers",
+                     ["instructions"])
 
     def waiting_match(self):
         elapsed = self.elapsed() if self.waiting else None
@@ -1702,6 +1723,8 @@ class Kortex:
             self.reopen(self.view_query, menu)  # the question itself: its answers are the rows below
         elif kind == "more":
             self.panel()
+        elif kind == "hint" and action == "instructions":
+            self.instructions()
         elif kind == "answer" and action == "stop" and self.session:
             session = self.session
             self.work(lambda: self.agent.abort(session), self.failing("Not stopped"))
@@ -1718,6 +1741,18 @@ class Kortex:
                     self.failed(None, error, "Not copied")
 
                 self.work(lambda: self.agent.messages(session), read)
+
+    def instructions(self):
+        """Edit the agent's instructions, the hint row's action. With patina, `patina ai
+        prompt` in a terminal: the user's own instructions in addition to patina's, handed
+        to either agent, which follows them from the next request. Without it, the agent's
+        own file of the user's instructions in the desktop's editor."""
+        self.last_activity = self.now()
+        patina = self.desktop.patina()
+        if patina:
+            self.desktop.launch(terminal_command([patina, "ai", "prompt"], self.desktop.terminal()), {})
+        else:
+            self.desktop.edit(self.agent.instructions_file())
 
     def panel(self):
         """Show what the agent does: its own interface on the conversation, in a terminal
@@ -1991,6 +2026,15 @@ def main():
 
         def __init__(self):
             self.started = {}  # the programs launched, by process id
+
+        def patina(self):
+            return find_patina()
+
+        def edit(self, path):
+            """Open a text file in the desktop's editor, empty when it was not there."""
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+            self.launch(["xdg-open", str(path)], {})
 
         def launch(self, command, env):
             process = subprocess.Popen(command, env=dict(os.environ, **env), start_new_session=True,

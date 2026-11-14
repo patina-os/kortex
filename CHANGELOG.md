@@ -7,6 +7,14 @@ What changed in each release of kortex. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Edit the agent's instructions, an action on the hint row: with patina it runs
+  `patina ai prompt` in a terminal, which keeps your own instructions beside patina's
+  for opencode and Hermes alike; without patina it opens the agent's own file
+  (opencode's `~/.config/opencode/AGENTS.md`, Hermes' `~/.hermes/SOUL.md`). The
+  instructions could only be found by knowing where they were.
+
 ### Fixed
 
 - Always is offered only for a command that looks and changes nothing whatever it is
