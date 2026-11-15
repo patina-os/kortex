@@ -27,9 +27,10 @@ are drawn for the replay. How it is made: [`docs/demo/`](docs/demo/).</sub>
 
 kortex is a small part of [patina](https://github.com/patina-os/patina), the polish
 layer for Plasma on Debian: patina installs it with its AI agent and puts it on Meta+A.
-It works on any Plasma 6 desktop that has [opencode](https://opencode.ai) or
-[Hermes Agent](https://github.com/NousResearch/hermes-agent): they are the agent, kortex
-is where you talk to it.
+You do not need patina for it: kortex runs on any Plasma 6 desktop, whatever the
+distribution, that has [opencode](https://opencode.ai) or
+[Hermes Agent](https://github.com/NousResearch/hermes-agent). They are the agent, and
+kortex is where you talk to it. [Will it run on my system?](#will-it-run-on-my-system)
 
 ## Made for
 
@@ -80,21 +81,63 @@ Status: alpha. Its CI runs it against a real `opencode serve` and a real Hermes 
 and patina's against a real KRunner in a Plasma 6.3 session on Debian 13; the
 [roadmap](docs/roadmap.md) says what is still to prove on a real desktop.
 
+## Will it run on my system?
+
+kortex lives in KRunner, Plasma's command palette, so what matters is the desktop and
+not the distribution.
+
+- **Runs on** any distribution with **KDE Plasma 6**, under Wayland or X11, on x86_64
+  and arm64 (kortex is plain Python, with nothing to compile): Debian 13, Fedora KDE,
+  openSUSE Tumbleweed, Arch and Manjaro, KDE neon, Kubuntu 25.04 and later.
+- **Tested** only on Debian 13 with Plasma 6.3, so far. On the other distributions it
+  should work just the same. If you try one,
+  [tell us how it went](https://github.com/patina-os/kortex/issues).
+- **Does not run on** Plasma 5 (Debian 12, Kubuntu 24.04 LTS, openSUSE Leap 15), and
+  not on GNOME, Xfce, Cinnamon, Hyprland or any other desktop, because those have no
+  KRunner.
+- **Needs** your distribution's Python 3 with its D-Bus bindings, plus an agent:
+  opencode or Hermes Agent, with a model it can use (a local one through Ollama, or a
+  provider's). kortex installs per user and needs no root.
+
+To see which Plasma you have, run `plasmashell --version` or open System Settings,
+About this System.
+
 ## Install
 
-With patina, the AI step of `patina install` (or `patina ai on`) installs it. Elsewhere it
-needs Plasma 6, an agent with a model it can use (opencode: `npm install -g opencode-ai`;
-Hermes Agent: its installer) and Python's D-Bus bindings:
+**With patina,** the AI step of `patina install` (or `patina ai on`) installs kortex.
+Skip the rest of this section.
 
-```sh
-sudo apt install python3-dbus python3-gi     # Debian and Ubuntu
-git clone https://github.com/patina-os/kortex && cd kortex
-./install.sh                                 # per user, under ~/.local/share; no root
-```
+**On any other Plasma 6 desktop,** follow these three steps:
 
-`./uninstall.sh` removes it again. For Hermes instead of opencode, write `hermes` into
-`~/.config/kortex/agent`; to open the palette or the panel with a key of your own, see
-[Using kortex](docs/usage.md#a-key-for-the-agent).
+1. Install Python's D-Bus bindings from your distribution. pip will not do, because
+   D-Bus starts kortex with the system's `/usr/bin/python3`:
+
+   ```sh
+   sudo apt install python3-dbus python3-gi                  # Debian, Ubuntu, KDE neon
+   sudo dnf install python3-dbus python3-gobject             # Fedora
+   sudo zypper install python3-dbus-python python3-gobject   # openSUSE
+   sudo pacman -S python-dbus python-gobject                 # Arch, Manjaro
+   ```
+
+2. Install an agent and give it a model: opencode (`npm install -g opencode-ai`, or
+   the installer on [opencode.ai](https://opencode.ai)) or Hermes Agent (its
+   installer). Run it once in a terminal to log in to a provider or to point it at
+   Ollama. kortex uses whatever the agent is set up with.
+
+3. Install kortex itself, per user under `~/.local/share`:
+
+   ```sh
+   git clone https://github.com/patina-os/kortex && cd kortex
+   ./install.sh
+   ```
+
+Then open KRunner (Meta+Space or Alt+Space), type a request and pick "Ask kortex".
+
+- **Updating:** run `git pull` and `./install.sh` again.
+- **Removing:** `./uninstall.sh`.
+- **Hermes instead of opencode:** write `hermes` into `~/.config/kortex/agent`.
+- **Meta+A and Meta+Shift+A** are patina's keys. Without patina, bind keys of your own
+  as described in [Using kortex](docs/usage.md#a-key-for-the-agent).
 
 ## Use
 
