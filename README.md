@@ -88,7 +88,7 @@ not the distribution.
 
 - **Runs on** any distribution with **KDE Plasma 6**, under Wayland or X11, on x86_64
   and arm64 (kortex is plain Python, with nothing to compile): Debian 13, Fedora KDE,
-  openSUSE Tumbleweed, Arch and Manjaro, KDE neon, Kubuntu 25.04 and later.
+  openSUSE Tumbleweed, Arch, Manjaro and CachyOS, KDE neon, Kubuntu 25.04 and later.
 - **Tested** only on Debian 13 with Plasma 6.3, so far. On the other distributions it
   should work just the same. If you try one,
   [tell us how it went](https://github.com/patina-os/kortex/issues).
@@ -107,37 +107,19 @@ About this System.
 **With patina,** the AI step of `patina install` (or `patina ai on`) installs kortex.
 Skip the rest of this section.
 
-**On any other Plasma 6 desktop,** follow these three steps:
+**On any other Plasma 6 desktop,** kortex needs Python's D-Bus bindings, an agent
+(opencode or Hermes Agent) with a model, and rules that make the agent ask before every
+change, which patina would set up. [Setting up kortex without patina](docs/setup.md)
+walks you through them, with a cloud provider's login or your own OpenAI-compatible
+API. Then kortex itself installs per user, under `~/.local/share`, with no root:
 
-1. Install Python's D-Bus bindings from your distribution. pip will not do, because
-   D-Bus starts kortex with the system's `/usr/bin/python3`:
-
-   ```sh
-   sudo apt install python3-dbus python3-gi                  # Debian, Ubuntu, KDE neon
-   sudo dnf install python3-dbus python3-gobject             # Fedora
-   sudo zypper install python3-dbus-python python3-gobject   # openSUSE
-   sudo pacman -S python-dbus python-gobject                 # Arch, Manjaro
-   ```
-
-2. Install an agent and give it a model: opencode (`npm install -g opencode-ai`, or
-   the installer on [opencode.ai](https://opencode.ai)) or Hermes Agent (its
-   installer). Run it once in a terminal to log in to a provider or to point it at
-   Ollama. kortex uses whatever the agent is set up with.
-
-3. Install kortex itself, per user under `~/.local/share`:
-
-   ```sh
-   git clone https://github.com/patina-os/kortex && cd kortex
-   ./install.sh
-   ```
+```sh
+git clone https://github.com/patina-os/kortex && cd kortex
+./install.sh
+```
 
 Then open KRunner (Meta+Space or Alt+Space), type a request and pick "Ask kortex".
-
-- **Updating:** run `git pull` and `./install.sh` again.
-- **Removing:** `./uninstall.sh`.
-- **Hermes instead of opencode:** write `hermes` into `~/.config/kortex/agent`.
-- **Meta+A and Meta+Shift+A** are patina's keys. Without patina, bind keys of your own
-  as described in [Using kortex](docs/usage.md#a-key-for-the-agent).
+`git pull` and `./install.sh` again update it, `./uninstall.sh` removes it.
 
 ## Use
 
@@ -155,6 +137,9 @@ Then open KRunner (Meta+Space or Alt+Space), type a request and pick "Ask kortex
 
 ## Documentation
 
+- [Setting up kortex without patina](docs/setup.md): the D-Bus bindings, opencode, a
+  model (a cloud provider or your own OpenAI-compatible API) and the rules that make
+  it ask first
 - [Using kortex](docs/usage.md): the searches, the conversation, the rows that ask, the
   panel, the notifications, a key of your own, Hermes, and what to look at when it
   seems stuck
