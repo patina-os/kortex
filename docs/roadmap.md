@@ -30,6 +30,22 @@
 - **Other agents.** opencode and Hermes are the two backends, each a small adapter
   behind the same calls: send, follow, answer a permission. A third (Goose, for
   example) would be another.
+- **Your own API without editing a file.** [docs/setup.md](setup.md) has the user
+  write a `custom` provider into `opencode.json` by hand. The opencode plugin
+  `@coool/opencode-custom-provider` (MIT) asks for the address and key instead and
+  loads the models from `/models`. Version 0.1.8, read in November 2026, sends nothing
+  but that request, starts no processes and runs no install script. To revisit once
+  opencode 2 is released:
+  - It is written for opencode 2's plugin API (`@opencode/plugin` 2.x). Under
+    opencode 1.19.5, `opencode plugin` registers it in `tui.json` only, so
+    `opencode serve`, which kortex talks to, never loads it.
+  - The command in its README, `opencode plugin add …`, would install the npm
+    package `add` under opencode 1.19.5, whose command takes the module directly.
+  - It keeps a second copy of the key in opencode's plugin storage. The `read` rules
+    of [docs/setup.md](setup.md) do not cover that file yet, so the agent could read
+    it and send the key to the model.
+  - One maintainer, on npm since October 2026, with no source repository named. Only
+    a pinned version may go into the guide, read again before each new pin.
 
 ## How it reaches users
 
