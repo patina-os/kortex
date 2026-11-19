@@ -139,7 +139,9 @@ def main(agent):
         matches = k.Match("ai " + request)
         assert str(matches[0][0]) == "ask" + SEP + request, matches
         bus.get_object(SERVICE, "/runner").Open(dbus_interface=SERVICE, timeout=5)  # Meta+A
-        wait_for("Meta+A to open an empty field", lambda: record.read_text() == "kortex\t\n", 10)
+        # on `ai`, whose rows say how to ask: KRunner calls no runner for an empty field
+        wait_for("Meta+A to open on ai", lambda: record.read_text() == "kortex\tai \n", 10)
+        assert str(k.Match("ai ")[0][0]) == "hint"
         print("e2e: ask match ok")
 
         # The agent's server starts with this request (Hermes' takes up to a minute), in
@@ -156,7 +158,12 @@ def main(agent):
                 if str(m[0]).startswith("permission" + SEP):
                     return m
         asked = wait_for("the agent to ask first", permission)
-        assert str(asked[1]).split("<br>")[0] == f"Allow {asks}: {command}", asked[1]
+        # what the step would do, by kortex, then what asks
+        said, what = str(asked[1]).split("<br>")[:2]
+        assert said.startswith("<b>") and what == f"Allow {asks}: {command}", asked[1]
+        # its answers are rows of their own, under it
+        rows = [str(m[0]).split(SEP)[0] for m in sorted(k.Match(marker, timeout=30), key=lambda m: -float(m[4]))]
+        assert rows[:3] == ["permission", "allow", "deny"], rows
         # Always only for a command that only looks (kortex.LOOK_ONLY): not for rm, nor
         # for the command that makes the file
         assert list(asked[5]["actions"]) == ["allow-once", "deny"], asked[5]["actions"]
