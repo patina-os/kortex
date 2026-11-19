@@ -48,15 +48,39 @@ find nothing to run.
 KRunner sizes its window to its rows and gives a one-line row a fixed height, while a
 multi-line row grows by a line with each word that wraps; in the free-floating mode the
 window hangs from a third of the screen's height, so its bottom edge moves. So while
-the agent works, the row that says how long it has been at it and what it wrote or
-does last is one line, and the steps are not rows at all (the panel shows them). The
-window grows by a row that asks, not by a line for a word, and the answer, the one
-multi-line row besides a row that asks, comes once the agent is done.
+the agent works, every row is one line: how long it has been at it and what it does,
+its last whole sentence, its steps so far in a word each, and Show every step (the
+panel shows the commands). The window changes its height when a step asks and when the
+answer comes, the two multi-line rows, not with each word.
+
+## A step that asks
+
+opencode's permission request becomes a row and its answers. The row's first line is
+what the step would do (`risk` in `kortex.py`): the first word, or first two, of each
+part of the command against four short lists (root, deletes, installs, network), a
+pattern for a command that hides another (`$(…)`, `xargs`, `sh -c`, `find -exec`, a
+`>` that overwrites), and for a step that is no command its kind (a change to a file,
+a service's tool, a folder outside the home folder). Then the agent's words and the
+step itself. The answers are matches of their own (`allow`, `always`, `rest`, `deny`
+and the request's id), ordered by relevance under the row, so they read as words and
+take Enter; the asking row keeps Allow once and Deny as its actions, for Shift+Enter
+and for callers that run it by id.
+
+Allow the rest of this task (`handover_on`: `KORTEX_HANDOVER`, else
+`~/.config/kortex/handover`) is kortex answering for the user: it remembers the
+conversation whose request was handed over and, each time it fetches the conversation,
+replies `once` to every step that asks and is not held by `risk`, with KRunner open or
+closed, and keeps what it allowed for the answer to list. A new request, another
+conversation, a Deny or the agent's reply ends it. Nothing is written to opencode's
+configuration, and no rule of opencode's changes.
 
 While KRunner is closed (its `Teardown`), kortex follows the request with one
 notification (`org.freedesktop.Notifications`): after three seconds that the agent
 works on it, transient, then, in its place, how it ended. Show and a click on it are
 its actions; kortex listens for `ActionInvoked` and opens KRunner on the conversation.
+A notification that asks for a step has the step's answers as actions too (Allow once,
+Deny, and Allow the rest where it is offered); kortex answers the agent on one and
+closes the notification (`CloseNotification`) once the step is answered anywhere.
 
 ## opencode as the agent
 
@@ -125,7 +149,7 @@ starts it again, so the service is there from the next conversation on.
 
 ## The panel
 
-Show what the agent does (the `terminal` action) and `Panel` on kortex's own D-Bus
+Show every step (the `steps` row; the `terminal` action is its icon) and `Panel` on kortex's own D-Bus
 interface run the terminal Plasma names (`TerminalApplication` in `kdeglobals`, else
 konsole) with `opencode attach <server> --session <id>` (Hermes: `hermes --resume
 <id>`; without a conversation, `opencode attach <server>` or `hermes`), the password in

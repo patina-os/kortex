@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>kortex Palette Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of reading text, with a full-width prototype bench (a scaled 960x600 desktop) per option. Single dark look: aurora, patina's OLED theme. */
+:root{
+  --bg:#000000; --panel:#0b0a10; --raise:#17141f; --line:#241f31;
+  --mute:#8a83a3; --dim:#524a6b; --fg:#d8d4e6; --hi:#f7f6fb;
+  --green:#3cff9d; --violet:#b77dff; --red:#ff5c7a; --amber:#ffa45c; --blue:#7aa2ff;
+  --display:"Sora",ui-sans-serif,system-ui,sans-serif;
+  --text:"Source Sans 3","Source Sans Pro",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"DejaVu Sans Mono",monospace;
+  color-scheme:dark;
+}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font:17px/1.55 var(--text);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1040px;margin:0 auto}
+.read{max-width:68ch}
+h1,h2,h3{font-family:var(--display);color:var(--hi);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:600;letter-spacing:-.01em}
+h2{font-size:clamp(22px,3vw,28px);font-weight:600;margin-top:64px}
+h3{font-size:18px;font-weight:600}
+p{margin:0}
+.stack{display:flex;flex-direction:column;gap:14px}
+a{color:var(--green)}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--raise);padding:1px 5px;border-radius:4px;color:var(--hi)}
+.tri{color:var(--green)}
+header.top{padding-block:56px 8px;display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-family:var(--mono);font-size:13px;color:var(--mute)}
+.lede{font-size:20px;color:var(--fg);max-width:62ch}
+.muted{color:var(--mute)}
+.small{font-size:15px}
+
+/* constraints */
+.cons{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:20px}
+.con{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.con b{color:var(--hi);font-weight:600}
+.con .ev{font-family:var(--mono);font-size:12px;color:var(--violet)}
+
+/* tables */
+.tw{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--mute);background:var(--panel)}
+tr:last-child td{border-bottom:0}
+td b{color:var(--hi);font-weight:600}
+.y{color:var(--green)} .n{color:var(--red)} .m{color:var(--amber)}
+
+/* bench */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:22px}
+.tab{font:600 15px var(--text);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+.tab .k{font-family:var(--mono);color:var(--mute);margin-right:6px;font-weight:400}
+.tab[aria-selected="true"]{border-color:var(--green);color:var(--hi);box-shadow:inset 0 0 0 1px var(--green)}
+.tab:focus-visible,button:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.bench{margin-top:14px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.stagebox{width:100%;max-width:100%;aspect-ratio:960/600;position:relative;overflow:hidden;border-radius:10px;border:1px solid var(--line);background:#000}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:600 14px var(--text);color:var(--hi);background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+.btn:hover{border-color:var(--violet)}
+.ctl .state{font-family:var(--mono);font-size:13px;color:var(--mute);margin-left:auto}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}
+.note-c{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.note-c h4{margin:0;font:500 12px var(--mono);color:var(--mute)}
+.note-c ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:15px}
+.pitch{font-size:18px;max-width:70ch}
+.pitch b{color:var(--hi)}
+.tagline{display:inline-block;font:500 12px var(--mono);padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
+.tagline.g{color:var(--green);border-color:#3cff9d55}
+.tagline.v{color:var(--violet);border-color:#b77dff55}
+.tagline.a{color:var(--amber);border-color:#ffa45c55}
+
+.ideas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:18px}
+.rec{margin-top:18px;border:1px solid #3cff9d55;border-radius:10px;padding:20px 22px;background:linear-gradient(180deg,#0b0a10,#000);display:flex;flex-direction:column;gap:12px}
+.rec ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.q{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+
+/* ===== the simulated desktop (960x600, scaled) ===== */
+.desk{position:absolute;left:0;top:0;width:960px;height:600px;transform-origin:0 0;transform:scale(var(--k,1));font:13px/1.4 var(--text);color:var(--fg);overflow:hidden;user-select:none}
+.wall{position:absolute;inset:0;background:
+  radial-gradient(60% 50% at 18% 30%,#3a2a7055,transparent 70%),
+  radial-gradient(45% 40% at 78% 70%,#3cff9d22,transparent 70%),
+  radial-gradient(50% 60% at 70% 20%,#b77dff33,transparent 70%),
+  repeating-linear-gradient(135deg,#ffffff08 0 1px,transparent 1px 9px),
+  repeating-linear-gradient(45deg,#7aa2ff0a 0 1px,transparent 1px 13px),
+  linear-gradient(160deg,#0d0b1a,#05040a 60%,#0a1410)}
+.bar{position:absolute;left:0;right:0;bottom:0;height:40px;background:#0b0a10f2;border-top:1px solid #17141f;display:flex;align-items:center;padding:0 10px}
+.bar .apps{display:flex;gap:6px}
+.bar .app{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:#d8d4e6}
+.bar .mid{position:absolute;left:50%;transform:translateX(-14px);display:flex;align-items:center;gap:8px}
+.bar .start{width:28px;height:28px;border-radius:6px;display:grid;place-items:center}
+.bar .tray{margin-left:auto;display:flex;align-items:center;gap:12px;color:#8a83a3;font-size:11px}
+.bar .clock{text-align:right;line-height:1.15;color:#d8d4e6}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.i.s{width:13px;height:13px}
+.mono9{font-family:var(--mono);font-size:11.5px}
+
+/* KRunner (Today, A) */
+.kr{position:absolute;left:190px;width:580px;top:178px;background:#0b0a10;border:1px solid #17141f;border-radius:6px;box-shadow:0 18px 50px #000c;padding:6px}
+.kr .head{display:flex;align-items:center;gap:6px;padding:2px}
+.kr .ib{width:26px;height:26px;display:grid;place-items:center;color:#d8d4e6;border-radius:4px}
+.kr .ib.on{background:#3cff9d;color:#000}
+.kr .field{flex:1;height:28px;border:1.5px solid #3cff9d;border-radius:4px;background:#000;display:flex;align-items:center;gap:6px;padding:0 8px;color:#d8d4e6}
+.kr .field .caret{width:1px;height:15px;background:#3cff9d;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.kr .ghost{all:unset;cursor:pointer;margin-left:auto;font:11px var(--mono);color:#524a6b;white-space:nowrap}
+.kr .ghost:hover{color:#3cff9d}
+.kr .ghost b{color:#8a83a3;font-weight:500}
+.kr .rows{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.kr .row{display:grid;grid-template-columns:76px 18px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border-radius:4px;border:1px solid transparent;min-height:34px}
+.kr .row.sel{background:#3cff9d14;border-color:#3cff9d88}
+.kr .row .cat{color:#8a83a3;text-align:right;font-size:12px}
+.kr .row .txt{min-width:0;color:#ebe8f4}
+.kr .row .one{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kr .row .sub{color:#8a83a3;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kr .row .sub.mono9{color:#b77dff}
+.kr .acts{display:flex;gap:2px}
+.kr .act{width:26px;height:26px;display:grid;place-items:center;border-radius:4px;color:#d8d4e6;background:none;border:0;cursor:pointer;padding:0}
+.kr .act:hover{background:#17141f}
+.kr .act.lbl{width:auto;display:flex;gap:5px;align-items:center;padding:0 8px 0 6px;font:600 11.5px var(--text);color:#d8d4e6;border:1px solid #241f31}
+.kr .act.lbl:hover{border-color:#3cff9d;color:#3cff9d}
+.kr .row.btnrow{cursor:pointer}
+.kr .row.btnrow:hover{background:#17141f}
+.kr .row.r2{min-height:56px}
+.kr .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kr .clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.risk{display:inline-block;font:600 10.5px var(--mono);padding:1px 6px;border-radius:3px;margin-right:6px;vertical-align:1px}
+.risk.net{background:#ffa45c22;color:#ffa45c}
+.risk.set{background:#7aa2ff22;color:#7aa2ff}
+.dots{display:inline-flex;gap:3px;margin-left:6px;vertical-align:1px}
+.dots i{width:6px;height:6px;border-radius:50%;background:#524a6b}
+.dots i.d{background:#3cff9d}
+.dots i.r{background:#3cff9d;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.ann{position:absolute;font:500 11px var(--mono);color:#ffa45c;background:#000c;border:1px dashed #ffa45c88;border-radius:4px;padding:3px 7px;pointer-events:none}
+
+/* Plasma notification */
+.note{position:absolute;right:10px;bottom:50px;width:330px;background:#0b0a10f5;border:1px solid #17141f;border-radius:8px;box-shadow:0 10px 30px #000c;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.note .nh{display:flex;align-items:center;gap:6px;color:#8a83a3;font-size:11.5px}
+.note .nt{color:#f7f6fb;font-weight:600}
+.note .nb{color:#d8d4e6;font-size:12.5px}
+.note .nb .mono9{color:#b77dff}
+.note .na{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.nbtn{font:600 12px var(--text);color:#f7f6fb;background:#17141f;border:1px solid #241f31;border-radius:4px;padding:4px 10px;cursor:pointer}
+.nbtn.g{border-color:#3cff9d;color:#3cff9d}
+.nbtn:hover{border-color:#b77dff}
+
+/* chat pieces (B, C) */
+.chat{display:flex;flex-direction:column;gap:10px;padding:12px 14px}
+.you{align-self:flex-end;max-width:78%;background:#b77dff26;border:1px solid #b77dff44;color:#f7f6fb;padding:6px 10px;border-radius:10px 10px 2px 10px}
+.say{color:#ebe8f4;max-width:92%}
+.looks{display:flex;flex-direction:column;gap:4px;color:#8a83a3;font-size:12px}
+.looks button{all:unset;cursor:pointer;display:flex;gap:6px;align-items:center}
+.looks button:hover{color:#d8d4e6}
+.looks .cmd{font-family:var(--mono);font-size:11px;color:#b77dff;padding-left:20px}
+.stepline{display:flex;gap:6px;align-items:center;color:#8a83a3;font-size:12px}
+.stepline .mono9{color:#b77dff}
+.spin{width:11px;height:11px;border-radius:50%;border:1.5px solid #3cff9d55;border-top-color:#3cff9d;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.consent{border:1px solid #3cff9d88;background:#3cff9d0d;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.consent .w{color:#f7f6fb}
+.consent pre{margin:0;font:11.5px/1.45 var(--mono);color:#b77dff;background:#000;border:1px solid #17141f;border-radius:4px;padding:6px 8px;white-space:pre-wrap}
+.consent .cb{display:flex;gap:6px;align-items:center}
+.cbtn{font:600 12.5px var(--text);border-radius:5px;padding:5px 12px;cursor:pointer;border:1px solid #241f31;background:#17141f;color:#f7f6fb}
+.cbtn.go{background:#3cff9d;color:#000;border-color:#3cff9d}
+.cbtn:hover{filter:brightness(1.12)}
+.consent .kh{margin-left:auto;font:11px var(--mono);color:#524a6b}
+.dec{font-size:11.5px;color:#8a83a3;display:flex;gap:6px;align-items:center}
+.dec.no{color:#ff5c7a}
+.answer{color:#f7f6fb;border-left:2px solid #3cff9d;padding-left:10px}
+.answer .foot{margin-top:6px;font:11px var(--mono);color:#8a83a3;display:flex;gap:12px}
+.answer .foot button{all:unset;cursor:pointer;color:#8a83a3}
+.answer .foot button:hover{color:#3cff9d}
+.stopped{color:#ff5c7a}
+.composer{border-top:1px solid #17141f;padding:8px 10px;display:flex;gap:8px;align-items:center}
+.composer .in{flex:1;min-width:0;background:#000;border:1px solid #241f31;border-radius:6px;padding:6px 10px;color:#8a83a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.composer .in.f{color:#f7f6fb;border-color:#3cff9d88}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}
+.sugg span{border:1px solid #241f31;border-radius:999px;padding:3px 10px;color:#8a83a3;font-size:12px}
+
+/* B: hand-off card */
+.card{position:absolute;left:180px;width:600px;top:76px;max-height:450px;display:flex;flex-direction:column;background:#0b0a10;border:1px solid #241f31;border-radius:12px;box-shadow:0 24px 60px #000d,0 0 0 1px #000}
+.card .ch{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #17141f}
+.card .ch .nm{font-family:var(--display);font-weight:600;color:#f7f6fb}
+.card .ch .det{font:11px var(--mono);color:#524a6b}
+.card .ch .sp{margin-left:auto;display:flex;gap:4px}
+.card .ch button{all:unset;cursor:pointer;color:#8a83a3;padding:3px 6px;border-radius:4px;font-size:11.5px;display:flex;gap:4px;align-items:center}
+.card .ch button:hover{background:#17141f;color:#f7f6fb}
+.card .body{overflow:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:#241f31 transparent}
+.pill{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:#0b0a10;border:1px solid #241f31;border-radius:999px;padding:6px 14px 6px 10px;box-shadow:0 8px 24px #000c;cursor:pointer;max-width:520px;white-space:nowrap}
+.pill .t{overflow:hidden;text-overflow:ellipsis}
+.pill.need{border-color:#3cff9d;box-shadow:0 0 0 3px #3cff9d22,0 8px 24px #000c}
+.pill.done{border-color:#b77dff}
+.pill .el{font-family:var(--mono);color:#8a83a3;font-size:11.5px}
+
+/* C: in the bar */
+.chip{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px 0 8px;border-radius:999px;border:1px solid #241f31;background:#000;color:#d8d4e6;font-size:12px;cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:#b77dff}
+.chip.on{border-color:#3cff9d88}
+.chip.need{border-color:#3cff9d;color:#000;background:#3cff9d;animation:glow 1.4s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 0 4px #3cff9d33}}
+.chip.done{border-color:#b77dff;color:#f7f6fb}
+.chip .el{font-family:var(--mono);font-size:11px;color:#8a83a3}
+.chip.need .el{color:#000}
+.rings{width:14px;height:14px;flex:none}
+.glass{position:absolute;bottom:48px;left:220px;width:520px;height:440px;display:flex;flex-direction:column;border-radius:12px;background:linear-gradient(180deg,#14112099,#0b0a10cc);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);border:1px solid #ffffff14;box-shadow:0 20px 50px #000c}
+.glass::after{content:"";position:absolute;inset:0;border-radius:12px;pointer-events:none;opacity:.07;background:repeating-radial-gradient(circle at 30% 20%,#fff 0 .5px,transparent .5px 2px)}
+.glass .gh{display:flex;align-items:center;gap:4px;padding:8px 10px 0}
+.glass .gt{all:unset;cursor:pointer;padding:6px 10px;border-radius:6px 6px 0 0;color:#8a83a3;font-size:12.5px;border-bottom:2px solid transparent}
+.glass .gt[aria-selected="true"]{color:#f7f6fb;border-bottom-color:#3cff9d}
+.glass .gh .sp{margin-left:auto;display:flex;gap:4px}
+.glass .gh .sp button{all:unset;cursor:pointer;color:#8a83a3;font-size:11.5px;padding:4px 8px;border-radius:4px}
+.glass .gh .sp button:hover{background:#ffffff10;color:#f7f6fb}
+.glass .body{flex:1;min-height:0;overflow:auto;border-top:1px solid #ffffff10;scrollbar-width:thin;scrollbar-color:#241f31 transparent}
+.glass .composer{border-top-color:#ffffff10}
+.glass .composer .in{background:#00000088}
+.plan{border:1px solid #3cff9d88;background:#3cff9d0a;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.plan .ph{display:flex;align-items:baseline;gap:8px}
+.plan .ph b{font-family:var(--display);color:#f7f6fb;font-weight:600}
+.plan .ph span{font:11px var(--mono);color:#8a83a3}
+.plan ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.plan li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px}
+.plan li .st{width:16px;height:16px;border-radius:50%;border:1.5px solid #524a6b;display:grid;place-items:center;margin-top:2px}
+.plan li.done .st{background:#3cff9d;border-color:#3cff9d;color:#000}
+.plan li.run .st{border-color:#3cff9d55;border-top-color:#3cff9d;animation:spin .8s linear infinite}
+.plan li .w{color:#f7f6fb}
+.plan li .c{font:11px var(--mono);color:#b77dff;margin-top:2px;word-break:break-all}
+.plan .fine{font-size:11.5px;color:#8a83a3}
+.steps{padding:10px 14px;display:flex;flex-direction:column;gap:10px}
+.steps .s{display:grid;grid-template-columns:16px minmax(0,1fr);gap:8px}
+.steps .s .mono9{color:#b77dff}
+.steps pre{margin:3px 0 0;font:10.5px/1.45 var(--mono);color:#8a83a3;background:#00000099;border-radius:4px;padding:5px 7px;white-space:pre-wrap}
+.steps .tag{font:10px var(--mono);color:#524a6b;margin-left:6px}
+.steps .tag.ch{color:#ffa45c}
+.ok{color:#3cff9d}
+
+.risk.del{background:#ff5c7a22;color:#ff5c7a}
+/* D: the session */
+.fakewin{position:absolute;left:56px;top:54px;width:520px;height:360px;background:#0b0a10;border:1px solid #17141f;border-radius:8px;box-shadow:0 14px 40px #000a;overflow:hidden;color:#8a83a3}
+.fakewin .ft{height:30px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #17141f;font-size:12px;color:#d8d4e6}
+.fakewin .fl{padding:12px 16px;display:flex;flex-direction:column;gap:2px}
+.fakewin .fr{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px}
+.fakewin .fr.on{background:#17141f;color:#f7f6fb}
+.fakewin .fr span:last-child{margin-left:auto;font:11px var(--mono)}
+.side{position:absolute;right:0;top:0;bottom:40px;width:310px;display:flex;flex-direction:column;background:#0b0a10;border-left:1px solid #241f31;box-shadow:-14px 0 40px #000a}
+.side .ch{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #17141f}
+.side .ch .nm{font-family:var(--display);font-weight:600;color:#f7f6fb}
+.side .ch .det{font:11px var(--mono);color:#524a6b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side .ch .sp{margin-left:auto;display:flex;gap:4px}
+.side .ch button{all:unset;cursor:pointer;color:#8a83a3;padding:3px 6px;border-radius:4px;font-size:11.5px;display:flex;gap:4px;align-items:center;white-space:nowrap}
+.side .ch button:hover{background:#17141f;color:#f7f6fb}
+.side .body{overflow:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:#241f31 transparent}
+.side .you{max-width:90%}
+.side.term{background:#000}
+.side.term .ch{font:11px var(--mono);color:#8a83a3}
+.tui{padding:10px 12px;display:flex;flex-direction:column;gap:7px;font:11px/1.5 var(--mono);color:#d8d4e6}
+.tui .u{color:#f7f6fb;border-left:2px solid #b77dff;padding-left:8px}
+.tui .c{color:#b77dff;word-break:break-all}
+.tui .d{color:#524a6b}
+.tui .a{border-left:2px solid #3cff9d;padding-left:8px}
+.tperm{border:1px solid #ffa45c;padding:7px 9px;color:#ffa45c;display:flex;flex-direction:column;gap:5px}
+.tperm .c{color:#b77dff}
+.tperm button,.tin button{all:unset;cursor:pointer;color:#000;background:#d8d4e6;padding:0 6px;margin-right:6px}
+.tperm button:hover,.tin button:hover{background:#3cff9d}
+.tin{border-top:1px solid #17141f;padding:8px 12px;font:11px/1.5 var(--mono);color:#8a83a3;display:flex;gap:6px;align-items:center}
+.tin .q{color:#f7f6fb;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.earlier{all:unset;cursor:pointer;display:block;margin:10px 14px 0;font:11px var(--mono);color:#8a83a3}
+.earlier:hover{color:#3cff9d}
+.peek{position:absolute;right:10px;bottom:50px;width:300px;background:#0b0a10;border:1px solid #241f31;border-radius:10px;box-shadow:0 10px 30px #000c;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.peek.need{border-color:#3cff9d;box-shadow:0 0 0 3px #3cff9d22,0 10px 30px #000c}
+.peek.done{border-color:#b77dff88}
+.peek .pk{cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.peek .pt{display:flex;align-items:center;gap:6px;color:#f7f6fb;font-weight:600}
+.peek .pt .el{margin-left:auto;font:11px var(--mono);color:#8a83a3;font-weight:400}
+.peek .pl{color:#d8d4e6;font-size:12.5px}
+.peek .pl .mono9{color:#b77dff}
+.peek .na{display:flex;gap:6px;justify-content:flex-end}
+.loop{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:6px 12px;border-bottom:1px solid #17141f;font-size:11.5px;color:#8a83a3}
+.lseg{display:inline-flex;border:1px solid #241f31;border-radius:5px;overflow:hidden}
+.lseg button{all:unset;cursor:pointer;padding:2px 8px;color:#d8d4e6;border-left:1px solid #241f31;white-space:nowrap}
+.lseg button:first-child{border-left:0}
+.lseg button[aria-pressed="true"]{background:#3cff9d;color:#000;font-weight:600}
+.loop .lw{flex-basis:100%;color:#8a83a3}
+.depth{display:flex;align-items:center;gap:8px;padding:8px 14px;font:11px var(--mono);color:#8a83a3;position:sticky;top:0;z-index:1;background:#0b0a10;border-bottom:1px solid #17141f}
+.depth button{all:unset;cursor:pointer;color:#3cff9d;margin-left:auto;white-space:nowrap}
+.depth button:hover{text-decoration:underline}
+.turn{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;margin:8px 14px 0;scroll-margin-top:40px;padding:7px 10px;border:1px solid #17141f;border-radius:8px;background:#ffffff05}
+.turn:hover{border-color:#b77dff66}
+.turn .tq{color:#b77dff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.turn .ta{color:#d8d4e6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.turn .tm{font:10.5px var(--mono);color:#8a83a3;display:flex;gap:8px}
+.turn .tm .chg{color:#ffa45c}
+.turn .tm .more{margin-left:auto;color:#3cff9d}
+.shorten{all:unset;cursor:pointer;display:block;margin:8px 14px -6px;font:10.5px var(--mono);color:#8a83a3}
+.shorten:hover{color:#3cff9d}
+.autod{font-size:11.5px;color:#8a83a3;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.autod .mono9{color:#b77dff}
+.autod button{all:unset;cursor:pointer;color:#ffa45c;font:11px var(--mono)}
+.autod button:hover{text-decoration:underline}
+.consent .cb{flex-wrap:wrap}
+.consent .own{font-size:11px;color:#8a83a3}
+.dopts{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.seg{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg .sl{font:12px var(--mono);color:var(--mute);padding:0 10px}
+.seg button{font:600 13px var(--text);color:var(--fg);background:var(--panel);border:0;border-left:1px solid var(--line);padding:7px 11px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--green);color:#000}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="eyebrow">kortex 0.8.0 · design study · 19 November 2026</span>
+  <h1>Where should the agent talk to you?</h1>
+  <p class="lede">Today kortex holds the whole conversation inside KRunner's result list. This page looks at four other answers, from a tidier palette to a session that stays beside your work, each as a prototype you can click through. The request is the same in all five: <i>“why is my wifi so slow?”</i>, two changes to allow, one answer.</p>
+</header>
+
+<section class="read stack">
+  <h2>What the popup has to survive</h2>
+  <p>These limits come from KRunner itself and from the test rounds of 9–10 and 13 November. Each redesign below answers some of them and gives up something else.</p>
+</section>
+<div class="cons">
+  <div class="con"><b>KRunner pulls, it is never told</b><span class="small">kortex re-runs the query over D-Bus with a word joiner (U+2060) toggled in, so KRunner asks again. That trick is the palette's heartbeat, and it breaks when someone types.</span><span class="ev">how-it-works.md · “The palette that pulls”</span></div>
+  <div class="con"><b>The window breathes</b><span class="small">KRunner sizes its window to its rows, so a row that wraps moves the bottom edge. The fix was one-line rows while the agent works, which leaves 40 characters for what the agent is doing.</span><span class="ev">roadmap · MAX_LATEST = 40</span></div>
+  <div class="con"><b>Actions are icons</b><span class="small">Allow, Always and Deny are three unlabeled icons on a row. One of them reads as “share”, the keyboard path is Shift+Enter, and Enter alone answers nothing.</span><span class="ev">K25 · K22 · usage.md</span></div>
+  <div class="con"><b>Consent fatigue</b><span class="small">A diagnosis asked 10 to 20 times, mostly raw shell a novice cannot judge, so the one dangerous row gets the same click. Wrong words over a right command were also seen: the thesis case.</span><span class="ev">agent-test.md 4, 5 · K5</span></div>
+  <div class="con"><b>Two surfaces, two languages</b><span class="small">Words in the palette, steps in a TUI docked at the right edge. The panel is the agent's own interface, so the user has to learn two views of one conversation.</span><span class="ev">Meta+A · Meta+Shift+A</span></div>
+  <div class="con"><b>It vanishes when you look away</b><span class="small">A click elsewhere closes KRunner. From then on the conversation lives in notifications, which cannot show the step's command or give a real Allow. An empty Meta+A shows nothing at all.</span><span class="ev">K23 · K27 · K28</span></div>
+</div>
+
+<section class="read stack">
+  <h2>What other popups do</h2>
+  <p>None of them has kortex's main problem, consent for commands with root nearby. But each solved one part of it.</p>
+</section>
+<div class="tw"><table style="min-width:860px">
+  <thead><tr><th>Popup</th><th>What it does</th><th>What kortex can take</th></tr></thead>
+  <tbody>
+    <tr><td><b>Spotlight, Alfred, KRunner</b></td><td>One field and a ranked list that is gone after one action.</td><td>Great to start a request, poor as a conversation. This is kortex today.</td></tr>
+    <tr><td><b>Raycast AI</b></td><td>Quick AI answers below the launcher field. One key continues the chat in a separate window.</td><td>Start in the launcher, then hand off to a surface built for talking. This is option B.</td></tr>
+    <tr><td><b>ChatGPT and Claude desktop quick entry</b></td><td>A small floating bar on a global key that grows into a chat window.</td><td>A window anchored at the top that grows downward only, so its top edge never moves.</td></tr>
+    <tr><td><b>Dynamic Island, Live Activities</b></td><td>Long tasks keep a small live status in a fixed spot, and you tap it to expand.</td><td>A pill or chip that stays while you work on, instead of a notification that disappears.</td></tr>
+    <tr><td><b>Copilot on the Windows taskbar</b></td><td>The assistant is a button in the bar, and its pane opens from there.</td><td>A place you can always see. Plasma places a panel applet's popup by itself. This is option C.</td></tr>
+    <tr><td><b>Plan modes in coding agents</b></td><td>The agent looks first, then shows a plan. You approve it once, and it runs.</td><td>One consent for a set of changes, matched command by command. Anything off the plan still asks.</td></tr>
+    <tr><td><b>polkit, Android permission dialogs</b></td><td>One question, labeled buttons, what is at stake in words, and a safe default.</td><td>Words for the risk (“changes your network”) and real buttons, not icons.</td></tr>
+  </tbody>
+</table></div>
+
+<section class="read stack">
+  <h2>Four options, to click through</h2>
+  <p>Each prototype starts paused at the first moment the agent asks. Allow or deny, click the wallpaper to look away, and bring it back with the button below. <b>Restart</b> plays the whole request from the start, in about 15 seconds. <b>A</b> is the chosen direction and opens first. <b>D</b> was added after the first review, for two things the others miss: a conversation that is not gone when you click elsewhere, and a session with some back and forth. It starts in its third turn. Its <b>Ask me</b> switch sets how far you are in the loop, and two more switches sit below the desktop.</p>
+</section>
+
+<div class="tabs" role="tablist" id="tabs">
+  <button class="tab" role="tab" data-v="today" aria-selected="false"><span class="k">0</span>Today</button>
+  <button class="tab" role="tab" data-v="a" aria-selected="false"><span class="k">A</span>Steady palette <span class="tagline g" style="margin-left:6px">chosen</span></button>
+  <button class="tab" role="tab" data-v="b" aria-selected="false"><span class="k">B</span>Hand-off card</button>
+  <button class="tab" role="tab" data-v="c" aria-selected="false"><span class="k">C</span>In the bar</button>
+  <button class="tab" role="tab" data-v="d" aria-selected="false"><span class="k">D</span>Session</button>
+</div>
+
+<div class="bench">
+  <div class="stagebox" id="stagebox"><div class="desk" id="desk"></div></div>
+  <div class="ctl">
+    <button class="btn" id="restart">Restart</button>
+    <button class="btn" id="away">Click elsewhere</button>
+    <span class="dopts" id="dopts" hidden>
+      <span class="seg" data-opt="awayMode"><span class="sl">Click away</span><button data-val="stay" aria-pressed="true">Steps aside</button><button data-val="shrink" aria-pressed="false">Shrinks</button></span>
+      <span class="seg" data-opt="panelKind"><span class="sl">Side panel</span><button data-val="chat" aria-pressed="true">kortex chat</button><button data-val="term" aria-pressed="false">Terminal</button></span>
+    </span>
+    <span class="state" id="state"></span>
+  </div>
+  <div id="explain"></div>
+</div>
+
+<section class="read stack">
+  <h2>Side by side</h2>
+</section>
+<div class="tw"><table style="min-width:860px">
+  <thead><tr><th></th><th>Today</th><th>A · Steady palette</th><th>B · Hand-off card</th><th>C · In the bar</th><th>D · Session</th></tr></thead>
+  <tbody>
+    <tr><td><b>Back and forth you can see</b></td><td class="n">the last answer</td><td class="n">the last answer, two lines</td><td class="y">all of it, while open</td><td class="y">all of it, in the popup</td><td class="y">earlier turns short, each opens; all scrolls</td></tr>
+    <tr><td><b>After a click elsewhere</b></td><td class="n">gone, then a notification</td><td class="m">notification with Allow/Deny</td><td class="m">pill at the top</td><td class="m">chip in the bar</td><td class="y">docks at the right edge, or a corner card with the last line</td></tr>
+    <tr><td><b>Window holds still</b></td><td class="n">grows by rows</td><td class="y">fixed five rows</td><td class="m">grows down, top fixed</td><td class="y">fixed size, Plasma places it</td><td class="y">card grows down, panel is fixed</td></tr>
+    <tr><td><b>How far you are in the loop</b></td><td>fixed: every change asks</td><td class="m">per question: allow the rest of this task</td><td>fixed: every change asks</td><td class="m">plan, or one at a time</td><td class="y">one switch: every step, per plan, only if risky</td></tr>
+    <tr><td><b>Real buttons for consent</b></td><td class="n">icons</td><td class="m">rows as buttons</td><td class="y">yes</td><td class="y">yes</td><td class="y">yes, in card, corner and panel</td></tr>
+    <tr><td><b>Clicks for the first request</b></td><td>2</td><td>2, or 1 with allow the rest</td><td>2</td><td class="y">1 (plan)</td><td>2, 1 or 0, by level</td></tr>
+    <tr><td><b>Shows what runs</b></td><td>command under words</td><td>command under words, risk named</td><td>command block, looks folded</td><td>plan with commands, Steps tab</td><td>command block, looks folded</td></tr>
+    <tr><td><b>The side panel</b></td><td>a second view, in a terminal</td><td>a second view, in a terminal</td><td class="y">optional</td><td class="y">optional (Steps tab)</td><td class="y">the same conversation, docked</td></tr>
+    <tr><td><b>Pull trick (U+2060)</b></td><td>needed</td><td>needed</td><td class="y">only for the first row</td><td class="y">only for the first row</td><td class="y">only for the first row</td></tr>
+    <tr><td><b>New code to own</b></td><td>–</td><td class="y">kortex.py only</td><td class="n">a Qt/QML window and layer-shell</td><td class="m">a QML plasmoid and a local API</td><td class="m">terminal panel: kortex.py only. Chat panel: a window as in B, or C's plasmoid</td></tr>
+    <tr><td><b>New dependencies</b></td><td>–</td><td class="y">none</td><td class="n">PyQt6/PySide6 QtQuick, layer-shell-qt</td><td class="y">none beyond Plasma</td><td class="m">none with the terminal; as B or C with the chat</td></tr>
+    <tr><td><b>Breaks with</b></td><td></td><td>KRunner's layout changes</td><td>X11 has no layer-shell; focus rules</td><td>plasmoid API changes in 6.x</td><td>docking on Wayland, not yet seen on real hardware</td></tr>
+  </tbody>
+</table></div>
+
+<section class="read stack">
+  <h2>Radical ideas that fit any option</h2>
+  <p>These are not windows. They change what the window has to carry, and the first two are in the prototypes.</p>
+</section>
+<div class="ideas">
+  <div class="note-c"><span class="tagline g">in C, works in A and B</span><h3>Consent for a plan, not a command</h3><p class="small">opencode's read-only <code>plan</code> agent looks first and proposes a list of changes. One <b>Run the plan</b> approves them. kortex already sees every permission request, so it replies <code>once</code> only to a request whose command matches a plan line exactly. Anything else asks as before, and so do root and deletes. This works with Hermes too, since the matching happens in kortex.</p></div>
+  <div class="note-c"><span class="tagline g">in A</span><h3>Answer from the notification</h3><p class="small">Freedesktop notifications can carry actions. With Allow once and Deny on the “asks first” notification, the user answers without reopening the palette. That fixes K23 as a side effect, because the notification is closed by its own answer.</p></div>
+  <div class="note-c"><span class="tagline v">idea</span><h3>Undo instead of ask</h3><p class="small">Take a snapshot before a change, and ask after the fact for anything that can be rolled back. Debian installs on ext4 by default, so this would need btrfs or a per-file backup. It is out of reach for now, but it is the only idea that removes most rows rather than moving them.</p></div>
+  <div class="note-c"><span class="tagline v">idea</span><h3>Ask about what is in front of you</h3><p class="small">Meta+A with text selected, or a window focused, attaches that context: the error dialog, the selected log line. Many problems start in a window, and today the user has to copy them out by hand.</p></div>
+  <div class="note-c"><span class="tagline a">idea</span><h3>No conversation window at all</h3><p class="small">Every answer is a rich notification and every consent is a polkit-style dialog. It is the smallest surface possible, but consent then comes from a second place. That brings back the split the panel already has, so it was not prototyped.</p></div>
+  <div class="note-c"><span class="tagline a">idea</span><h3>Risk words, not risk colours</h3><p class="small">“Changes your network”, “Deletes files”, “Runs as root” are worked out by kortex from the command, not taken from the model's words. That answers the thesis case: the label stays true even when the explanation is wrong.</p></div>
+</div>
+
+<section class="read stack">
+  <h2>Decision: A, the steady palette</h2>
+</section>
+<div class="rec">
+  <p class="pitch"><b>kortex stays in KRunner and gives the user more control there.</b> A is cheap to build, needs changes to kortex.py only, and adds no dependency. It also keeps what works today: every search can end with “Ask kortex”. Built as kortex 0.9.0.</p>
+  <ol class="small">
+    <li><b>Questions as rows.</b> A risk label kortex works out from the command, the agent's words, the command, then Allow this once and Don't, stop here as rows. Always allow is a row with its rule in words, only where it may be offered (K25).</li>
+    <li><b>One-line rows while the agent works:</b> the status, its last whole sentence, its steps so far in a word each, and Show every step.</li>
+    <li><b>Notifications that answer:</b> Allow once and Deny on the “asks first” notification, which then closes (K23).</li>
+    <li><b>An empty Meta+A</b> opens on the hint, the recent conversations and two requests to try (K27).</li>
+    <li><b>Allow the rest of this task is off by default.</b> A user turns it on in the palette's list or with <code>patina ai handover on</code>. It covers one request, never what deletes, runs as root, installs or changes a service, and the answer lists what ran on it.</li>
+  </ol>
+  <p class="small"><b>Why off by default.</b> With it, one yes covers commands the user has not seen, and the list of what still asks matches a command's shape, not its effect. That is the weakness the agent test found in Hermes. opencode's point in patina is that nothing changes without a yes that named it, so giving that up is the user's own choice.</p>
+  <p class="small"><b>Where the build differs from the mock above.</b> The row that asks comes first and the status last, so that Shift+Enter still allows once. The agent's words are one line, not two, because only one-line rows keep KRunner's height. The answer keeps today's twelve lines. The window still changes height when a step asks and when the answer comes. “Five rows, always” did not survive: rows that only filled space were left out.</p>
+  <p class="small muted">B, C and D stay on this page as later options. D's session ideas (the conversation that steps aside, earlier turns shortened, the Ask me levels) are the natural next step if users hold sessions of many turns.</p>
+</div>
+
+<section class="read stack">
+  <h2>Still to see on a real desktop</h2>
+  <ul class="q">
+    <li>That KRunner keeps the answer rows in order under the row that asks.</li>
+    <li>What Enter does on a row that only says something.</li>
+    <li>That Plasma's notifications show three buttons and close when kortex asks.</li>
+    <li>Whether one approval per plan (option C's idea) is the better hand-over: a yes there covers only commands the user has seen.</li>
+  </ul>
+  <h3 style="margin-top:20px">Open for the later options</h3>
+  <ul class="q small muted">
+    <li>D: after a click elsewhere, step aside to the right edge or shrink to the corner? kortex's own chat or the terminal as the side panel?</li>
+    <li>D: does “only if risky” ship, and which Ask me level is the default?</li>
+    <li>C: the chip beside the start button or in the tray? Plan-first as default or opt-in?</li>
+  </ul>
+</section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const Q = "why is my wifi so slow?";
+const DENIED = "Stopped: you denied the last step, so it did not run. Say what to do instead.";
+const ANSWER = "You're on home-5G now, the 5 GHz network of the same router: signal 71 %, and the round trip to the internet fell from 48 ms to 9 ms. Your laptop joins home-5G first from now on. Far from the router, 2.4 GHz can still be the better one.";
+const BEATS = [
+  {t:1100,k:"think",line:"Looking at your Wi-Fi first."},
+  {t:1300,k:"step",cmd:"nmcli -t -f ACTIVE,SSID,FREQ,SIGNAL dev wifi",what:"reading Wi-Fi networks",look:true,out:"yes:home:2437 MHz:38\nno:home-5G:5180 MHz:71\nno:Neighbour:2412 MHz:22"},
+  {t:1200,k:"step",cmd:"iw dev wlp2s0 link",what:"reading the link speed",look:true,out:"SSID: home\nfreq: 2437\nsignal: -74 dBm\ntx bitrate: 26.0 MBit/s"},
+  {t:1200,k:"step",cmd:"ping -c 3 1.1.1.1",what:"checking the speed",look:true,out:"3 packets transmitted, 3 received\nrtt min/avg/max = 41.3/48.2/57.9 ms"},
+  {t:1500,k:"say",text:"You are on home at 2.4 GHz with 38 % signal. home-5G, the same router's 5 GHz network, is in range at 71 %."},
+  {t:1000,k:"ask",words:"I'll switch you to home-5G, the 5 GHz network of the same router.",short:"switch to home-5G",cmd:"nmcli connection up home-5G",risk:"net",riskw:"Changes your network"},
+  {t:900,k:"step",cmd:"nmcli connection up home-5G",what:"switching network",out:"Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/7)"},
+  {t:1300,k:"ask",words:"I'll make home-5G the network your laptop joins first.",short:"join home-5G first",cmd:"nmcli connection modify home-5G connection.autoconnect-priority 10",risk:"set",riskw:"Changes a setting"},
+  {t:800,k:"step",cmd:"nmcli connection modify home-5G connection.autoconnect-priority 10",what:"changing a setting",out:""},
+  {t:1100,k:"step",cmd:"ping -c 3 1.1.1.1",what:"checking the speed again",look:true,out:"3 packets transmitted, 3 received\nrtt min/avg/max = 8.7/9.1/9.6 ms"},
+  {t:1500,k:"answer",text:ANSWER}
+];
+const TURNS = [
+  {q:Q, beats:BEATS},
+  {q:"is the neighbour's wifi in my way?", beats:[
+    {t:1000,k:"think",line:"Comparing the channels."},
+    {t:1200,k:"step",cmd:"nmcli -f SSID,CHAN,SIGNAL dev wifi",what:"reading the channels",look:true,out:"home-5G    36  71\nhome        6  38\nNeighbour   1  22"},
+    {t:1500,k:"answer",text:"No. Neighbour sends on channel 1 at 2.4 GHz with 22 % signal, and you are on channel 36 at 5 GHz now. The two do not overlap."}
+  ]},
+  {q:"then forget the old home network", beats:[
+    {t:1000,k:"think",line:"Looking at the saved networks."},
+    {t:1100,k:"step",cmd:"nmcli -t -f NAME,TYPE connection show",what:"reading the saved networks",look:true,out:"home-5G:802-11-wireless\nhome:802-11-wireless"},
+    {t:1100,k:"ask",words:"I'll remove the saved 2.4 GHz network home, so the laptop never falls back to it. To add it again you would need its password.",short:"remove the saved network home",cmd:"nmcli connection delete home",risk:"del",riskw:"Deletes a saved network"},
+    {t:900,k:"step",cmd:"nmcli connection delete home",what:"removing a saved network",out:"Connection 'home' successfully deleted."},
+    {t:1300,k:"answer",text:"Done. home is no longer saved, only home-5G is. To get it back, pick home in the network list and enter its password."}
+  ]}
+];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const trunc = (s,n) => s.length > n ? s.slice(0,n-1) + "…" : s;
+
+const P = {
+  gear:'<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+  search:'<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',
+  help:'<path d="M6 6a2 2 0 1 1 2.8 1.8C8.2 8.1 8 8.6 8 9.2"/><circle cx="8" cy="11.8" r=".4" fill="currentColor"/>',
+  pin:'<path d="M6 2h4l-.5 4 2 2H4.5l2-2zM8 8v6"/>',
+  check:'<path d="m3 8.5 3 3 7-7"/>',
+  x:'<path d="m4 4 8 8M12 4l-8 8"/>',
+  copy:'<rect x="5" y="5" width="8" height="9" rx="1.5"/><path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H10"/>',
+  dock:'<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M10 3v10"/>',
+  stop:'<rect x="4" y="4" width="8" height="8" rx="1"/>',
+  warn:'<path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3.2"/><circle cx="8" cy="11.6" r=".4" fill="currentColor"/>',
+  folder:'<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>',
+  globe:'<circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12"/>',
+  term:'<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m5 7 2 1.5L5 10M8.5 10.5H11"/>',
+  wifi:'<path d="M2 6.5a9 9 0 0 1 12 0M4 9a6 6 0 0 1 8 0M6 11.4a3 3 0 0 1 4 0"/><circle cx="8" cy="13.4" r=".5" fill="currentColor"/>',
+  vol:'<path d="M3 6h2l3-2.5v9L5 10H3zM10.5 6a3 3 0 0 1 0 4"/>',
+  chev:'<path d="m6 4 4 4-4 4"/>',
+  down:'<path d="m4 6 4 4 4-4"/>',
+  min:'<path d="M4 8h8"/>',
+  plus:'<path d="M8 3v10M3 8h10"/>',
+  dot:'<circle cx="8" cy="8" r="2.5" fill="currentColor"/>'
+};
+const ic = (n, cls) => `<svg class="i ${cls||""}" viewBox="0 0 16 16" aria-hidden="true">${P[n]}</svg>`;
+const mark = (sz) => `<svg viewBox="0 0 16 16" width="${sz||16}" height="${sz||16}" aria-hidden="true"><path d="M8 2.5 14 13H2z" fill="none" stroke="#3cff9d" stroke-width="1.7" stroke-linejoin="round"/></svg>`;
+const rings = (c) => `<svg class="rings" viewBox="0 0 16 16" aria-hidden="true"><ellipse cx="8" cy="9" rx="7" ry="5" fill="none" stroke="${c||"#b77dff"}" stroke-width="1.2" opacity=".55"/><ellipse cx="8" cy="9" rx="4.3" ry="3" fill="none" stroke="${c||"#b77dff"}" stroke-width="1.2" opacity=".8"/><path d="M8 5.6 9.6 8.6H6.4z" fill="${c==="#000"?"#000":"#3cff9d"}"/></svg>`;
+
+/* ---------- the simulation ---------- */
+class Sim {
+  constructor(opts){ this.o = opts || {}; this.view = null; this.reset(true); }
+  reset(ff){
+    clearTimeout(this.tm);
+    this.i = 0; this.turn = 0; this.B = TURNS[0].beats;
+    this.s = {phase:"idle", elapsed:0, steps:[], log:[], ask:null, plan:null, planOK:false, planOne:false, answer:null, latest:"", mode:"Working", away:false, open:{}, tab:"chat", where:"card", stepBase:0};
+    if (ff && this.o.session){
+      /* a session at rest: two turns done, the third asks */
+      const s = this.s; this.begin();
+      for (let g = 0; g < 200; g++){
+        if (s.phase === "run"){ if (this.i < this.B.length) this.apply(this.B[this.i]); else break; }
+        else if (s.phase === "ask" && !s.ask){ s.plan.state = "run"; s.planOK = true; s.phase = "run"; s.log.push({type:"dec", ok:true, text:"the plan, " + s.plan.items.length + " changes"}); }
+        else if (s.phase === "ask"){ if (this.turn === 2) break; s.log.push({type:"dec", ok:true, text:s.ask.short}); s.ask = null; s.phase = "run"; this.i++; }
+        else if (s.phase === "done"){ s.elapsed = [14,5][this.turn]; this.nextTurn(); }
+      }
+      s.elapsed = 3;
+    } else if (ff){ this.begin(); while (this.i < this.B.length && this.s.phase === "run") this.apply(this.B[this.i]); this.s.elapsed = 7; }
+  }
+  begin(){ this.s.phase = "run"; this.s.latest = "waiting for the agent"; this.s.log.push({type:"you", text:TURNS[this.turn].q}); }
+  nextQ(){ const s = this.s; if (s.phase === "idle") return Q; if (this.o.session && s.phase === "done" && this.turn < TURNS.length - 1) return TURNS[this.turn + 1].q; return null; }
+  nextTurn(){
+    const s = this.s;
+    s.log.push({type:"ans", text:s.answer, n:stepsDone(s), el:s.elapsed});
+    this.turn++; this.B = TURNS[this.turn].beats; this.i = 0;
+    s.answer = null; s.elapsed = 0; s.stepBase = s.steps.length;
+    s.plan = null; s.planOK = false; s.planOne = false; s.restOK = false; this.begin();
+  }
+  send(){
+    const s = this.s;
+    if (s.phase === "idle") this.begin();
+    else if (this.nextQ()) this.nextTurn();
+    else return;
+    this.draw(); this.loop();
+  }
+  loop(){
+    clearTimeout(this.tm);
+    if (this.i >= this.B.length || this.s.phase !== "run") return;
+    const b = this.B[this.i];
+    this.tm = setTimeout(() => { this.apply(b); this.draw(); this.loop(); }, b.t);
+  }
+  apply(b){
+    const s = this.s;
+    s.steps.forEach(x => { if (x.state === "run") x.state = "done"; });
+    if (s.plan) s.plan.items.forEach(x => { if (x.state === "run" && !(b.k === "step" && b.cmd === x.cmd)) x.state = "done"; });
+    switch (b.k){
+      case "think": s.mode = "Thinking"; s.latest = b.line; break;
+      case "say": s.mode = "Working"; s.latest = b.text; s.log.push({type:"say", text:b.text}); break;
+      case "step": {
+        const st = Object.assign({}, b, {state:"run"}), prev = s.log[s.log.length - 1];
+        if (prev && prev.type === "auto" && prev.b.cmd === b.cmd) st.quiet = true;
+        s.steps.push(st); s.log.push({type:"step", st}); s.mode = "Working"; s.latest = b.what;
+        const it = s.plan && s.plan.items.find(x => x.cmd === b.cmd && x.state === "wait");
+        if (it) it.state = "run";
+        break;
+      }
+      case "ask": {
+        const risky = b.risk === "del", L = this.o.level;
+        /* reversible, and the user handed it over: runs, and is reported */
+        if (!risky && ((this.o.session && L === "auto") || s.restOK)){ s.log.push({type:"auto", b, rest:s.restOK}); break; }
+        if ((this.o.plan || L === "plan") && !s.planOne && !risky){
+          if (!s.planOK){
+            s.plan = {items: this.B.slice(this.i).filter(x => x.k === "ask" && x.risk !== "del").map(x => Object.assign({}, x, {state:"wait"})), state:"ask"};
+            s.log.push({type:"plan", p:s.plan}); s.phase = "ask"; s.latest = "waiting for you"; return;
+          }
+          break; /* on the plan: kortex replies once by itself */
+        }
+        s.ask = b; s.phase = "ask"; s.latest = "waiting for you"; return;
+      }
+      case "answer": s.answer = b.text; s.phase = "done"; s.mode = "Answered"; break;
+    }
+    this.i++;
+  }
+  act(a){
+    const s = this.s;
+    if (this.o.session){
+      if (a === "away"){ if (s.where === "card") s.where = this.o.awayMode === "stay" ? "panel" : "peek"; s.away = true; return this.draw(); }
+      if (a === "back"){ s.where = "card"; s.away = false; return this.draw(); }
+      if (a === "dock" || a === "peek"){ s.where = a === "dock" ? "panel" : "peek"; s.away = true; return this.draw(); }
+    }
+    if (a === "send") return this.send();
+    if (a === "away"){ s.away = true; return this.draw(); }
+    if (a === "back"){ s.away = false; return this.draw(); }
+    if (a.startsWith("open:")){ const k = a.slice(5); s.open[k] = !s.open[k]; return this.draw(); }
+    if (a.startsWith("lvl:")){ this.o.level = a.slice(4); return this.draw(); }
+    if (a === "rest-off"){ s.restOK = false; return this.draw(); }
+    if (a === "deep"){ s.deep = !s.deep; return this.draw(); }
+    if (a === "tab-chat" || a === "tab-steps"){ s.tab = a.slice(4); return this.draw(); }
+    if (a === "restart"){ this.reset(false); return this.draw(); }
+    if (a === "noop") return;
+    if (s.phase !== "ask") return;
+    if (a === "allow-rest"){ s.restOK = true; a = "allow"; }
+    if (a === "allow"){ s.log.push({type:"dec", ok:true, text:s.ask.short}); s.ask = null; s.phase = "run"; this.i++; }
+    else if (a === "deny"){
+      s.log.push({type:"dec", ok:false, text: s.ask ? s.ask.short : "the plan"});
+      if (s.plan && s.plan.state === "ask") s.plan.state = "denied";
+      s.ask = null; s.phase = "stopped"; s.answer = DENIED; return this.draw();
+    }
+    else if (a === "plan-run"){ s.plan.state = "run"; s.planOK = true; s.phase = "run"; s.log.push({type:"dec", ok:true, text:"the plan, " + s.plan.items.length + " changes"}); }
+    else if (a === "plan-one"){ s.plan.state = "one"; s.planOne = true; s.phase = "run"; }
+    this.draw(); this.loop();
+  }
+  draw(){ if (this.view) this.view(this); }
+}
+
+/* ---------- shared desktop ---------- */
+function bar(mid){
+  return `<div class="bar">
+    <div class="apps"><span class="app">${ic("folder")}</span><span class="app">${ic("globe")}</span><span class="app">${ic("term")}</span></div>
+    <div class="mid"><span class="start">${mark(18)}</span>${mid||""}</div>
+    <div class="tray">${ic("vol","s")}${ic("wifi","s")}<span class="clock">14:32<br>19 Nov 2026</span></div>
+  </div>`;
+}
+function stepsDone(s){ return s.steps.slice(s.stepBase || 0).filter(x => x.state === "done").length; }
+
+/* ---------- 0: today ---------- */
+function krHead(text, ghost){
+  return `<div class="head"><span class="ib">${ic("gear")}</span><span class="ib on">${ic("chev")}</span>
+    <div class="field">${ic("search","s")}<span>${esc(text)}</span><span class="caret"></span>${ghost||""}</div>
+    <span class="ib">${ic("help")}</span><span class="ib">${ic("pin")}</span></div>`;
+}
+function act(name, title, a){ return `<button class="act" title="${esc(title)}" aria-label="${esc(title)}" data-act="${a||"noop"}">${ic(name)}</button>`; }
+function row(o){
+  return `<div class="row ${o.sel?"sel":""} ${o.cls||""}" ${o.a?`data-act="${o.a}" role="button" tabindex="0"`:""}>
+    <span class="cat">${o.cat||""}</span><span>${o.icon||""}</span>
+    <span class="txt"><div class="${o.wrap||"one"}">${o.text}</div>${o.sub?`<div class="sub ${o.subm?"mono9":""}">${o.sub}</div>`:""}</span>
+    <span class="acts">${o.acts||""}</span></div>`;
+}
+function vToday(sim){
+  const s = sim.s; let h = `<div class="wall"></div>`;
+  if (!s.away){
+    const rows = [];
+    if (s.phase === "idle"){
+      rows.push(row({cat:"kortex", icon:mark(), text:"Ask kortex: " + esc(Q), sub:"opencode · Enter sends", sel:true, a:"send"}));
+    } else if (s.phase === "run"){
+      rows.push(row({cat:"kortex", icon:mark(), text:`${s.mode} · <span class="js-el">${s.elapsed}</span> s · ${esc(trunc(s.latest,40))}`, sel:true,
+        acts: act("copy","Copy") + act("dock","Show what the agent does") + act("stop","Stop")}));
+    } else if (s.phase === "ask"){
+      rows.push(row({cat:"kortex", icon:mark(), text:"Waiting for your answer · Shift+Enter allows once", acts: act("dock","Show what the agent does") + act("stop","Stop")}));
+      rows.push(row({icon:`<span style="color:#ffa45c">${ic("warn")}</span>`, text:"Allow: " + esc(s.ask.words), sub:esc(s.ask.cmd), subm:true, sel:true,
+        acts: act("check","Allow once","allow") + act("x","Deny","deny")}));
+    } else {
+      rows.push(row({cat:"kortex", icon:mark(), text: esc(s.answer), wrap:"", sub: s.phase === "done" ? `opencode · Enter copies · ${stepsDone(s)} steps` : "opencode", sel:true,
+        acts: act("copy","Copy") + act("dock","Show what the agent does")}));
+    }
+    h += `<div class="kr win">${krHead(s.phase === "idle" ? Q : "kortex › ")}<div class="rows">${rows.join("")}</div></div>`;
+    if (s.phase === "ask") h += `<div class="ann" style="left:640px;top:300px">icons only · Enter answers nothing</div>`;
+    if (s.phase === "done") h += `<div class="ann" style="left:200px;top:150px">the window grew with the answer</div>`;
+  } else {
+    let t, b, acts = `<button class="nbtn" data-act="back">Show</button>`;
+    if (s.phase === "run"){ t = "kortex works on your request"; b = `<span class="js-el">${s.elapsed}</span> s · ${esc(trunc(s.latest,60))}`; }
+    else if (s.phase === "ask"){ t = "kortex asks first"; b = esc(s.ask.words); }
+    else if (s.phase === "done"){ t = "kortex answered"; b = esc(trunc(s.answer,150)); }
+    else { t = "kortex stopped"; b = esc(s.answer); }
+    h += `<div class="note"><div class="nh">${mark(12)} kortex · now</div><div class="nt">${t}</div><div class="nb">${b}</div><div class="na">${acts}</div></div>`;
+    if (s.phase === "ask") h += `<div class="ann" style="right:350px;bottom:120px">no command, no Allow here</div>`;
+  }
+  return h + bar();
+}
+
+/* ---------- A: steady palette ---------- */
+function vA(sim){
+  const s = sim.s; let h = `<div class="wall"></div>`;
+  const n = s.steps.length, dots = `<span class="dots">${s.steps.map(x => `<i class="${x.state==="done"?"d":"r"}"></i>`).join("")}</span>`;
+  if (!s.away){
+    let r = [];
+    const stepsBtn = act("dock","Show every step (Meta+Shift+A)");
+    const hint = row({icon:"", text:`<span class="muted">Click away and a notification follows</span>`});
+    const stepsRow = row({icon:ic("dock"), text:"Show every step", sub:"opens the side panel with each command · Meta+Shift+A", cls:"btnrow", a:"noop"});
+    const autos = s.log.filter(x => x.type === "auto");
+    let ghost = "";
+    if (s.phase === "idle"){
+      r = [row({cat:"kortex", icon:mark(), text:"Ask kortex: " + esc(Q), sub:"Enter sends", sel:true, a:"send"}),
+           row({icon:"", text:`<span class="muted">Try: “the printer stopped printing”<br>Try: “install PhotoCraft”</span>`, cls:"r2", wrap:""}),
+           row({icon:"", text:`<span class="muted">Edit what the agent always keeps to</span>`}),
+           row({icon:"", text:`<span class="muted">Every change asks. On a question you can allow the rest of that task.</span>`}), hint];
+    } else if (s.phase === "run"){
+      const done = s.steps.filter(x=>x.state==="done").map(x=>x.cmd.split(" ")[0]);
+      r = [row({cat:"kortex", icon:mark(), text:`${s.mode} · <span class="js-el">${s.elapsed}</span> s · step ${Math.max(n,1)}: ${esc(s.latest.length>40?"reading the agent's words":s.latest)}${dots}`, sel:true,
+              acts: act("stop","Stop")}),
+           row({icon:"", text:esc(s.log.filter(x=>x.type==="say").map(x=>x.text).pop() || s.latest), cls:"r2", wrap:"clamp2"}),
+           row({icon:"", text:`<span class="muted">Done so far</span>`, sub: done.length ? esc(done.join(" · ")) : "nothing yet", subm:true}),
+           s.restOK ? row({icon:`<span class="ok">${ic("check")}</span>`, text:`<span class="ok">Running the rest on your yes</span>${autos.length ? ` · ${autos.length} change${autos.length>1?"s":""} so far` : ""}`, sub:"Enter takes it back: the next change asks again", cls:"btnrow", a:"rest-off"})
+                    : row({icon:"", text:`<span class="muted">Every change asks</span>`}), stepsRow];
+      if (s.restOK) ghost = `<button class="ghost" data-act="rest-off">type <b>ask</b> ↵ to be asked again</button>`;
+    } else if (s.phase === "ask"){
+      const del = s.ask.risk === "del";
+      r = [row({cat:"kortex", icon:mark(), text:`<span style="color:#ffa45c">Waiting for you</span> · <span class="js-el">${s.elapsed}</span> s${dots}`, acts: stepsBtn + act("stop","Stop")}),
+           row({icon:`<span style="color:#ffa45c">${ic("warn")}</span>`, text:`<span class="risk ${s.ask.risk}">${esc(s.ask.riskw)}</span>${esc(s.ask.words)}`, sub:esc(s.ask.cmd), subm:true, cls:"r2", wrap:"clamp2", sel:true}),
+           row({icon:`<span class="ok">${ic("check")}</span>`, text:"Allow this once", sub:"↓ Enter · or Shift+Enter from above", cls:"btnrow", a:"allow"}),
+           del ? row({icon:"", text:`<span class="muted">Deleting asks every time</span>`})
+               : row({icon:`<span class="ok">${ic("check")}</span>`, text:"Allow the rest of this task", sub:"this and what follows in this request · deleting, root and installs still ask", cls:"btnrow", a:"allow-rest"}),
+           row({icon:`<span style="color:#ff5c7a">${ic("x")}</span>`, text:"Don't, stop here", cls:"btnrow", a:"deny"})];
+      if (!del) ghost = `<button class="ghost" data-act="allow-rest">type <b>go</b> ↵ to allow the rest</button>`;
+    } else if (s.phase === "done"){
+      r = [row({cat:"kortex", icon:mark(), text:`Answered after <span>${s.elapsed}</span> s · ${stepsDone(s)} steps · Enter copies`, acts: act("copy","Copy")}),
+           row({icon:"", text:esc(s.answer), cls:"r2", wrap:"clamp2", sel:true}),
+           autos.length ? row({icon:`<span style="color:#ffa45c">${ic("warn")}</span>`, text:`Ran on your yes: ${esc(autos.map(x => x.b.short).join(", "))}`, sub:esc(autos.map(x => x.b.cmd).join(" ; ")), subm:true})
+                        : row({icon:"", text:`<span class="muted">Every change was allowed one by one</span>`}),
+           row({icon:"", text:"Show the whole answer", cls:"btnrow", a:"noop"}),
+           stepsRow];
+    } else {
+      r = [row({cat:"kortex", icon:mark(), text:`<span style="color:#ff5c7a">Stopped</span> · you said no`}),
+           row({icon:"", text:esc(DENIED), cls:"r2", wrap:"clamp2", sel:true}),
+           row({icon:"", text:`<span class="muted">Type after kortex › what to do instead</span>`}),
+           row({icon:"", text:`<span class="muted">Nothing else ran</span>`}), stepsRow];
+    }
+    h += `<div class="kr win" style="top:150px">${krHead(s.phase === "idle" ? Q : "kortex › ", ghost)}<div class="rows">${r.join("")}</div></div>`;
+    h += `<div class="ann" style="left:790px;top:177px">5 rows, always</div>`;
+  } else {
+    let t, b, acts = `<button class="nbtn" data-act="back">Show</button>`;
+    if (s.phase === "run"){ t = s.restOK ? "kortex runs the rest on your yes" : "kortex works on your request"; b = `step ${s.steps.length} · ${esc(trunc(s.latest,60))}`; }
+    else if (s.phase === "ask"){ t = `kortex asks first · <span class="risk ${s.ask.risk}">${esc(s.ask.riskw)}</span>`; b = `${esc(s.ask.words)}<br><span class="mono9">${esc(s.ask.cmd)}</span>`;
+      acts = `<button class="nbtn" data-act="deny">Deny</button><button class="nbtn g" data-act="allow">Allow once</button>${s.ask.risk !== "del" ? `<button class="nbtn" data-act="allow-rest">Allow the rest</button>` : ""}<button class="nbtn" data-act="back">Show</button>`; }
+    else if (s.phase === "done"){ t = "kortex answered"; b = esc(trunc(s.answer,150)); acts = `<button class="nbtn" data-act="noop">Copy</button>` + acts; }
+    else { t = "kortex stopped"; b = esc(s.answer); }
+    h += `<div class="note"><div class="nh">${mark(12)} kortex · now</div><div class="nt">${t}</div><div class="nb">${b}</div><div class="na">${acts}</div></div>`;
+  }
+  return h + bar();
+}
+
+/* ---------- chat body, shared by B and C ---------- */
+function chat(s, opts){
+  const out = []; let looks = [];
+  const flushLooks = (k) => {
+    if (!looks.length) return;
+    const running = looks.some(x => x.state === "run"), key = (opts.openLooks ? "L" : "l") + k, open = opts.openLooks ? !s.open[key] : s.open[key];
+    const names = [...new Set(looks.map(x => x.cmd.split(" ")[0]))].join(", ");
+    out.push(`<div class="looks"><button data-act="open:${key}">${ic(open?"down":"chev","s")} ${running ? `<span class="spin"></span> ${esc(looks[looks.length-1].what)}…` : `Looked at ${looks.length} thing${looks.length>1?"s":""} · ${esc(names)}`}</button>${open ? looks.map(x=>`<div class="cmd">${esc(x.cmd)}</div>`).join("") : ""}</div>`);
+    looks = [];
+  };
+  const end = opts.to === undefined ? s.log.length : opts.to, tail = opts.to === undefined;
+  for (let k = opts.from || 0; k < end; k++){
+    const e = s.log[k];
+    if (e.type === "step" && e.st.look){ looks.push(e.st); continue; }
+    flushLooks(k);
+    if (e.type === "you") out.push(`<div class="you">${esc(e.text)}</div>`);
+    else if (e.type === "say") out.push(`<div class="say">${esc(e.text)}</div>`);
+    else if (e.type === "step" && e.st.quiet) continue;
+    else if (e.type === "step") out.push(`<div class="stepline">${e.st.state==="run"?'<span class="spin"></span>':`<span class="ok">${ic("check","s")}</span>`} ${esc(e.st.what)} · <span class="mono9">${esc(trunc(e.st.cmd,58))}</span></div>`);
+    else if (e.type === "dec") out.push(`<div class="dec ${e.ok?"":"no"}">${ic(e.ok?"check":"x","s")} You ${e.ok?"allowed":"denied"} ${esc(e.text)}</div>`);
+    else if (e.type === "plan") out.push(planCard(e.p));
+    else if (e.type === "auto") out.push(`<div class="autod"><span class="ok">${ic("check","s")}</span> ${e.rest ? "Covered by your yes" : "Changed without asking"}: ${esc(e.b.short)} · <span class="mono9">${esc(trunc(e.b.cmd,44))}</span> <button data-act="noop">Undo</button></div>`);
+    else if (e.type === "ans") out.push(`<div class="answer">${esc(e.text)}<div class="foot"><span>${e.n} step${e.n===1?"":"s"} · ${e.el} s</span></div></div>`);
+  }
+  flushLooks("end");
+  if (!tail) return `<div class="chat">${out.join("")}</div>`;
+  if (s.phase === "run" && !s.steps.some(x => x.state === "run") ) out.push(`<div class="stepline"><span class="spin"></span> ${esc(s.mode === "Thinking" ? s.latest : "writing")}…</div>`);
+  if (s.ask) out.push(`<div class="consent"><div><span class="risk ${s.ask.risk}">${esc(s.ask.riskw)}</span></div><div class="w">${esc(s.ask.words)}</div><pre>${esc(s.ask.cmd)}</pre>
+    <div class="cb"><button class="cbtn go" data-act="allow">Allow</button>${opts.rest && s.ask.risk !== "del" ? `<button class="cbtn" data-act="allow-rest">Allow the rest of this task</button>` : ""}<button class="cbtn" data-act="deny">Deny</button><span class="kh">A allows · D denies</span></div>${opts.rest && s.ask.risk === "del" ? `<div class="own">Deleting asks every time, at every level.</div>` : ""}</div>`);
+  if (s.phase === "done") out.push(`<div class="answer">${esc(s.answer)}<div class="foot"><span>${stepsDone(s)} steps · ${s.elapsed} s</span><button data-act="noop">Copy</button>${opts.term?'<button data-act="noop">Open in terminal</button>':""}</div></div>`);
+  if (s.phase === "stopped") out.push(`<div class="stopped">${esc(DENIED)}</div>`);
+  return `<div class="chat">${out.join("")}</div>`;
+}
+function planCard(p){
+  const items = p.items.map((x, k) => `<li class="${x.state}"><span class="st">${x.state==="done"?ic("check","s"):""}</span><div><div class="w"><span class="risk ${x.risk}">${esc(x.riskw)}</span>${esc(x.words)}</div><div class="c">${esc(x.cmd)}</div></div></li>`).join("");
+  let foot;
+  if (p.state === "ask") foot = `<div class="fine">Anything not on this list asks again. Deleting and root always ask on their own.</div>
+    <div class="cb" style="display:flex;gap:6px"><button class="cbtn go" data-act="plan-run">Run the plan</button><button class="cbtn" data-act="plan-one">One at a time</button><button class="cbtn" data-act="deny">Not now</button></div>`;
+  else if (p.state === "one") foot = `<div class="fine">One at a time: each change asks on its own below.</div>`;
+  else if (p.state === "denied") foot = `<div class="fine" style="color:#ff5c7a">Not run.</div>`;
+  else foot = `<div class="fine">Running. kortex allows exactly these commands, once each.</div>`;
+  return `<div class="plan"><div class="ph"><b>Plan</b><span>${p.items.length} changes, then a check</span></div><ol>${items}</ol>${foot}</div>`;
+}
+function scrollBottom(root){ const b = root.querySelector(".body"); if (b) b.scrollTop = b.scrollHeight; }
+
+/* ---------- B: hand-off card ---------- */
+function vB(sim){
+  const s = sim.s; let h = `<div class="wall"></div>`;
+  if (!s.away){
+    const body = s.phase === "idle"
+      ? `<div class="chat"><div class="say muted">Ask about this computer, or have something done. Every change waits for your yes.</div><div class="sugg"><span>the printer stopped printing</span><span>install PhotoCraft</span><span>what keeps the fan busy?</span></div></div>`
+      : chat(s, {term:true});
+    h += `<div class="card win"><div class="ch">${mark()}<span class="nm">kortex</span><span class="det">opencode · Mistral Medium</span>
+      <span class="sp"><button data-act="noop">${ic("dock","s")} Steps</button><button data-act="away" title="Tuck away">${ic("min","s")}</button></span></div>
+      <div class="body">${body}</div>
+      <div class="composer"><span class="in ${s.phase==="idle"?"f":""}">${s.phase==="idle"?esc(Q):"Reply to kortex…"}</span>${s.phase==="idle"?`<button class="cbtn go" data-act="send">Send</button>`:""}</div></div>`;
+    h += `<div class="ann" style="left:790px;top:100px">top edge fixed · grows down</div>`;
+  } else {
+    let cls = "", t;
+    if (s.phase === "run") t = `<span class="spin"></span><span class="t">${esc(trunc(s.latest,50))}</span><span class="el"><span class="js-el">${s.elapsed}</span> s</span>`;
+    else if (s.phase === "ask"){ cls = "need"; t = `${mark(14)}<span class="t"><b>kortex needs you</b> · ${esc(s.ask.riskw.toLowerCase())}: ${esc(s.ask.short)}</span>`; }
+    else if (s.phase === "done"){ cls = "done"; t = `${mark(14)}<span class="t"><b>kortex answered</b> · ${esc(trunc(s.answer,48))}</span>`; }
+    else { cls = "done"; t = `${mark(14)}<span class="t">kortex stopped</span>`; }
+    h += `<div class="pill ${cls}" data-act="back" role="button" tabindex="0">${t}</div>`;
+    h += `<div class="ann" style="left:380px;top:56px">click the pill to open the card again</div>`;
+  }
+  return h + bar();
+}
+
+/* ---------- C: in the bar ---------- */
+function vC(sim){
+  const s = sim.s; let h = `<div class="wall"></div>`;
+  let chip;
+  if (s.phase === "idle") chip = `<span class="chip" data-act="back">${rings()} Ask</span>`;
+  else if (s.phase === "run") chip = `<span class="chip on" data-act="${s.away?"back":"away"}">${rings()}<span class="spin"></span><span class="el"><span class="js-el">${s.elapsed}</span> s</span></span>`;
+  else if (s.phase === "ask") chip = `<span class="chip need" data-act="${s.away?"back":"away"}">${rings("#000")} ${s.plan && s.plan.state==="ask" ? "Plan · 2 changes" : "1 to allow"}</span>`;
+  else chip = `<span class="chip done" data-act="${s.away?"back":"away"}">${rings()} ${s.phase==="done"?"Answered":"Stopped"}</span>`;
+  if (!s.away){
+    let body;
+    if (s.tab === "steps"){
+      body = `<div class="steps">${s.steps.length ? s.steps.map(x => `<div class="s"><span>${x.state==="run"?'<span class="spin"></span>':`<span class="ok">${ic("check","s")}</span>`}</span><div><span class="mono9">${esc(x.cmd)}</span><span class="tag ${x.look?"":"ch"}">${x.look?"looks":"changes"}</span>${x.out?`<pre>${esc(x.out)}</pre>`:""}</div></div>`).join("") : `<div class="muted">No steps yet.</div>`}</div>`;
+    } else body = s.phase === "idle"
+      ? `<div class="chat"><div class="say muted">Ask about this computer, or have something done. kortex looks first, then shows you a plan.</div><div class="sugg"><span>the printer stopped printing</span><span>install PhotoCraft</span><span>what keeps the fan busy?</span></div></div>`
+      : chat(s, {term:false});
+    h += `<div class="glass win"><div class="gh"><button class="gt" data-act="tab-chat" aria-selected="${s.tab==="chat"}">Conversation</button><button class="gt" data-act="tab-steps" aria-selected="${s.tab==="steps"}">Steps · ${s.steps.length}</button>
+      <span class="sp"><button data-act="noop">Recent</button><button data-act="noop">${ic("plus","s")}</button></span></div>
+      <div class="body">${body}</div>
+      <div class="composer"><span class="in ${s.phase==="idle"?"f":""}">${s.phase==="idle"?esc(Q):"Reply to kortex…"}</span>${s.phase==="idle"?`<button class="cbtn go" data-act="send">Send</button>`:""}</div></div>`;
+    h += `<div class="ann" style="left:760px;top:140px">Plasma places it · glass like the start menu</div>`;
+  } else if (s.phase === "ask"){
+    h += `<div class="note"><div class="nh">${mark(12)} kortex · now</div><div class="nt">${s.plan && s.plan.state==="ask" ? "kortex has a plan · 2 changes" : "kortex asks first"}</div><div class="nb">For your Wi-Fi: switch to home-5G and join it first from now on.</div><div class="na"><button class="nbtn g" data-act="back">Show the plan</button></div></div>`;
+  }
+  if (s.away) h += `<div class="ann" style="left:520px;bottom:52px">the chip keeps going</div>`;
+  return h + bar(chip);
+}
+
+/* ---------- D: the session ---------- */
+function composer(sim){
+  const q = sim.nextQ();
+  return `<div class="composer"><span class="in ${q?"f":""}">${q?esc(q):"Reply to kortex…"}</span>${q?`<button class="cbtn go" data-act="send">Send</button>`:""}</div>`;
+}
+function turnsOf(s){
+  const T = [];
+  s.log.forEach((e, k) => {
+    if (e.type === "you") T.push({from:k, q:e.text, steps:0, changes:0, ans:null});
+    const t = T[T.length - 1]; if (!t) return;
+    t.to = k + 1;
+    if (e.type === "step"){ t.steps++; if (!e.st.look) t.changes++; }
+    if (e.type === "ans") t.ans = e.text;
+  });
+  return T;
+}
+const LEVELS = {each:["every step","You see every command and allow every change."], plan:["per plan","The agent looks, shows its changes, and one yes runs them."], auto:["only if risky","Small changes run and are reported. Deleting, root and installs still ask."]};
+function loopBar(sim){
+  const L = sim.o.level;
+  return `<div class="loop"><span>Ask me</span><span class="lseg">${Object.keys(LEVELS).map(k => `<button data-act="lvl:${k}" aria-pressed="${k===L}">${LEVELS[k][0]}</button>`).join("")}</span><span class="lw">${LEVELS[L][1]}</span></div>`;
+}
+function sessionBody(sim, card){
+  const s = sim.s, T = turnsOf(s), L = sim.o.level, out = [];
+  const compact = !s.deep && (card || L !== "each");
+  const first = card && !s.deep && T.length > 4 ? T.length - 4 : 0;
+  const shortened = compact ? T.slice(first, -1).filter((t, n) => !s.open["t" + (n + first)]).length : 0;
+  if (first) out.push(`<button class="earlier" data-act="dock">↑ ${first} earlier turn${first>1?"s":""} · open the panel</button>`);
+  if (shortened) out.push(`<div class="depth"><span>Short view · ${shortened} turn${shortened>1?"s":""} shortened, steps left out</span><button data-act="deep">Show everything</button></div>`);
+  else if (s.deep) out.push(`<div class="depth"><span>Full view · every step</span><button data-act="deep">Shorten</button></div>`);
+  T.forEach((t, n) => {
+    if (n < first) return;
+    const last = n === T.length - 1;
+    if (!last && compact && !s.open["t" + n]){
+      const a = t.ans ? t.ans.split(/(?<=[.!?])\s/)[0] : "";
+      out.push(`<button class="turn" data-act="open:t${n}"><span class="tq">${esc(t.q)}</span><span class="ta">${esc(a)}</span><span class="tm"><span>${t.steps} step${t.steps===1?"":"s"}</span>${t.changes ? `<span class="chg">${t.changes} change${t.changes===1?"":"s"}</span>` : "<span>changed nothing</span>"}<span class="more">show ›</span></span></button>`);
+    } else {
+      if (!last && compact) out.push(`<button class="shorten" data-act="open:t${n}">⌃ shorten this turn</button>`);
+      out.push(chat(s, {from:t.from, to:last ? undefined : t.to, openLooks:s.deep || (!card && L === "each"), rest:true}));
+    }
+  });
+  return out.join("");
+}
+function tui(sim){
+  const s = sim.s, o = [];
+  s.log.forEach(e => {
+    if (e.type === "you") o.push(`<div class="u">${esc(e.text)}</div>`);
+    else if (e.type === "say") o.push(`<div>${esc(e.text)}</div>`);
+    else if (e.type === "step") o.push(`<div class="c">$ ${esc(e.st.cmd)} ${e.st.state==="run"?"…":"✓"}</div>`);
+    else if (e.type === "dec") o.push(`<div class="d">permission ${e.ok?"allowed once":"rejected"}</div>`);
+    else if (e.type === "ans") o.push(`<div class="a">${esc(e.text)}</div>`);
+  });
+  if (s.ask) o.push(`<div class="tperm"><div>△ Permission required: bash</div><div class="c">$ ${esc(s.ask.cmd)}</div><div><button data-act="allow">Allow once</button><button data-act="deny">Reject</button></div></div>`);
+  if (s.phase === "run") o.push(`<div class="d">${esc(s.latest)}… <span class="js-el">${s.elapsed}</span>s</div>`);
+  if (s.phase === "done") o.push(`<div class="a">${esc(s.answer)}</div>`);
+  if (s.phase === "stopped") o.push(`<div style="color:#ff5c7a">${esc(DENIED)}</div>`);
+  const q = sim.nextQ();
+  return `<div class="body"><div class="tui">${o.join("")}</div></div><div class="tin"><span>&gt;</span><span class="q">${q?esc(q):""}▌</span>${q?`<button data-act="send">enter</button>`:""}</div>`;
+}
+function vD(sim){
+  const s = sim.s, term = sim.o.panelKind === "term", turns = s.log.filter(e => e.type === "you").length;
+  const det = `session · ${turns} turn${turns===1?"":"s"}`;
+  let h = `<div class="wall"></div><div class="fakewin"><div class="ft">${ic("wifi","s")} Wi-Fi · System Settings</div><div class="fl">
+    <div class="fr on">${ic("wifi")}<span>home-5G</span><span>5 GHz · 71 %</span></div><div class="fr">${ic("wifi")}<span>home</span><span>2.4 GHz · 38 %</span></div><div class="fr">${ic("wifi")}<span>Neighbour</span><span>2.4 GHz · 22 %</span></div></div></div>`;
+  if (s.where === "card"){
+    const body = s.phase === "idle"
+      ? `<div class="chat"><div class="say muted">Ask about this computer, or have something done. The conversation stays with you until you close it.</div><div class="sugg"><span>the printer stopped printing</span><span>install PhotoCraft</span><span>what keeps the fan busy?</span></div></div>`
+      : sessionBody(sim, true);
+    h += `<div class="card win"><div class="ch">${mark()}<span class="nm">kortex</span><span class="det">${s.phase==="idle"?"new session":det}</span>
+      <span class="sp"><button data-act="dock">${ic("dock","s")} Dock</button><button data-act="peek" title="Tuck away">${ic("min","s")}</button></span></div>
+      ${loopBar(sim)}<div class="body">${body}</div>${composer(sim)}</div>`;
+    h += `<div class="ann" style="left:790px;top:100px">click elsewhere: it ${sim.o.awayMode==="stay"?"steps aside to the right edge":"shrinks to the corner"}</div>`;
+  } else if (s.where === "panel"){
+    h += term
+      ? `<div class="side term win"><div class="ch">${ic("term","s")} kortex · opencode attach</div>${tui(sim)}</div>`
+      : `<div class="side win"><div class="ch">${mark()}<span class="nm">kortex</span><span class="det">${det}</span><span class="sp"><button data-act="back">Compact</button><button data-act="peek" title="Tuck away">${ic("min","s")}</button></span></div>
+         ${loopBar(sim)}<div class="body">${sessionBody(sim, false)}</div>${composer(sim)}</div>`;
+    h += `<div class="ann" style="left:330px;top:440px">${term ? "the agent's own interface: its keys, its prompts" : "the same conversation, whole · you work on beside it"}</div>`;
+  } else {
+    let cls = "", top, line, acts = "";
+    if (s.phase === "run"){ top = `<span class="spin"></span> kortex<span class="el"><span class="js-el">${s.elapsed}</span> s</span>`; line = esc(trunc(s.latest, 90)); }
+    else if (s.phase === "ask"){ cls = "need"; top = `${mark(14)} kortex needs you`; line = `<span class="risk ${s.ask.risk}">${esc(s.ask.riskw)}</span>${esc(trunc(s.ask.words, 90))}<br><span class="mono9">${esc(s.ask.cmd)}</span>`;
+      acts = `<div class="na"><button class="nbtn" data-act="deny">Deny</button><button class="nbtn g" data-act="allow">Allow</button></div>`; }
+    else if (s.phase === "done"){ cls = "done"; top = `${mark(14)} kortex<span class="el">${turns} turn${turns===1?"":"s"}</span>`; line = esc(trunc(s.answer, 120)); }
+    else { cls = "done"; top = `${mark(14)} kortex stopped`; line = esc(trunc(DENIED, 120)); }
+    h += `<div class="peek win ${cls}"><div class="pk" data-act="back" role="button" tabindex="0"><div class="pt">${top}</div><div class="pl">${line}</div></div>${acts}</div>`;
+    h += `<div class="ann" style="right:330px;bottom:70px">always the last line · click to open</div>`;
+  }
+  return h + bar();
+}
+
+/* ---------- explanations ---------- */
+const EXPLAIN = {
+  d: {tag:'<span class="tagline g">added after review · built around a session</span>',
+    pitch:"<b>One conversation in three sizes, and one switch for how far you are in the loop.</b> You ask in a <b>card</b>. Click elsewhere and it does not close: it <b>steps aside</b> to the right edge as the side panel, or <b>shrinks</b> to a corner card with the last line. Both scroll. Earlier turns are shortened to three lines each (the question, the first sentence of the answer, how many steps and changes), under a line that says the view is short, with <b>Show everything</b> and a <b>show ›</b> on each turn. <b>Ask me</b> sets the level: <b>every step</b> shows every command and asks for every change, <b>per plan</b> asks once for a list of changes, <b>only if risky</b> runs small changes and reports them with an Undo. Deleting asks at every level. You can also loosen it on the spot with <b>Allow the rest of this task</b>. Restart and try each level on the first request.",
+    lists:[["Solves",["Click elsewhere no longer loses the conversation","Back and forth: earlier turns stay in view, short, and open on demand","Hand over or stay in the loop: one switch, changeable mid-session","The side panel is part of the conversation, not a second view"]],
+           ["Costs",["A chat surface of kortex's own (a window as in B, or C's plasmoid)","A list, kept as data, of command shapes that count as small and reversible","Per plan and only if risky: kortex answers the agent's permission requests itself","“Only if risky” loosens patina's rule that opencode asks before every change"]],
+           ["Risks",["A wrong entry in the reversible list runs unasked: it must be an allow-list, short, and reviewed","Undo is only honest where kortex recorded the state before the change","A short view can hide the step that mattered; the changes count is the guard","In the terminal panel the level switch has no place: opencode's own prompts decide"]]]},
+  today: {pitch:"<b>What ships in kortex 0.8.</b> The conversation is KRunner's result list: a one-line status row while the agent works, a row per action that asks, and the answer as the one row that wraps. The steps are in the terminal panel.",
+    lists:[["Watch for",["The window grows when the answer arrives, because the bottom edge follows the rows.","Allow and Deny are icons. Hover them to see what they mean.","Look away: the notification has words but no command and no Allow."]],
+           ["Holds up",["Nothing new to install or own.","Every search can end with “Ask kortex”.","Notifications follow a closed palette."]]]},
+  a: {tag:'<span class="tagline g">chosen direction · stay in KRunner · cheapest</span>',
+    pitch:"<b>Keep KRunner, and make it hold still and speak plainly.</b> Always five rows, so the window never changes size. While the agent works, the second row holds its last words, two lines at most. When it asks, the rows become the question: what is at stake in words kortex works out from the command, the command itself, then <b>Allow this once</b>, <b>Allow the rest of this task</b> and <b>Don't</b> as rows you select with ↓ and Enter. Allowing the rest is A's auto mode: it covers this request only, never deleting, root or installs, and typing <b>go</b> after the marker does the same. While it runs, a row says so and takes it back with Enter, and the answer names what ran on your yes. <b>Show every step</b> is a row of its own that opens the side panel. While a question waits, its five rows are taken, so the panel is the icon on the first row and Meta+Shift+A. When you look away, the notification can answer the question.",
+    lists:[["Solves",["Window size (fixed rows, two-line clamp)","K25: no icon to decode, no Always on a change","The way to the side panel is a row, Show every step","K23: answer from the notification, which then closes","K27: an empty Meta+A shows a hint and examples"]],
+           ["Costs",["kortex.py only, about a week","No new dependency","Placeholder rows to keep the height","The same list of what never runs unasked as D needs"]],
+           ["Leaves",["The pull trick and its races","The answer clamped to two lines","Two surfaces: palette and terminal","No standing mode: the hand-over ends with the request"]]]},
+  b: {tag:'<span class="tagline a">own window · most freedom</span>',
+    pitch:"<b>KRunner starts the request, and a card of kortex's own carries the conversation.</b> Like Raycast's “continue in chat”: the card is anchored at the top and grows downward only. Steps that only look are folded into one line. A change is a card with real buttons and the command in a block. Tuck it away and it shrinks to a pill at the top of the screen, which turns green when it needs you.",
+    lists:[["Solves",["A real chat: scrollback, replies, real buttons","No pull trick once the card is open","Looks folded, changes shown: less noise","The pill replaces most notifications"]],
+           ["Costs",["A Qt Quick window in kortex (PyQt6 or PySide6)","layer-shell-qt to place it on Wayland, and a KWin rule on X11","Focus, multiple screens, Escape and the like, all kortex's to handle"]],
+           ["Risks",["A second toolkit in a small Python tool","Duplicates the TUI panel unless it replaces it","Its look has to follow patina's theme by hand"]]]},
+  c: {tag:'<span class="tagline v">radical · lives in the desktop</span>',
+    pitch:"<b>The agent is part of the bar, not a popup.</b> A chip beside the start button shows its state all the time: Ask, seconds while working, green when it needs you. Meta+A opens a Plasma popup over it, frosted glass like the start menu, a fixed size that Plasma places. kortex looks first, then shows a <b>plan</b>: two changes, one approval. A Steps tab has every command and its output, so most users never need the terminal.",
+    lists:[["Solves",["Window size: Plasma's popup, fixed size","Consent fatigue: one plan approval, matched command by command","Two surfaces: Steps is a tab","Looking away: the chip stays, and a notification only for a plan"]],
+           ["Costs",["A QML plasmoid in kortex's repository","A small localhost API in kortex.py for it (QML has no D-Bus)","patina's layout script adds it to the bar"]],
+           ["Risks",["Meta+A focus for a plasmoid on Wayland, to test","Plasmoid API churn in Plasma 6.x","A plan is only as good as the model's look-first phase"]]]}
+};
+function explain(v){
+  const e = EXPLAIN[v];
+  return `<div class="stack"><div>${e.tag||""}</div><p class="pitch">${e.pitch}</p><div class="notes">${e.lists.map(([h, l]) => `<div class="note-c"><h4>${h}</h4><ul>${l.map(x=>`<li>${x}</li>`).join("")}</ul></div>`).join("")}</div></div>`;
+}
+
+/* ---------- wiring ---------- */
+const desk = document.getElementById("desk"), box = document.getElementById("stagebox");
+const stateEl = document.getElementById("state"), awayBtn = document.getElementById("away");
+const VIEWS = {today:vToday, a:vA, b:vB, c:vC, d:vD};
+const sims = {today:new Sim(), a:new Sim(), b:new Sim(), c:new Sim({plan:true}), d:new Sim({session:true, awayMode:"stay", panelKind:"chat", level:"plan"})};
+const dopts = document.getElementById("dopts");
+let cur = "a";
+try { const h = location.hash.slice(1); if (VIEWS[h]) cur = h; } catch(e){}
+
+Object.keys(sims).forEach(k => {
+  sims[k].view = (sim) => {
+    if (k !== cur) return;
+    desk.innerHTML = VIEWS[k](sim);
+    scrollBottom(desk);
+    const s = sim.s;
+    const label = {idle:"ready to send", run:"agent working", ask:"waiting for you", done:"answered", stopped:"stopped"}[s.phase];
+    stateEl.textContent = label + (s.away ? " · looking away" : "");
+    awayBtn.textContent = s.away ? "Press Meta+A" : "Click elsewhere";
+    awayBtn.disabled = s.phase === "idle";
+    dopts.hidden = k !== "d";
+  };
+});
+function show(v){
+  cur = v;
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.v === v)));
+  document.getElementById("explain").innerHTML = explain(v);
+  sims[v].draw();
+}
+document.getElementById("tabs").addEventListener("click", e => { const t = e.target.closest(".tab"); if (!t) return; show(t.dataset.v); try { history.replaceState(null, "", "#" + t.dataset.v); } catch(_){} });
+dopts.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const seg = b.closest(".seg"), sm = sims.d;
+  sm.o[seg.dataset.opt] = b.dataset.val;
+  seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  if (seg.dataset.opt === "awayMode" && sm.s.where !== "card") sm.s.where = b.dataset.val === "stay" ? "panel" : "peek";
+  if (seg.dataset.opt === "panelKind" && sm.s.phase !== "idle"){ sm.s.where = "panel"; sm.s.away = true; }
+  sm.draw();
+});
+document.getElementById("restart").addEventListener("click", () => { sims[cur].reset(false); sims[cur].draw(); });
+awayBtn.addEventListener("click", () => sims[cur].act(sims[cur].s.away ? "back" : "away"));
+desk.addEventListener("click", e => {
+  const a = e.target.closest("[data-act]");
+  if (a){ sims[cur].act(a.dataset.act); return; }
+  const s = sims[cur].s;
+  if (!e.target.closest(".win,.note,.pill,.chip,.bar") && !s.away && s.phase !== "idle") sims[cur].act("away");
+});
+desk.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches('[role="button"]')){ e.preventDefault(); sims[cur].act(e.target.dataset.act); } });
+setInterval(() => {
+  Object.values(sims).forEach(sm => { if (sm.s.phase === "run") sm.s.elapsed++; });
+  desk.querySelectorAll(".js-el").forEach(el => el.textContent = sims[cur].s.elapsed);
+}, 1000);
+const fit = () => desk.style.setProperty("--k", box.clientWidth / 960);
+new ResizeObserver(fit).observe(box); fit();
+show(cur);
+})();
+</script>
+</body>
+</html>

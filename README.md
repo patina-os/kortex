@@ -45,7 +45,7 @@ kortex is where you talk to it. [Will it run on my system?](#will-it-run-on-my-s
 - **Working with an agent.** Have it write a script, find its way through a project,
   work on your server, or file a ticket through a service you connected (Linear,
   Notion, GitHub, Nextcloud). Walk away while it works and a notification brings the
-  answer back; Show what the agent does docks the agent's own view of the conversation
+  answer back; Show every step docks the agent's own view of the conversation
   at the screen's right edge, for longer work.
 
 An agent can be wrong, a small local model more often than a large one: read what it
@@ -60,17 +60,20 @@ proposes before you allow it.
   what the agent wrote, thought or does last ("running a command"), then its answer.
   Its commands are in the panel, for when you want to see them.
 - **Nothing changes without a yes.** Every command, file change, web request or
-  service's tool the agent's permissions hold back is a row of its own, in the
-  agent's words ("I'll add the alias to your .bashrc, after a copy of it"): Allow
-  once, Always or Deny. Under the words is what the step does, since words can be
-  wrong: the command, the file and its changed lines, or what a service's tool is
-  given; a step the agent did not explain shows as that alone. What the permissions hold back is the agent's configuration: patina's asks
+  service's tool the agent's permissions hold back is a row of its own: what the step
+  would do, worked out by kortex ("Deletes", "Runs as root", "Changes your network"),
+  then the agent's words ("I'll add the alias to your .bashrc, after a copy of it"),
+  then the step itself, since words can be wrong: the command, the file and its
+  changed lines, or what a service's tool is given. Its answers are rows to read and
+  pick: Allow this once, or Don't. If you would rather say yes once per task, turn on
+  Allow the rest of this task ([what it covers, and what it gives up](docs/usage.md#allow-the-rest-of-this-task)); it is off until you do. What the permissions hold back is the agent's configuration: patina's asks
   before every change, on the machine and in a connected service.
 - **It asks you, too.** A question of the agent's is a row with its answers; pick
   one or type your own.
 - **Walk away.** Click elsewhere and a notification follows the request to its answer.
-  Its Show brings the conversation back.
-- **See what it does.** Show what the agent does (or Meta+Shift+A with patina) docks
+  One that asks for a step takes your answer where it is: Allow once or Deny. Show
+  brings the conversation back.
+- **See what it does.** Show every step (or Meta+Shift+A with patina) docks
   the agent's own interface on the conversation at the screen's right edge, full
   height and a fifth of its width, above your windows: every step and command, while
   you work on beside it.
@@ -131,9 +134,10 @@ Then open KRunner (Meta+Space or Alt+Space), type a request and pick "Ask kortex
 | `ai` and a request | a row that asks only the agent; Enter sends it |
 | `ai` | the recent conversations |
 | `kortex ›` | the current conversation; type after it to go on |
-| a row that asks | Allow once · Always · Deny |
+| a step that asks | its rows: Allow this once · Don't, stop here · Always allow, where offered |
 | what the agent asks you | Enter on an answer, or type your own |
-| the answer, or the row that says how long | Copy · Show what the agent does · Stop |
+| while the agent works | its last words · its steps in a word each · Show every step · Stop |
+| the answer | Enter copies · Show every step |
 
 ## Documentation
 
@@ -148,6 +152,8 @@ Then open KRunner (Meta+Space or Alt+Space), type a request and pick "Ask kortex
 - [Principles](docs/principles.md): privacy, no action without a yes, root through a
   dialog, small and boring
 - [Development](docs/development.md): the tests, the demo, releases
+- [Design studies](docs/design/): the palette's redesign of November 2026 as prototypes
+  to click through, the options not taken, and what would reopen the question
 - [Roadmap](docs/roadmap.md): choices still open, how it reaches users
 - [Changelog](CHANGELOG.md)
 
