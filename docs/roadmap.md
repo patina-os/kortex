@@ -19,6 +19,17 @@
 
 ## Choices still open
 
+- **Leaving KRunner.** The design study of November 2026 ([design/](design/)) drew
+  three other homes for the conversation: a window of kortex's own, a widget in the
+  panel, and a session that docks beside the user's work. The decision was to stay in
+  KRunner (0.9.0) and to keep the others on record. What would reopen it: users who
+  hold sessions of many turns, for which the palette shows only the last answer, or a
+  KRunner release that breaks the refresh kortex depends on.
+- **The 0.9.0 palette on a real desktop.** The answer rows, their order under the row
+  that asks, the notification's buttons and its closing were tested against fakes
+  only. To see on Plasma 6.3: that the rows keep their order, what Enter does on a row
+  that only says something, and that Plasma's notifications show three buttons.
+
 - **Streaming in KRunner.** The first run on real hardware (0.4.1) showed the window
   growing and shrinking with each refresh, as the answer grew a line and the thoughts
   below it came and went. 0.5.0 shows one-line rows while the agent works and the

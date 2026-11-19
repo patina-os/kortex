@@ -5,6 +5,48 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [0.9.0] - 2026-11-19
+
+The palette after the design study of November 2026 ([docs/design/](docs/design/)):
+kortex stays in KRunner, and says more there.
+
+### Added
+
+- A step that asks has its answers as rows to read and to pick with Enter: Allow this
+  once, Don't, stop here, and Always allow with its rule in words where Always may be
+  offered. They were icons on the asking row, one of which read as "share", and Enter
+  alone answered nothing. Shift+Enter on the asking row still allows once.
+- The asking row starts with what the step would do, in kortex's words, worked out from
+  the step and not from what the agent says of it: Deletes, Runs as root, Installs or
+  removes software, Changes something in a service, Changes your network, Changes a
+  file, Only looks and the like. In a test an agent called a folder that held a thesis
+  "one stale cache file".
+- While the agent works, the conversation has a row for its last whole sentence, one
+  for its steps so far in a word each ("Done so far: nmcli · iw · ping") and Show every
+  step, which opens the panel. Each is one line, so the window keeps its height.
+- A notification that asks for a step takes the answer: Allow once and Deny beside
+  Show, with what the step would do in its title. It goes once the step is answered,
+  there or in the palette; it stayed until it was closed by hand.
+- Allow the rest of this task, off unless you turn it on (the row of `ai`, or
+  `~/.config/kortex/handover`; patina: `patina ai handover on`). With it, a step that
+  asks has a third answer that allows it and every later step of the same request,
+  except what deletes, runs as root, installs or removes software, changes something in
+  a connected service, or is a command kortex cannot judge: those ask every time.
+  Typing `go` after `kortex ›` is the same. A row says so while it runs and takes it
+  back with Enter (or `ask`), a Deny takes it back too, and the answer lists every
+  command that ran without a question of its own. Never with Hermes, which asks only
+  before what it counts as dangerous. kortex answers those steps for you: the agent's
+  own rules are unchanged, and nothing is kept for the next request.
+
+### Changed
+
+- Meta+A with nothing running opens the palette on `ai`: the hint, the recent
+  conversations, and before the first one two requests to try, which Enter puts in the
+  field. It opened an empty field, for which KRunner calls no runner, so it showed
+  nothing at all.
+- The row that says how long no longer carries Copy, and Enter on it copies nothing:
+  there is no answer yet, and it emptied the clipboard.
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

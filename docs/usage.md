@@ -12,16 +12,21 @@ answers; the hint row of `ai` and the row that says how long name the agent.
 Meta+A       why is my wifi slow?
              ◉ Ask kortex: why is my wifi slow?                 Enter
              ─────────────────────────────────────────────────────────
-kortex ›     ◉ Working · 12 s · running a command                Copy · Show what the agent does · Stop
-             ⚠ Allow: I'll switch you to the 5 GHz network.     Allow once · Deny
+kortex ›     ⚠ Changes your network
+               Allow: I'll switch you to the 5 GHz network.
                nmcli connection up home-5G
+             ✓ Allow this once
+             ✗ Don't, stop here
+             ◉ Waiting for your answer · Shift+Enter allows once
 ```
 
 ## Asking
 
 - **Meta+A** (patina's `ask` key) opens KRunner on kortex alone: whatever you type goes
   to the agent. Enter on "Ask kortex: …" sends it. While a request runs or a row waits
-  for your answer, it opens on the conversation instead.
+  for your answer, it opens on the conversation instead. With nothing running it opens
+  on `ai`: the hint, your recent conversations and, before the first one, two requests
+  to try (Enter puts one in the field).
 - **Any search** of three letters or more, in KRunner (Meta+Space) or in Plasma's start
   menu, ends with "Ask kortex: …", below what Plasma finds. A search that reads as a
   question or a request comes first instead: it ends with `?`, or it has three words
@@ -40,16 +45,20 @@ kortex ›     ◉ Working · 12 s · running a command                Copy · S
 
 Enter sends the request and opens KRunner on the conversation, `kortex ›` (`kortex >` and
 `ai ›` work too). It reads like a chat with the agent: its words, not its commands, which
-are in the panel (below). While the agent works, the row that says so is one line, so
-KRunner's window holds still instead of growing and shrinking with each word. It shows:
+are in the panel (below). While the agent works, every row is one line, so KRunner's
+window holds still instead of growing and shrinking with each word. It shows:
 
-- **How long the agent has been at it and what it wrote or does last**, on one row:
-  "Working · 12 s · The 5 GHz network is in range.", or "Thinking · 12 s · …" while a
-  reasoning model thinks (the start of the last sentence it finished, which holds still
-  until it finishes the next) before it answers, or what it does during a step
-  ("running a command", "reading a file", "using linear"), so a model that thinks for a
-  minute does not look stuck. While a row asks, it says "Waiting for your answer · Shift+Enter
-  allows once" and holds still, so that the row can be clicked.
+- **How long the agent has been at it and what it does**, on the first row: "Working ·
+  12 s · running a command" ("reading a file", "using linear", or how many steps so
+  far), or "Thinking · 12 s · …" while a reasoning model thinks (the start of the last
+  sentence it finished), so a model that thinks for a minute does not look stuck. Stop,
+  on that row, ends what the agent does (opencode). While a row asks, it says "Waiting
+  for your answer · Shift+Enter allows once" and holds still, so that the rows can be
+  clicked.
+- **Its last words**: the last whole sentence it wrote, on a row of its own.
+- **Its steps so far, each in a word**: "Done so far: nmcli · iw · ping", a command's
+  first word or the tool's name. The commands themselves are the panel's.
+- **Show every step**, which opens the panel.
 - **The answer**, once the agent is done, in place of the row that said how long: what
   it said after its last step (what it said between the steps is how it got there),
   with how many steps it took beside it ("Enter copies · 3 steps"). The Markdown a
@@ -64,13 +73,18 @@ KRunner's window holds still instead of growing and shrinking with each word. It
   or the folder outside your home it reaches ("access outside your home folder").
   Words can be wrong: in a test an agent called a folder that held a thesis "one
   stale cache file", and words may describe the step after this one ("I'll install
-  it" over a command that only looks it up). A step the agent did not explain shows
-  as what it does alone. And with
-  what Always would let through (`Always allows, in every conversation: du *` lets any
-  `du` through, in this conversation and the next ones, until the agent's server
-  stops). Allow once, Always or Deny answer it, with the mouse; from the keyboard,
-  Shift+Enter is Allow once (KRunner runs a row's first action with it). Enter alone
-  answers nothing, and nothing runs before you choose. Always is offered only
+  it" over a command that only looks it up). So the row starts with what the step
+  would do, in kortex's words, worked out from the step itself: "Deletes", "Runs as
+  root", "Installs or removes software", "Changes something in tracker", "Changes
+  your network", "Changes a file", "Can overwrite a file", "Only looks". A step the
+  agent did not explain shows as what it does alone. Its answers are the rows under
+  it, to pick with Enter or the mouse: **Allow this once**, **Don't, stop here** and,
+  where it may be offered, **Always allow** with what it would let through (`Always
+  allow: du *` lets any `du` through, in this conversation and the next ones, until
+  the agent's server stops). Enter on the asking row itself answers nothing; Shift+Enter
+  on it is Allow once (KRunner runs a row's first action with it), and its two icons
+  are Allow once and Deny. Nothing runs before you choose. When two steps ask at once,
+  the second has its answer rows once the first is answered. Always is offered only
   for commands that look and change nothing whatever they are given (`du`, `ls`,
   `wc`, `apt-cache`, `systemctl status` and the like): its rule is the command's start
   and `*`, so one Always on a `find … | wc -l` let `find -delete` run unasked later,
@@ -86,13 +100,45 @@ KRunner's window holds still instead of growing and shrinking with each word. It
   ticket go to?"), with a row for each answer it offers. Enter on one answers; so
   does typing your own after `kortex ›`. What a conversation the agent started for a
   part of the work asks is shown here too.
-- **Stop**, on the row that says how long, ends what the agent does (opencode).
 - **Why it stopped**, when the agent or its provider failed, with Show what the agent
   does.
 
+## Allow the rest of this task
+
+Off unless you turn it on. opencode asks before every change (with patina's rules), and
+a task of five changes is five questions. If you would rather say yes once per task:
+
+- **Turn it on** with the row "Allow the rest of a task: off" in the list `ai` shows
+  (Meta+A with nothing running), or `patina ai handover on` with patina, or by writing
+  `on` into `~/.config/kortex/handover`. The same row, `patina ai handover off` or
+  `off` in the file turn it off; `KORTEX_HANDOVER` overrides the file.
+- **A step that asks** then has a third answer, **Allow the rest of this task**: it
+  allows this step and every later step of the same request. Typing `go` after
+  `kortex ›` while a step asks is the same. The notification that asks has it too.
+- **What still asks, every time:** a step that deletes (`rm`, `rmdir`, `shred`,
+  `truncate`, `git clean` and the like), runs as root (`sudo`, `pkexec`), installs or
+  removes software (`apt`, `flatpak`, `pip`, `npm`, `patina install`), changes
+  something in a connected service, reaches outside your home folder, reads what is in
+  your files (opencode's read and grep, which ask where a file may hold a secret), or
+  is a command kortex cannot judge: one that overwrites a file with `>`, or runs what
+  another command printed (`$(…)`, `xargs`, `sh -c`, `find -exec`). Such a step shows
+  "…: asks every time" in place of the third answer.
+- **While it runs**, a row says "Running the rest on your yes · 2 changes so far";
+  Enter on it, or typing `ask`, takes it back, and so does a Deny.
+- **The answer** is followed by a row that lists every command that ran without a
+  question of its own.
+- **It ends with the request.** The next request, in the same conversation too, asks
+  again from its first change.
+
+What you give up: the yes covers commands you have not seen, and the list of what still
+asks matches the shape of a command, not its effect. A `mv` over a file you need, or an
+edit that empties one, would run. Hermes has no such answer: it asks only before what
+it counts as dangerous, so each of its questions is answered by itself.
+
 ## The panel
 
-Show what the agent does, on the row that says how long or on the answer, opens the
+Show every step, a row while the agent works and after its answer (or Show what the
+agent does, the icon on the row that says how long and on the answer), opens the
 agent's own interface on the conversation (`opencode attach`, `hermes --resume`) in the
 terminal Plasma names, docked at the screen's right edge: as high as the screen's work
 area, a fifth of its width but at least 480 and at most 720 pixels, above your other
@@ -113,7 +159,10 @@ Another search typed over it leaves the conversation alone.
 A click elsewhere closes KRunner, and the agent keeps working. A few seconds later a
 notification says that it works on your request; the same notification then says what
 it answered (its last words, which after a task say how it went) or why it stopped. A
-row that asks, and a question of the agent's, come as notifications of their own, and
+step that asks comes as a notification of its own, with what the step would do in its
+title ("kortex asks first · Changes your network") and its answers as buttons: Allow
+once and Deny, beside Show. It goes once the step is answered, there or in the palette.
+A question of the agent's comes as a notification of its own too, and
 so does a provider that puts the request off for more than a minute (a free limit
 used up), with the time of its next try, or that the agent has tried for ten seconds
 without reaching it. Show, or a click on the notification, opens
