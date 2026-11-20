@@ -78,8 +78,14 @@ h1 .tri { color: var(--green); }
 .match .text .thought { font-style: italic; color: var(--muted); }
 .match .sub { grid-column: 2; font-size: 13px; color: var(--muted); }
 .match.warn .text { font-weight: 600; }
-.match.warn .text .cmd { display: block; font: 500 13px var(--mono); color: var(--amber); margin-top: 2px; }
-.match.warn .text .always { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.match.warn .text .cmd { display: block; font: 500 13px var(--mono); color: var(--violet, #b77dff); margin-top: 2px; }
+.match.warn .text .risk { display: block; font: 600 12px var(--mono); color: var(--amber); margin-bottom: 2px; }
+.match.quiet .text { color: var(--muted); }
+/* kortex's one-line rows under the first: KRunner gives them one line's height */
+.match.compact { padding: 5px 10px; align-items: center; }
+.match.compact .icon { width: 24px; height: 24px; margin-left: 4px; grid-row: auto; }
+.match.compact .sub { display: none; }
+.match.entered:not(.sel) { background: color-mix(in srgb, var(--green) 14%, transparent); }
 .acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .act { font: 500 12.5px var(--ui); color: var(--text); background: var(--panel); border: 1px solid var(--line);
   border-radius: 6px; padding: 3px 9px; }
@@ -220,10 +226,15 @@ const ICONS = {
       return `<circle cx="${(32 + 27.5 * Math.cos(a)).toFixed(2)}" cy="${(32 + 27.5 * Math.sin(a)).toFixed(2)}" r="3.6" fill="#6d4fc2"/>`; }).join("") +
     '<circle cx="32" cy="32" r="17" fill="none" stroke="#9b6bff" stroke-width="5"/><path d="M32 21.61L42 38.93H22Z" fill="#3cff9d"/></svg>',
   warn: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><path d="M16 3 L30 28 H2 Z" fill="#ffc857"/><path d="M16 12 V19" stroke="#000" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23.5" r="1.8" fill="#000"/></svg>',
+  yes: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><path d="M7 17 L13 23 L25 9" fill="none" stroke="#3cff9d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  no: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><path d="M9 9 L23 23 M23 9 L9 23" fill="none" stroke="#ff5c7a" stroke-width="3" stroke-linecap="round"/></svg>',
+  side: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><rect x="5" y="7" width="22" height="18" rx="2.5" fill="none" stroke="#8b90a1" stroke-width="2.4"/><path d="M19 7 V25" stroke="#8b90a1" stroke-width="2.4"/></svg>',
+  dot: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><circle cx="16" cy="16" r="3.5" fill="#8b90a1"/></svg>',
   history: '<svg viewBox="0 0 32 32" class="icon" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="#8b90a1" stroke-width="2.4"/><path d="M16 9 V16 L21 19" fill="none" stroke="#e8eaf0" stroke-width="2.4" stroke-linecap="round"/></svg>',
 };
 const ACTION_NAMES = { "allow-once": "Allow once", "allow-always": "Always allow", deny: "Deny",
-  copy: "Copy the answer", terminal: "Show what the agent does", stop: "Stop" };
+  copy: "Copy the answer", terminal: "Show what the agent does", stop: "Stop", show: "Show",
+  instructions: "Edit the agent's instructions" };
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -232,9 +243,9 @@ const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">"
 const plain = (s) => s.replace(/<br>/g, "\n").replace(/<\/?b>/g, "").replace(/&(lt|gt|amp);/g, (_, e) => ({ lt: "<", gt: ">", amp: "&" }[e]));
 const styled = (s) => esc(plain(s.replace(/<b>/g, "\u0001").replace(/<\/b>/g, "\u0002")))
   .replace(/\u0001/g, "<b>").replace(/\u0002/g, "</b>").replace(/\n/g, "<br>");
-// A row that asks: the agent's words, then the command (for a risky step) and what Always reaches.
+// A row that asks: what the step would do, in kortex's words; the agent's words; the step itself.
 const asking = (s) => plain(s).split("\n").map((line, i) =>
-  i === 0 ? esc(line) : line.startsWith("Always allows") ? `<span class="always">${esc(line)}</span>`
+  i === 0 ? `<span class="risk">${esc(line)}</span>` : i === 1 ? esc(line)
     : `<span class="cmd">${esc(line)}</span>`).join("");
 
 const start = TIMELINE.find((e) => e.kind === "start");
@@ -248,13 +259,13 @@ TIMELINE.forEach((e, i) => {
   const next = TIMELINE[i + 1];
   if (e.kind === "shortcut") {
     shortcuts += 1;
-    const onTalk = e.opened && e.opened.trim().length > 0;
+    const onTalk = e.opened && e.opened.trim().startsWith("kortex");
     const caption = onTalk ? `<b>Meta+A</b> while the agent waits: the palette opens on the conversation, the question in view`
-      : shortcuts === 1 ? `<b>Meta+A</b> opens the command palette on kortex alone: no <b>ai</b> to type` : `<b>Meta+A</b> again, for a second request`;
+      : shortcuts === 1 ? `<b>Meta+A</b> opens the command palette on kortex alone` : `<b>Meta+A</b> again, for a second request`;
     steps.push({ e, shortcut: e.key, opened: e.opened || "", caption,
       log: `${esc(e.key)} → kortex Open() → /App querySingleRunner(kortex, <em>"${esc(e.opened || "")}"</em>)` });
   } else if (e.kind === "type") {
-    let caption = `A question in your own words: <b>Ask kortex</b> is first`;
+    let caption = `A question in your own words, and <b>Enter</b>`;
     if (e.matches.length > 1) caption = `<b>Enter</b> starts a new conversation; the second row would continue the last one`;
     steps.push({ e, type: e.query, single: true, matches: e.matches, caption,
       log: `Match(<em>"${esc(e.query)}"</em>) → ${e.matches.length} match${e.matches.length === 1 ? "" : "es"}` });
@@ -262,6 +273,8 @@ TIMELINE.forEach((e, i) => {
     const what = e.action ? `<b>${ACTION_NAMES[e.action]}</b>` : "<b>Enter</b>";
     let caption = `${what}: kortex hands the request to the agent`;
     if (e.id === "permission") caption = `${what}: now, and only now, the step runs`;
+    if (e.id === "allow") caption = `<b>Allow this once</b>, a row to read and pick: now, and only now, the step runs`;
+    if (e.id === "steps") caption = `<b>Show every step</b>, under the answer`;
     if (e.action === "terminal") caption = `<b>Show what the agent does</b>, on the answer`;
     if (!firstRunWait && e.id === "ask") {
       // until the agent's server, started with the first request, answered
@@ -278,21 +291,27 @@ TIMELINE.forEach((e, i) => {
     const perm = e.matches.find((m) => m.id === "permission");
     const ans = e.matches.find((m) => m.id === "answer");
     let caption = "The palette follows the agent; KRunner asks again whenever the row changes";
-    if (perm && plain(perm.text).split("\n").length > 1 && !plain(perm.text).split("\n")[1].startsWith("Always"))
-      caption = "It asks first, in its own words. A step that runs <b>patina</b> or as root shows its command under them";
-    else if (perm) caption = "The next step asks again, in words only: opening an app needs no command to judge";
+    const said = e.matches.find((m) => m.id === "info" && m.subtext === "The agent's words");
+    if (perm) caption = "It asks first: what the step would do, in kortex's words, then the agent's own, then the command. The answers are rows";
+    else if (e.matches.some((m) => m.id === "hint")) caption = e.matches.some((m) => m.id === "session")
+      ? "The hint, and the conversation so far to continue" : "Nothing runs: the hint, and what a request looks like";
     else if (ans && ans.text.startsWith("Thinking")) caption = "It thinks first: the row says how long, and the last sentence it finished";
     else if (ans && ans.text.includes("running a command")) caption = "It runs a command. The palette names what it does; the command is the panel's";
-    else if (ans && ans.text.startsWith("Working")) caption = "It works: how long, and the last sentence it wrote";
+    else if (ans && ans.text.startsWith("Working") && said && said.text !== "Nothing said yet") caption = "It works: how long, its last sentence, and its steps in a word each";
+    else if (ans && ans.text.startsWith("Working")) caption = "It works: how long, and what it has said and done so far";
     else if (ans && ans.multiline) caption = `The answer, as in a chat: <b>${esc(ans.subtext.split(" · ").slice(-1)[0])}</b> under it`;
     steps.push({ e, matches: e.matches, caption, asked: Boolean(perm), log: `Match(<em>"${esc(e.query)}"</em>) → ${e.matches.map((m) => m.id).join(", ")}` });
   } else if (e.kind === "close") {
     steps.push({ e, close: true, caption: "A click elsewhere closes the palette. The agent keeps working", log: "Teardown()" });
   } else if (e.kind === "notify") {
     const caption = e.summary.endsWith(" answered") ? "…and a notification brings the answer"
-      : e.summary.endsWith("asks first") ? "The next step asks while the palette is closed: a notification says so, in the agent's words"
+      : e.summary.includes("asks first") ? "The next step asks while the palette is closed: the notification says so, and takes the answer"
       : "kortex says so in a notification, which follows the request";
     steps.push({ e, notify: e, caption, log: `→ Notify(<em>"${esc(e.summary)}"</em>)` });
+  } else if (e.kind === "act") {
+    steps.push({ e, act: e.action, caption: e.action === "show" ? "<b>Show</b> opens the conversation again"
+      : `<b>${ACTION_NAMES[e.action]}</b>, on the notification: the step runs, and the palette stays closed`,
+      log: `ActionInvoked(${e.id}, "${e.action}")` });
   } else if (e.kind === "show") {
     steps.push({ e, show: true, caption: "<b>Show</b> opens the conversation again", log: "ActionInvoked(show)" });
   } else if (e.kind === "pause") {
@@ -315,16 +334,22 @@ function renderField(text, caret) {
 }
 
 function matchHTML(m, i, pressed) {
-  const icon = m.id === "permission" ? ICONS.warn : m.id === "session" ? ICONS.history : ICONS.kortex;
+  const icon = m.id === "permission" ? ICONS.warn : m.id === "session" ? ICONS.history
+    : ICONS[{ allow: "yes", rest: "yes", always: "yes", deny: "no", steps: "side", more: "side" }[m.id]]
+    || (["info", "try", "handover", "ask-again"].includes(m.id) ? ICONS.dot : ICONS.kortex);
   const text = m.id === "permission" ? asking(m.text) : m.multiline ? styled(m.text) : esc(m.text);
   const acts = (i === 0 || m.id === "permission") && m.actions.length
     ? `<div class="acts">${m.actions.map((a) => `<span class="act${pressed && pressed.action === a && pressed.id === m.id ? " pressed" : ""}">${ACTION_NAMES[a] || a}</span>`).join("")}</div>` : "";
+  // Enter runs the row it names (kortex's rows that answer are below the one that asks)
+  const entered = pressed && !pressed.action && (pressed.id === m.id || (i === 0 && !pressed.own));
   const cls = ["match", i === 0 ? "sel" : "", m.multiline ? "multi" : "", m.id === "permission" ? "warn" : "",
-    pressed && !pressed.action && i === 0 ? "entered" : ""].filter(Boolean).join(" ");
+    ["info", "try", "handover"].includes(m.id) ? "quiet" : "", i > 0 && !m.multiline ? "compact" : "",
+    entered ? "entered" : ""].filter(Boolean).join(" ");
   return `<li class="${cls}">${icon}<div class="text">${text}</div>${m.subtext ? `<div class="sub">${esc(m.subtext)}</div>` : ""}${acts}</li>`;
 }
 
 function renderResults(matches, pressed) {
+  if (pressed) pressed.own = matches.some((m, i) => i > 0 && m.id === pressed.id);
   $("results").innerHTML = matches.length ? matches.map((m, i) => matchHTML(m, i, pressed)).join("")
     : '<li class="empty">Type a request</li>';
 }
@@ -337,8 +362,12 @@ function renderLog() {
 }
 
 function renderNote(n, pressed) {
+  // its actions as the server got them: id, label, ...; "default" is a click on it
+  const buttons = [];
+  for (let i = 0; i + 1 < n.actions.length; i += 2) if (n.actions[i] !== "default") buttons.push([n.actions[i], n.actions[i + 1]]);
   $("note").innerHTML = `${ICONS.kortex}<div class="app">kortex</div><div class="sum">${esc(n.summary)}</div>` +
-    `<div class="body">${esc(plain(n.body))}</div><div class="acts"><span class="act${pressed ? " pressed" : ""}">Show</span></div>`;
+    `<div class="body">${esc(plain(n.body))}</div><div class="acts">` +
+    buttons.map(([id, label]) => `<span class="act${pressed === id || pressed === true && id === "show" ? " pressed" : ""}">${esc(label)}</span>`).join("") + "</div>";
 }
 
 function renderPanel(p) {
@@ -380,6 +409,9 @@ function apply(step, animate) {
     renderNote(step.notify, false);
     $("note").hidden = false;
     shown.note = step.notify;
+  } else if (step.act) {
+    if (shown.note) renderNote(shown.note, step.act);
+    if (animate) setTimeout(() => { $("note").hidden = true; }, 900); else $("note").hidden = true;
   } else if (step.show) {
     if (shown.note) renderNote(shown.note, true);
     if (animate) setTimeout(() => { $("note").hidden = true; }, 600); else $("note").hidden = true;
@@ -425,6 +457,7 @@ function durationOf(step) {
   if (step.close) return 1700;
   if (step.notify) return 3000;
   if (step.show) return 1400;
+  if (step.act) return 1700;
   if (step.hold) return 2600;
   if (step.panel) return 6500;
   if (step.quiet) return 1300;

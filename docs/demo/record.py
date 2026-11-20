@@ -36,6 +36,7 @@ SERVICE = "io.github.patina_os.kortex"
 SEP = "\x1f"
 JOINER = "\u2060"  # in a query kortex puts on screen to refresh what KRunner shows already
 MARKER = "kortex ›"  # the conversation
+TRIGGER = "ai"  # what Meta+A opens KRunner on while nothing runs
 OPENCODE = os.environ.get("KORTEX_OPENCODE") or shutil.which("opencode")
 MODEL = "nemotron-3.5-bolt:e4b"  # the name the scripted model answers under
 # opencode's permissions as patina sets them (defaults/apps.yaml in patina): reading runs
@@ -62,7 +63,7 @@ start = time.monotonic()
 def plain(matches):
     return [{"id": str(m[0]).split(SEP)[0], "key": str(m[0]).split(SEP)[-1] if SEP in str(m[0]) else "", "text": str(m[1]), "subtext": str(m[5].get("subtext", "")),
              "actions": [str(a) for a in m[5].get("actions", [])], "multiline": bool(m[5].get("multiline", False))}
-            for m in matches]
+            for m in sorted(matches, key=lambda m: -float(m[4]))]  # as KRunner orders them: by relevance
 
 
 def note(kind, **data):
@@ -181,11 +182,42 @@ def main():
         opened = opened[-1] if opened else ""
         seen = len(lines)
         note("shortcut", key="Meta+A", opened=opened)
+        if opened.strip() == TRIGGER:  # nothing runs: `ai`, whose rows say how to ask
+            # KRunner's first call has what kortex knows; the recent conversations
+            # arrive a moment later, with the refresh kortex asks KRunner for
+            note("view", query=opened, matches=plain(k.Match(opened, timeout=60)))
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                time.sleep(0.5)
+                matches = plain(k.Match(opened, timeout=60))
+                if not any(m["id"] == "waiting" for m in matches):
+                    break
+            if matches != timeline[-1]["matches"]:
+                note("view", query=opened, matches=matches)
         return opened
 
+    def press(note_id, action):
+        """A button of a notification, as the notification server reports it."""
+        note("act", id=note_id, action=action)
+        notifications = bus.get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+        notifications.Invoke(dbus.UInt32(note_id), action, dbus_interface="io.github.patina_os.kortex.Test")
+        time.sleep(0.4)
+        reopens()
+
+    def told(what):
+        """Wait for a notification whose summary has `what`; its id."""
+        deadline = time.monotonic() + 90
+        while True:
+            found = [e for e in timeline if e["kind"] == "notify" and what in e["summary"]]
+            if found:
+                return found[-1]["id"]
+            assert time.monotonic() < deadline, f"no notification with {what}"
+            time.sleep(0.2)
+            reopens()
+
     def panel():
-        """Show what the agent does: the terminal kortex starts, and what it shows."""
-        run("answer", "terminal")
+        """Show every step: the terminal kortex starts, and what it shows."""
+        run("steps")
         terminal = home / "terminal"
         deadline = time.monotonic() + 30
         while not terminal.exists() and time.monotonic() < deadline:
@@ -224,36 +256,32 @@ def main():
         # Meta+A opens KRunner on kortex alone (patina's `ask` action): no `ai` to type.
         meta_a()
         q1 = "how full is my disk?"
-        type_query(q1)
+        type_query(f"{TRIGGER} {q1}")
         run("ask" + SEP + q1)
         watch(answered("free of"))
         time.sleep(2.5)  # the answer is read; kortex is done with the request
         meta_a()
         q2 = "install PhotoCraft for me"
-        type_query(q2)
+        type_query(f"{TRIGGER} {q2}")
         run("ask" + SEP + q2)
         watch(asking("patina install"))
         time.sleep(1.5)
         note("pause", what="nothing has run yet")
-        asked = next(m for m in k.Match(MARKER) if str(m[0]).startswith("permission" + SEP))
-        run(str(asked[0]), "allow-once")
+        # Enter on the row under the question: Allow this once
+        asked = next(m for m in k.Match(MARKER) if str(m[0]).startswith("allow" + SEP))
+        run(str(asked[0]))
         # The user clicks elsewhere, which closes KRunner (its Teardown, the one after the
         # closing the run caused), and kortex follows the request with notifications.
         time.sleep(1.7)
         note("close")
         k.Teardown()
-        deadline = time.monotonic() + 90
-        while not any(e["kind"] == "notify" and e["summary"].endswith("asks first") for e in timeline):
-            assert time.monotonic() < deadline, "no notification of the second step"
-            time.sleep(0.2)
-            reopens()
+        # The second step asks while KRunner is closed: the notification takes the answer.
+        asks = told("asks first")
+        time.sleep(2.5)
+        press(asks, "allow-once")
+        answer = told(" answered")
         time.sleep(2)
-        # Meta+A while the agent waits: KRunner opens on the conversation, the row in view.
-        assert meta_a().startswith(MARKER), "Meta+A did not open the conversation"
-        watch(asking("open the ArtCraft Launcher"))
-        time.sleep(1.2)
-        asked = next(m for m in k.Match(MARKER) if str(m[0]).startswith("permission" + SEP))
-        run(str(asked[0]), "allow-once")
+        press(answer, "show")
         watch(answered("up to date"))
         time.sleep(1.5)
         panel()

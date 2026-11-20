@@ -2009,6 +2009,8 @@ class Steps(unittest.TestCase):
         k.run(rows[1][0], "")  # an example goes into the field, to read before it is sent
         self.assertEqual(desk.queries[-1], "ai why is my wifi slow?")
         self.assertEqual(oc.asked, [])
+        k.run("ask" + SEP + "x", "")  # a conversation since, and a list from before it: no examples
+        self.assertEqual(kinds(k.match("ai")), ["hint", "handover"])
 
     def test_a_notification_that_asks_takes_the_answer(self):
         k, oc, desk, _clock = new()

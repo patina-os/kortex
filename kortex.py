@@ -1693,7 +1693,9 @@ class Kortex:
                 "session" + SEP + s["id"], s.get("title") or "Conversation", "view-history", 0.8 - i * 0.1,
                 "Continue · " + ago(s.get("time", {}).get("updated", 0))))
         if not menu:
-            if not self.sessions:  # nothing asked yet: what a request looks like
+            # nothing asked yet: what a request looks like. Not while the list is from
+            # before this conversation, which the fetch just begun brings.
+            if not self.sessions and not self.session:
                 for i, example in enumerate(EXAMPLES):
                     matches.append(match("try" + SEP + example, f"Try: {example}", ICON, 0.3 - i * 0.01,
                                          "Enter puts it in the field"))
