@@ -11,13 +11,15 @@ are drawn by `page.html` in patina's aurora colours.
   up, and a scripted model, `demo_llm.py`, that answers slowly, thinks before each step
   as a reasoning model does, says in a sentence what each step does, as patina's
   `agent.md` asks, and uses tools like an agent. Meta+A is kortex's `Open`, as patina
-  binds it. It asks how full the disk is (a read-only `df`, which runs without asking)
-  and to install PhotoCraft: patina's artcraft bundle, which asks in the agent's words
-  with the `patina` command under them, then the ArtCraft Launcher opened, which asks
-  in words only (`patina` and the launcher are stand-ins that only print or do
-  nothing). After the first Allow once the palette is closed: a notification says the
-  second step asks, and Meta+A opens the conversation on it. At the end, Show what the
-  agent does on the answer starts the panel: the terminal is a stand-in that notes the
+  binds it: with nothing running it opens on `ai`, whose rows say how to ask. It asks
+  how full the disk is (a read-only `df`, which runs without asking) and to install
+  PhotoCraft: patina's artcraft bundle, then the ArtCraft Launcher opened. Each asks
+  first, with what the step would do, the agent's words and the command (`patina` and
+  the launcher are stand-ins that only print or do nothing). The first is answered
+  with its row, Allow this once; then the palette is closed: a notification says the
+  second step asks and takes the answer, its Allow once, and the next one brings the
+  agent's answer, whose Show opens the conversation. At the end, Show every step
+  under the answer starts the panel: the terminal is a stand-in that notes the
   command kortex gives it, KWin's stand-in notes the docking, and the panel's lines are
   read from opencode's own server. Every Match, Run, Teardown, notification and KWin
   call, and what kortex answered, goes into `timeline.json`.

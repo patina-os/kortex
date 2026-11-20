@@ -1,44 +1,134 @@
 [
  {
-  "t": 1114,
+  "t": 806,
   "kind": "start",
-  "kortex": "0.7.0",
-  "opencode": "1.19.5"
+  "kortex": "0.9.0",
+  "opencode": "1.19.6"
  },
  {
-  "t": 1517,
+  "t": 1210,
   "kind": "shortcut",
   "key": "Meta+A",
-  "opened": ""
+  "opened": "ai "
  },
  {
-  "t": 1519,
-  "kind": "type",
-  "query": "how full is my disk?",
+  "t": 1212,
+  "kind": "view",
+  "query": "ai ",
   "matches": [
    {
-    "id": "ask",
-    "key": "how full is my disk?",
-    "text": "Ask kortex: how full is my disk?",
-    "subtext": "New conversation · Enter",
+    "id": "hint",
+    "key": "",
+    "text": "Ask kortex: type your request",
+    "subtext": "opencode answers",
+    "actions": [
+     "instructions"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "waiting",
+    "key": "",
+    "text": "Waiting for the agent…",
+    "subtext": "Starts with the first request",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "try",
+    "key": "why is my wifi slow?",
+    "text": "Try: why is my wifi slow?",
+    "subtext": "Enter puts it in the field",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "try",
+    "key": "what keeps the fan busy?",
+    "text": "Try: what keeps the fan busy?",
+    "subtext": "Enter puts it in the field",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "handover",
+    "key": "",
+    "text": "Allow the rest of a task: off",
+    "subtext": "Enter turns it on: one yes can cover the rest of a request · deleting, root, installs and services still ask",
     "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 1519,
+  "t": 3720,
+  "kind": "view",
+  "query": "ai ",
+  "matches": [
+   {
+    "id": "hint",
+    "key": "",
+    "text": "Ask kortex: type your request",
+    "subtext": "opencode answers",
+    "actions": [
+     "instructions"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "try",
+    "key": "why is my wifi slow?",
+    "text": "Try: why is my wifi slow?",
+    "subtext": "Enter puts it in the field",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "try",
+    "key": "what keeps the fan busy?",
+    "text": "Try: what keeps the fan busy?",
+    "subtext": "Enter puts it in the field",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "handover",
+    "key": "",
+    "text": "Allow the rest of a task: off",
+    "subtext": "Enter turns it on: one yes can cover the rest of a request · deleting, root, installs and services still ask",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 3721,
+  "kind": "type",
+  "query": "ai how full is my disk?",
+  "matches": [
+   {
+    "id": "ask",
+    "key": "how full is my disk?",
+    "text": "how full is my disk?",
+    "subtext": "Ask kortex · Enter",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 3721,
   "kind": "run",
   "id": "ask",
   "action": ""
  },
  {
-  "t": 1820,
+  "t": 4021,
   "kind": "reopen",
   "query": "kortex › "
  },
  {
-  "t": 1821,
+  "t": 4023,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -53,52 +143,259 @@
   ]
  },
  {
-  "t": 2579,
+  "t": 4477,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
-    "id": "waiting",
+    "id": "answer",
     "key": "",
-    "text": "Waiting for the agent… 1 s",
-    "subtext": "Starts with the first request",
+    "text": "Working · 0 s",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
     "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 3650,
+  "t": 4781,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
-    "id": "waiting",
+    "id": "answer",
     "key": "",
-    "text": "Waiting for the agent… 2 s",
-    "subtext": "Starts with the first request",
+    "text": "Working · 1 s",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
     "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 4409,
+  "t": 5084,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
-    "id": "waiting",
+    "id": "answer",
     "key": "",
-    "text": "Waiting for the agent…",
-    "subtext": "Starts with the first request",
+    "text": "Thinking · 1 s",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
     "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 5319,
+  "t": 5846,
+  "kind": "view",
+  "query": "kortex ›",
+  "matches": [
+   {
+    "id": "answer",
+    "key": "",
+    "text": "Thinking · 2 s · The user asks how full the disk is.",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 6757,
+  "kind": "view",
+  "query": "kortex ›",
+  "matches": [
+   {
+    "id": "answer",
+    "key": "",
+    "text": "Thinking · 3 s · The user asks how full the disk is.",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 7212,
+  "kind": "view",
+  "query": "kortex ›",
+  "matches": [
+   {
+    "id": "answer",
+    "key": "",
+    "text": "Thinking · 3 s · df on / shows it, and patina lets df…",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 7668,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -108,16 +405,39 @@
     "text": "Working · 3 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 5624,
+  "t": 7822,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -127,264 +447,564 @@
     "text": "Working · 4 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 6233,
+  "t": 8127,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Thinking · 4 s",
+    "text": "Working · 4 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 6537,
+  "t": 8736,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Thinking · 5 s",
+    "text": "Working · 5 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 6993,
+  "t": 8888,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Thinking · 5 s · The user asks how full the disk is.",
+    "text": "Working · 5 s · running a command",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 7602,
+  "t": 9647,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Thinking · 6 s · The user asks how full the disk is.",
+    "text": "Thinking · 5 s · 1 step so far",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 8514,
+  "t": 9800,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Working · 6 s",
+    "text": "Thinking · 6 s · 1 step so far",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 8667,
+  "t": 10104,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Working · 7 s",
+    "text": "Thinking · 6 s · df answered: free space and use of the…",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 9578,
+  "t": 10558,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Working · 8 s · running a command",
+    "text": "Thinking · 6 s · Say both, briefly.",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Let me look at your disk.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 9730,
+  "t": 10710,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Thinking · 8 s",
+    "text": "Working · 6 s · 1 step so far",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 10647,
+  "t": 10862,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Thinking · 9 s",
+    "text": "Working · 7 s · 1 step so far",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 11413,
+  "t": 11775,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Working · 9 s",
+    "text": "Working · 8 s · 1 step so far",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Your system disk has 60G free of 252G (15% used).",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "Done so far: df",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 11565,
+  "t": 11928,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Working · 10 s",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 12629,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Your system disk has 8.0G free of 252G (80% used).",
+    "text": "Your system disk has 60G free of 252G (15% used).",
     "subtext": "opencode · Enter copies · 1 step",
     "actions": [
      "copy",
      "terminal"
     ],
     "multiline": true
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
+    "multiline": false
    }
   ]
  },
  {
-  "t": 15533,
+  "t": 14830,
   "kind": "shortcut",
   "key": "Meta+A",
-  "opened": ""
+  "opened": "ai "
  },
  {
-  "t": 15535,
+  "t": 14831,
+  "kind": "view",
+  "query": "ai ",
+  "matches": [
+   {
+    "id": "hint",
+    "key": "",
+    "text": "Ask kortex: type your request",
+    "subtext": "opencode answers",
+    "actions": [
+     "instructions"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "handover",
+    "key": "",
+    "text": "Allow the rest of a task: off",
+    "subtext": "Enter turns it on: one yes can cover the rest of a request · deleting, root, installs and services still ask",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 15335,
+  "kind": "view",
+  "query": "ai ",
+  "matches": [
+   {
+    "id": "hint",
+    "key": "",
+    "text": "Ask kortex: type your request",
+    "subtext": "opencode answers",
+    "actions": [
+     "instructions"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "session",
+    "key": "ses_e08010a54ffe2e7hEFKFCaPTcQ",
+    "text": "how full is my disk?",
+    "subtext": "Continue · just now",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "handover",
+    "key": "",
+    "text": "Allow the rest of a task: off",
+    "subtext": "Enter turns it on: one yes can cover the rest of a request · deleting, root, installs and services still ask",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 15337,
   "kind": "type",
-  "query": "install PhotoCraft for me",
+  "query": "ai install PhotoCraft for me",
   "matches": [
    {
     "id": "ask",
     "key": "install PhotoCraft for me",
-    "text": "Ask kortex: install PhotoCraft for me",
-    "subtext": "New conversation · Enter",
+    "text": "install PhotoCraft for me",
+    "subtext": "Ask kortex · Enter",
     "actions": [],
     "multiline": false
    },
    {
     "id": "continue",
     "key": "install PhotoCraft for me",
-    "text": "Continue with kortex: install PhotoCraft for me",
+    "text": "install PhotoCraft for me",
     "subtext": "This conversation",
     "actions": [],
     "multiline": false
@@ -392,18 +1012,18 @@
   ]
  },
  {
-  "t": 15535,
+  "t": 15337,
   "kind": "run",
   "id": "ask",
   "action": ""
  },
  {
-  "t": 15838,
+  "t": 15638,
   "kind": "reopen",
   "query": "kortex › "
  },
  {
-  "t": 15840,
+  "t": 15639,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -413,16 +1033,39 @@
     "text": "Thinking · 0 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 16450,
+  "t": 16247,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -432,16 +1075,39 @@
     "text": "Thinking · 0 s · PhotoCraft is part of the ArtCraft…",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 16602,
+  "t": 16399,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -451,16 +1117,39 @@
     "text": "Thinking · 1 s · PhotoCraft is part of the ArtCraft…",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 17514,
+  "t": 17310,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -470,16 +1159,39 @@
     "text": "Thinking · 1 s · patina installs its launcher with the…",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 17666,
+  "t": 17462,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -489,16 +1201,39 @@
     "text": "Thinking · 2 s · patina installs its launcher with the…",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 18579,
+  "t": 18375,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -508,16 +1243,81 @@
     "text": "Thinking · 3 s · patina installs its launcher with the…",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 18883,
+  "t": 18528,
+  "kind": "view",
+  "query": "kortex ›",
+  "matches": [
+   {
+    "id": "answer",
+    "key": "",
+    "text": "Thinking · 3 s · That changes the system, so it waits…",
+    "subtext": "opencode",
+    "actions": [
+     "terminal",
+     "stop"
+    ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
+    "multiline": false
+   }
+  ]
+ },
+ {
+  "t": 18680,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -527,16 +1327,39 @@
     "text": "Working · 3 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 19643,
+  "t": 19442,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -546,42 +1369,88 @@
     "text": "Working · 4 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "Nothing said yet",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 20252,
+  "t": 20053,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "answer",
     "key": "",
-    "text": "Working · 4 s · I'll install patina's ArtCraft bundle…",
+    "text": "Working · 4 s",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "said",
+    "text": "I'll install patina's ArtCraft bundle, which brings the launcher PhotoCraft comes from.",
+    "subtext": "The agent's words",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "info",
+    "key": "done",
+    "text": "No steps yet",
+    "subtext": "Its steps, each in a word",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
     "multiline": false
    }
   ]
  },
  {
-  "t": 20406,
+  "t": 20205,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
    {
     "id": "permission",
-    "key": "per_1c5a77c20001EBJrnEQdKW9xfd",
-    "text": "Allow: I'll install patina's ArtCraft bundle, which brings the launcher PhotoCraft comes from.<br>patina install --bundles artcraft",
+    "key": "per_1f7ff3515001YBAl1tYHyLszmZ",
+    "text": "<b>Installs or removes software</b><br>Allow: I'll install patina's ArtCraft bundle, which brings the launcher PhotoCraft comes from.<br>patina install --bundles artcraft",
     "subtext": "Asks first",
     "actions": [
      "allow-once",
@@ -590,12 +1459,27 @@
     "multiline": true
    },
    {
+    "id": "allow",
+    "key": "per_1f7ff3515001YBAl1tYHyLszmZ",
+    "text": "Allow this once",
+    "subtext": "Enter",
+    "actions": [],
+    "multiline": false
+   },
+   {
+    "id": "deny",
+    "key": "per_1f7ff3515001YBAl1tYHyLszmZ",
+    "text": "Don't, stop here",
+    "subtext": "Enter",
+    "actions": [],
+    "multiline": false
+   },
+   {
     "id": "answer",
     "key": "",
     "text": "Waiting for your answer · Shift+Enter allows once",
     "subtext": "opencode",
     "actions": [
-     "copy",
      "terminal",
      "stop"
     ],
@@ -604,27 +1488,27 @@
   ]
  },
  {
-  "t": 21906,
+  "t": 21706,
   "kind": "pause",
   "what": "nothing has run yet"
  },
  {
-  "t": 21908,
+  "t": 21708,
   "kind": "run",
-  "id": "permission",
-  "action": "allow-once"
+  "id": "allow",
+  "action": ""
  },
  {
-  "t": 22210,
+  "t": 22009,
   "kind": "reopen",
   "query": "kortex › "
  },
  {
-  "t": 23910,
+  "t": 23710,
   "kind": "close"
  },
  {
-  "t": 24313,
+  "t": 24112,
   "kind": "notify",
   "id": 1,
   "summary": "kortex is working on it",
@@ -638,10 +1522,34 @@
   "body": "install PhotoCraft for me<br>A notification follows when it answers."
  },
  {
-  "t": 26318,
+  "t": 26316,
   "kind": "notify",
   "id": 2,
-  "summary": "kortex asks first",
+  "summary": "kortex asks first · Runs a command",
+  "actions": [
+   "default",
+   "Show",
+   "allow-once",
+   "Allow once",
+   "deny",
+   "Deny",
+   "show",
+   "Show"
+  ],
+  "transient": false,
+  "body": "Allow: The bundle is in. Now I'll open the ArtCraft Launcher, where you pick PhotoCraft.<br>setsid -f artcraft-launcher"
+ },
+ {
+  "t": 28817,
+  "kind": "act",
+  "id": 2,
+  "action": "allow-once"
+ },
+ {
+  "t": 36034,
+  "kind": "notify",
+  "id": 1,
+  "summary": "kortex answered",
   "actions": [
    "default",
    "Show",
@@ -649,286 +1557,21 @@
    "Show"
   ],
   "transient": false,
-  "body": "Allow: The bundle is in. Now I'll open the ArtCraft Launcher, where you pick PhotoCraft."
+  "body": "The ArtCraft Launcher is open: pick PhotoCraft there, and the launcher keeps it up to date. To remove it later, ask me to remove the artcraft bundle."
  },
  {
-  "t": 28720,
-  "kind": "shortcut",
-  "key": "Meta+A",
-  "opened": "kortex › "
+  "t": 38035,
+  "kind": "act",
+  "id": 1,
+  "action": "show"
  },
  {
-  "t": 28722,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "permission",
-    "key": "per_1c5a78f8b001xrQtGWzdmoHOTa",
-    "text": "Allow: The bundle is in. Now I'll open the ArtCraft Launcher, where you pick PhotoCraft.<br>Always allows, in every conversation: setsid *",
-    "subtext": "Asks first",
-    "actions": [
-     "allow-once",
-     "allow-always",
-     "deny"
-    ],
-    "multiline": true
-   },
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Waiting for your answer · Shift+Enter allows once",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 29924,
-  "kind": "run",
-  "id": "permission",
-  "action": "allow-once"
- },
- {
-  "t": 30225,
+  "t": 38437,
   "kind": "reopen",
   "query": "kortex › "
  },
  {
-  "t": 30227,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Working · 14 s · running a command",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 30379,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Thinking · 14 s",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 30689,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Thinking · 15 s",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 31146,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Thinking · 15 s · Both steps ran, each after its own…",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 31602,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Thinking · 16 s · Both steps ran, each after its own…",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 32669,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Thinking · 17 s · Both steps ran, each after its own…",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 32820,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Thinking · 17 s · Tell the user where PhotoCraft is…",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 32974,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Working · 17 s",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 33582,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Working · 18 s",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 34646,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Working · 19 s",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 34798,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Working · 19 s · The ArtCraft Launcher is open: pick…",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 35560,
-  "kind": "view",
-  "query": "kortex ›",
-  "matches": [
-   {
-    "id": "answer",
-    "key": "",
-    "text": "Working · 20 s · The ArtCraft Launcher is open: pick…",
-    "subtext": "opencode",
-    "actions": [
-     "copy",
-     "terminal",
-     "stop"
-    ],
-    "multiline": false
-   }
-  ]
- },
- {
-  "t": 36170,
+  "t": 38439,
   "kind": "view",
   "query": "kortex ›",
   "matches": [
@@ -942,31 +1585,39 @@
      "terminal"
     ],
     "multiline": true
+   },
+   {
+    "id": "steps",
+    "key": "",
+    "text": "Show every step",
+    "subtext": "Opens the panel beside your windows",
+    "actions": [],
+    "multiline": false
    }
   ]
  },
  {
-  "t": 37671,
+  "t": 39939,
   "kind": "run",
-  "id": "answer",
-  "action": "terminal"
+  "id": "steps",
+  "action": ""
  },
  {
-  "t": 37972,
+  "t": 40241,
   "kind": "kwin",
   "what": "load",
   "name": "kortex-panel"
  },
  {
-  "t": 37972,
+  "t": 40241,
   "kind": "kwin",
   "what": "run",
   "name": ""
  },
  {
-  "t": 38521,
+  "t": 40764,
   "kind": "panel",
-  "command": "-e /root/.local/bin/opencode attach http://127.0.0.1:49141 --session ses_e3a5895f1ffeaPTjRC5U3hIs4B",
+  "command": "-e /root/.local/bin/opencode attach http://127.0.0.1:53853 --session ses_e0800dcf6ffemGyS6lADvg8w3h",
   "lines": [
    {
     "kind": "user",

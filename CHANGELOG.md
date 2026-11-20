@@ -5,6 +5,19 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+### Fixed
+
+- Meta+A after a conversation no longer shows the two requests to try for a moment
+  before the list of conversations arrives: they are for a palette nothing was asked
+  in yet.
+
+### Changed
+
+- The README's animation is a run of 0.9.0: the step that asks with what it would do
+  and its answers as rows, and the second step answered on its notification.
+
 ## [0.9.0] - 2026-11-19
 
 The palette after the design study of November 2026 ([docs/design/](docs/design/)):

@@ -18,9 +18,9 @@
   edge of the screen when you want to see every step.
 </p>
 
-![kortex in KRunner: Meta+A and a question answered in a sentence; then PhotoCraft installed in two steps, each asking first in the agent's own words, the second while the palette was closed, through a notification and Meta+A; then Show what the agent does docks the agent's view of the conversation at the right edge](docs/demo/kortex-demo.gif)
+![kortex in KRunner: Meta+A and a question answered in a sentence; then PhotoCraft installed in two steps, each asking first: what the step would do, the agent's own words and the command, answered with the row Allow this once, and the second, while the palette was closed, with Allow once on the notification; then Show every step docks the agent's view of the conversation at the right edge](docs/demo/kortex-demo.gif)
 
-<sub>A replay of a real run of kortex 0.7.0 with opencode 1.19.5 and a scripted model
+<sub>A replay of a real run of kortex 0.9.0 with opencode 1.19.6 and a scripted model
 that thinks before it answers and says what each step does: kortex answered over D-Bus
 what the palette shows, and the panel shows the conversation as opencode kept it; both
 are drawn for the replay. How it is made: [`docs/demo/`](docs/demo/).</sub>
