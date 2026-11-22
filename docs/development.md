@@ -26,6 +26,11 @@ model, `tests/agent/` has a driver that prints the palette's rows and stand-in s
 in a real Plasma 6.3 session on Debian 13 and fails when KRunner does not follow the
 conversation.
 
+What none of these see (a key on a row, the window while the agent works, a
+notification's buttons, the password dialog, the panel's place on the screen) is the
+[desktop run](desktop-run.md), a checklist to go through by hand before a release that
+changes what the palette shows.
+
 ## The demo
 
 The animation at the top of the README is a replay of a real run, recorded and drawn by

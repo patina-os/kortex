@@ -152,6 +152,8 @@ Then open KRunner (Meta+Space or Alt+Space), type a request and pick "Ask kortex
 - [Principles](docs/principles.md): privacy, no action without a yes, root through a
   dialog, small and boring
 - [Development](docs/development.md): the tests, the demo, releases
+- [The desktop run](docs/desktop-run.md): the checklist for trying kortex by hand on a
+  real Plasma desktop, and what to report
 - [Design studies](docs/design/): the palette's redesign of November 2026 as prototypes
   to click through, the options not taken, and what would reopen the question
 - [Roadmap](docs/roadmap.md): choices still open, how it reaches users

@@ -2,6 +2,9 @@
 
 ## First release, done when
 
+The unchecked items are for a real desktop: [the desktop run](desktop-run.md) is the
+checklist for them.
+
 - [ ] A request in KRunner on Debian 13's Plasma answers from a local model through
   opencode and Ollama, and from a cloud model with the same configuration switched.
   The first run on real hardware (0.3.4, a cloud model) stood still at "Thinking…":
@@ -15,7 +18,8 @@
 - [ ] The panel (Show what the agent does, Meta+Shift+A) docks the agent's view of the
   session at the right edge on Wayland, on a real desktop (seen on X11 in a test
   session only).
-- [ ] Installing and removing it per user leaves nothing behind but the password file.
+- [ ] Installing and removing it per user leaves nothing behind but `~/.config/kortex`:
+  the password file, and the agent's name and the hand-over setting where they were set.
 
 ## Choices still open
 
@@ -27,8 +31,10 @@
   KRunner release that breaks the refresh kortex depends on.
 - **The 0.9.0 palette on a real desktop.** The answer rows, their order under the row
   that asks, the notification's buttons and its closing were tested against fakes
-  only. To see on Plasma 6.3: that the rows keep their order, what Enter does on a row
-  that only says something, and that Plasma's notifications show three buttons.
+  only. patina's desktop workflow has since shown the rows in their order in a real
+  KRunner on Plasma 6.3 (kortex 0.9.1). Still to see, with
+  [the desktop run](desktop-run.md): what Enter does on a row that only says
+  something, and that Plasma's notifications show their buttons and close.
 
 - **Streaming in KRunner.** The first run on real hardware (0.4.1) showed the window
   growing and shrinking with each refresh, as the answer grew a line and the thoughts
