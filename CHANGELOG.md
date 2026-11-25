@@ -5,6 +5,67 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
+## [Unreleased]
+
+The fixes of patina's test round of 25 November 2026 (`docs/test-round.md` in patina).
+
+### Security
+
+- With Allow the rest of this task, a deletion written as `/bin/rm`, `\rm`, `(rm …)`,
+  `{ rm; }`, in a loop, after `env`, `nice`, `timeout` or `sudo`, or as `rsync --delete`,
+  now asks every time. A command whose program kortex cannot read asks as well.
+- A change to a service, a timer or a cron job (`systemctl enable`, `crontab`, a file in
+  `~/.config/systemd/user/`) and stopping a program (`kill`) now ask every time, also
+  after Allow the rest of this task.
+- Always is no longer offered for `du`, `wc`, a web page or a search: given
+  `--files0-from`, du and wc print a file's lines, and a fetch sends its address to any
+  host.
+
+### Fixed
+
+- kortex no longer stops the agent's server while the panel is open or the agent works
+  on something.
+- A command that only looks is no longer "Can overwrite a file" for its `2>/dev/null`,
+  and `flatpak list`, `flatpak search` and `dpkg -l` are no longer "Installs or removes
+  software".
+- An agent that stops after its steps without a word no longer reads "Done.", nor does
+  one whose last words say what it will do next. Its last thought is shown when it wrote
+  nothing else.
+- A provider that cannot be reached is named, with `patina ai login` to check it, and
+  said at once while the agent retries. A model the provider lacks, and a request the
+  agent never answered, now say so; a provider's error is no longer a raw dict.
+- An agent that does not start because of a missing key file or a broken settings file
+  says what to do.
+- After a Deny, the answer says what ran before. A Stop keeps what the agent wrote and
+  is no longer shown as an error.
+- Code blocks keep their lines and indent. Links, italics and quotes are read, and a
+  model's `<think>` tag is dropped. Notifications read the answer's Markdown and cut it
+  at a word; the 12-line cap counts only the lines it shows and never ends on a table's
+  head.
+- "Cut off" shows only once two fetches agree, with an Ask again row under it. Enter on
+  the hint, the waiting row or a request that was not sent no longer just closes the
+  palette.
+- Conversation titles are cut at a word, with "…".
+
+### Changed
+
+- After a restart, `kortex ›` shows the last conversation again, and `ai` says "Loading
+  your conversations…" instead of showing the examples first. The waiting row counts
+  from the start, without "Starts with the first request".
+- A step that asks says more plainly what it would do: "Allow this command:", "tracker:
+  update issue (…)", "Reads from tracker", "Creates or changes files", "adds:" and
+  "removes:" lines, and several kinds at once ("Deletes · as root"). Its words keep their
+  line breaks, and its answers carry what they cover in their own text, not in a subtext
+  KRunner hides.
+- The answers to a step have the same words in the palette and in a notification:
+  Allow this once, Allow the rest of this task, Don't, stop here. The row that asks has
+  no icons of its own, so Shift+Enter on it no longer allows once.
+- One name, Allow the rest of this task, and one list of what still asks: deleting,
+  running as root, installing software, changing or enabling a service, and the
+  connected services' changes.
+- The agent's question shows its answers' descriptions, and its notification has its
+  answers as buttons and closes once answered.
+
 ## [0.9.1] - 2026-11-20
 
 ### Fixed

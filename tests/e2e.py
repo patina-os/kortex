@@ -135,7 +135,7 @@ def main(agent):
             request, command, asks = "remove the folder kortex-proof", mock_llm.REMOVE_COMMAND, "recursive delete"
             proof.mkdir()
         else:
-            request, command, asks = "make the file kortex-proof", mock_llm.TOOL_COMMAND, "bash"
+            request, command, asks = "make the file kortex-proof", mock_llm.TOOL_COMMAND, "this command"
         matches = k.Match("ai " + request)
         assert str(matches[0][0]) == "ask" + SEP + request, matches
         bus.get_object(SERVICE, "/runner").Open(dbus_interface=SERVICE, timeout=5)  # Meta+A
@@ -166,7 +166,7 @@ def main(agent):
         assert rows[:3] == ["permission", "allow", "deny"], rows
         # Always only for a command that only looks (kortex.LOOK_ONLY): not for rm, nor
         # for the command that makes the file
-        assert list(asked[5]["actions"]) == ["allow-once", "deny"], asked[5]["actions"]
+        assert "always" not in rows and list(asked[5]["actions"]) == [], (rows, asked[5]["actions"])
         time.sleep(1)
         ran = (lambda: not proof.exists()) if agent == "hermes" else proof.exists
         assert not ran(), "the command ran before it was allowed"
@@ -178,7 +178,7 @@ def main(agent):
                  lambda: record.read_text()[len(before):] == f"kortex\t{opening}\n", 10)
         print("e2e: Meta+A opens the conversation while a row waits")
 
-        k.Run(str(asked[0]), "allow-once", timeout=30)
+        k.Run("allow" + SEP + str(asked[0]).split(SEP, 1)[1], "", timeout=30)  # the row Allow this once
         wait_for("the command to run", ran, 60)
 
         def answer():
