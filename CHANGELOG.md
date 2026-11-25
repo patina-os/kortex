@@ -23,6 +23,16 @@ The fixes of patina's test round of 25 November 2026 (`docs/test-round.md` in pa
 
 ### Fixed
 
+- A model whose provider has no key (Mistral after a `patina update` that switched to
+  it) is said before the request goes: "Mistral has no key yet, so the agent cannot
+  answer", with a row that opens `patina ai login` and Enter on the error to ask again.
+  opencode took such a request, stopped without a word, and the palette and the
+  notification said nothing. A key added since the agent's server started is read
+  first.
+- An error opencode says only on its event stream ends the request at once, in the
+  palette and the notification, instead of after 20 s or never; a conversation opened
+  later whose request was never answered says so, with Enter to ask again, where it
+  showed the request alone.
 - kortex no longer stops the agent's server while the panel is open or the agent works
   on something.
 - A command that only looks is no longer "Can overwrite a file" for its `2>/dev/null`,

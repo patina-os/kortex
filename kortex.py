@@ -472,6 +472,10 @@ class AgentError(Exception):
     """The agent is missing, did not start, or did not answer."""
 
 
+class NotReady(AgentError):
+    """The agent cannot answer at all: its model's provider has no key (NO_KEY)."""
+
+
 def http_status(error):
     """The HTTP status the agent answered a failed request with, or None."""
     cause = error.__cause__
@@ -492,6 +496,25 @@ def opencode_config():
     if given:
         return Path(given)
     return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "opencode" / "opencode.json"
+
+
+def opencode_auth():
+    """opencode's own login, the keys of its providers, which its server reads as it starts."""
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "opencode" / "auth.json"
+
+
+def known_provider_name(provider):
+    """A provider's name for the palette: from opencode's settings ("Your own ·
+    api.example.eu"), else from its copy of the providers it knows (models.dev, "Mistral"),
+    else the id."""
+    name = provider_name(provider)
+    if name != provider:
+        return name
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "opencode" / "models.json"
+    try:
+        return str(json.loads(cache.read_text())[provider]["name"]) or provider
+    except (OSError, ValueError, LookupError, TypeError):
+        return provider
 
 
 def hermes_config():
@@ -576,12 +599,15 @@ def find_hermes():
     return found
 
 
-def note_event(asked, line, streamed=None):
+def note_event(asked, line, streamed=None, errors=None):
     """Keep `asked`, the pending permission requests by id, current with one line of
     opencode's event stream (`data: {"type": ..., "properties": ...}`), and `streamed`, the
     text of each part still being written, by part id: opencode 1.19 keeps a text or
     reasoning part empty in GET /session/:id/message until the part is done, and sends
-    the words on its event stream meanwhile."""
+    the words on its event stream meanwhile. `errors`: the error each conversation stopped
+    on last, by session id, with when it came (ms): opencode 1.19 says one that comes
+    before it writes a reply ("Model not found" for a provider without a key) only here,
+    and stores the request without a reply."""
     if not line.startswith("data:"):
         return
     try:
@@ -595,6 +621,8 @@ def note_event(asked, line, streamed=None):
             streamed[props["partID"]] = streamed.get(props["partID"], "") + props["delta"]
         elif streamed is not None and kind == "message.part.updated" and props["part"].get("text"):
             streamed.pop(props["part"]["id"], None)  # done: GET /message has the whole of it now
+        elif errors is not None and kind == "session.error" and props.get("sessionID"):
+            errors[props["sessionID"]] = (time.time() * 1000, props.get("error") or {})
     except (ValueError, LookupError, TypeError, AttributeError):
         pass  # not an event kortex follows
 
@@ -634,12 +662,18 @@ class Server:
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         self.asked = {}  # permission requests from an event stream, by id; under self.lock
         self.streamed = {}  # the text of parts still being written, by part id; under self.lock
+        self.errors = {}  # the error each conversation stopped on last, (when, error) by id; under self.lock
         self.lock = threading.Lock()
         self.listened = None  # the server the event stream is followed for
         self.config_seen = None  # the agent's configuration's mtime as the server in use read it
+        self.auth_seen = None  # and its keys' file's
 
     def owned(self):
         return self.process is not None
+
+    def not_ready(self):
+        """Why the agent cannot answer at all, said before a request goes to it, or None:
+        Hermes says a provider's error in its run, which kortex follows."""
 
     def stopped(self):
         """True when the server kortex started has exited since."""
@@ -686,6 +720,7 @@ class Server:
         with self.lock:
             self.asked.clear()
             self.streamed.clear()
+            self.errors.clear()
 
     def request(self, method, path, body=None, start=True, timeout=10, quiet=False):
         if start:
@@ -772,6 +807,7 @@ class Opencode(Server):
         command = find_opencode()
         port = free_port()
         self.config_seen = mtime(opencode_config())  # the new server reads it as it is now
+        self.auth_seen = mtime(opencode_auth())  # and its keys
         self.url = f"http://127.0.0.1:{port}"
         self.launch([command, "serve", "--hostname", "127.0.0.1", "--port", str(port)],
                     {"OPENCODE_SERVER_PASSWORD": self.password}, "opencode.log", "/global/health")
@@ -817,7 +853,7 @@ class Opencode(Server):
                         if self.url != url:
                             break
                         with self.lock:
-                            note_event(self.asked, raw.decode("utf-8", "replace"), self.streamed)
+                            note_event(self.asked, raw.decode("utf-8", "replace"), self.streamed, self.errors)
             except (OSError, http.client.HTTPException):
                 pass  # the server stopped or restarts; try again while it is the one in use
             time.sleep(1)
@@ -845,15 +881,68 @@ class Opencode(Server):
     def ask(self, session, text):
         self.request("POST", f"/session/{session}/prompt_async", {"parts": [{"type": "text", "text": text}]})
 
+    def not_ready(self):
+        """Why opencode cannot answer at all, said before a request goes to it: the
+        provider of its model is not among those it can use (GET /config/providers),
+        since it has no key; NO_KEY with its name, or None. opencode took such a request,
+        said "Model not found" on its event stream only, and stopped without a reply. Its
+        server reads the keys as it starts: one added since (opencode's own login) is read
+        again first, while nothing of it works."""
+        try:
+            model = (self.request("GET", "/config") or {}).get("model") or ""
+            provider = model.partition("/")[0] if "/" in model else ""
+            usable = self.usable() if provider else None
+            if usable is not None and provider not in usable and mtime(opencode_auth()) != self.auth_seen \
+                    and self.owned() and not self.busy():
+                self.auth_seen = mtime(opencode_auth())
+                log("opencode's keys changed since its server started; it reads them again")
+                self.request("POST", "/instance/dispose")
+                usable = self.usable()
+        except AgentError as e:
+            if http_status(e) in (400, 404):  # an opencode without these
+                return None
+            raise
+        if usable is None or provider in usable:
+            return None
+        return NO_KEY.format(name=known_provider_name(provider))
+
+    def usable(self):
+        """The providers opencode can use, by id, or None when it does not say."""
+        found = (self.request("GET", "/config/providers") or {}).get("providers")
+        if not isinstance(found, list):
+            return None
+        return {p.get("id") for p in found if isinstance(p, dict)}
+
+    def login_command(self):
+        """opencode's own login to a provider, for a desktop without patina."""
+        return [find_opencode(), "auth", "login"]
+
     def messages(self, session):
         """The conversation, with the parts still being written filled in from the event
-        stream, so the answer, and what the agent thinks first, grow on screen."""
+        stream, so the answer, and what the agent thinks first, grow on screen; and the
+        error it stopped on, from the event stream, as its reply where the request has
+        none (opencode stores the request and says the error only there). "Model not
+        found" for a provider without a key says that."""
         found = self.request("GET", f"/session/{session}/message")
         with self.lock:
             for message in found:
                 for part in message.get("parts", []):
                     if not part.get("text") and part.get("id") in self.streamed:
                         part["text"] = self.streamed[part["id"]]
+            stopped = self.errors.get(session)
+        i = last_user(found)
+        if (stopped and i >= 0 and stopped[0] >= ((found[i]["info"].get("time") or {}).get("created") or 0)
+                and not any(m["info"].get("role") == "assistant" for m in found[i + 1:])):
+            error = stopped[1] if isinstance(stopped[1], dict) else {}
+            if NO_MODEL.search(str((error.get("data") or {}).get("message") or "")):
+                try:
+                    reason = self.not_ready()
+                except AgentError:
+                    reason = None
+                if reason:
+                    error = {"name": "NotReady", "data": {"message": reason}}
+            found.append({"info": {"role": "assistant", "error": error,
+                                   "time": {"created": stopped[0], "completed": stopped[0]}}, "parts": []})
         return found
 
     def status(self, session):
@@ -1274,10 +1363,22 @@ def retry_words(retry):
 # again and again): the palette showed nothing, and the notification "Done.".
 NO_ANSWER = "The agent stopped without an answer."
 # A request the agent stored and went idle on, without a reply or an error: opencode does
-# so for a model its settings do not list. The palette showed nothing for minutes.
+# so for a model its settings do not list, and says why only on its event stream, which
+# kortex may not have heard (it started after, or the agent's server did). The palette
+# showed nothing for minutes, and a conversation opened later its request alone.
 NOT_TAKEN = (f"The agent did not answer, and said nothing of why. Its model may be one its provider does not "
              f"have: pick another with {LOGIN}.")
 NOT_TAKEN_AFTER = 20  # seconds a request may sit unanswered while the agent is idle
+# The agent's model is of a provider it has no key for (`not_ready`): opencode took the
+# request, said "Model not found" on its event stream only and stopped, and the palette
+# showed nothing. Said before the request goes, with a row that logs in (LOGIN_ROW).
+NO_KEY = "{name} has no key yet, so the agent cannot answer. Log in with " + LOGIN + "."
+LOGIN_ROW = ("Log in to the agent's provider", "Enter opens the login in a terminal")
+
+
+def needs_login(text):
+    """True for an error that says the provider has no key (NO_KEY)."""
+    return "has no key yet, so the agent cannot answer" in text
 # A reply whose message never completed although the agent is idle: its server stopped
 # (or was killed) mid-answer and a new one read the conversation; the text it has is cut
 # off, and showed as a finished answer.
@@ -1837,8 +1938,10 @@ def view(state, elapsed=None, agent="", stop=False, handover=False, rest=False, 
     working = status != "idle"
     actions = ["terminal"] + (["stop"] if stop else [])
     if error and error != "Aborted":
-        matches.append(match("answer", why_stopped(state["messages"], error), "dialog-error", 0.7, "The agent stopped",
-                             ["terminal"], True))
+        stopped = why_stopped(state["messages"], error)
+        matches.append(match("answer", stopped, "dialog-error", 0.7, "The agent stopped", ["terminal"], True))
+        if needs_login(stopped):
+            matches.append(match("login", LOGIN_ROW[0], "dialog-password", 0.69, LOGIN_ROW[1]))
     elif working and (state["permissions"] or questions):
         # holds still while a row asks, to be clicked
         matches.append(match("answer", "Waiting for your answer", ICON, 0.7, agent, actions))
@@ -1870,6 +1973,15 @@ def view(state, elapsed=None, agent="", stop=False, handover=False, rest=False, 
             matches.append(match("info" + SEP + "asks", "Every change asks", "dialog-information", 0.67,
                                  f"A question offers {ALLOW_REST}"))
         matches.append(match("steps", "Show every step", "view-right-new", 0.66, "Opens the panel beside your windows"))
+    elif (last_user(state["messages"]) >= 0 and not replied(state["messages"], "")
+          and (elapsed is None or elapsed >= NOT_TAKEN_AFTER)):
+        # stored and never answered, the agent idle: what stopped it was said while kortex
+        # did not listen (NOT_TAKEN). A conversation opened later showed its request alone,
+        # or nothing. Enter asks the same again.
+        request = asked_last(state["messages"])
+        matches.append(match(("continue" + SEP + request) if request else "answer", NOT_TAKEN, "dialog-warning", 0.7,
+                             (agent + " · " if agent else "") + ("Enter asks again" if request else "Ask again"), (),
+                             True))
     elif not said and not steps and replied(state["messages"], "") and not cutting and not error:
         # it thought, and stopped: Enter asks the same again
         request = asked_last(state["messages"])
@@ -2253,6 +2365,8 @@ class Kortex:
             again = self.request if self.problem_was == "Not sent" else ""  # Enter sends it again
             matches.append(match("problem" + (SEP + again if again else ""), self.problem, "dialog-error", 0.95,
                                  self.problem_was + (" · Enter asks again" if again else ""), (), True))
+            if needs_login(self.problem):
+                matches.append(match("login", LOGIN_ROW[0], "dialog-password", 0.94, LOGIN_ROW[1]))
         if self.waiting:
             return matches + [self.waiting_match()]
         if not self.session:
@@ -2411,6 +2525,11 @@ class Kortex:
             log(f"asking {self.agent.title}" + (" in the conversation" if kind == "continue" else ""))
 
             def send():
+                # A model whose provider has no key: said now, and the request not sent
+                # (opencode took it and said why only on its event stream).
+                reason = self.agent.not_ready() if hasattr(self.agent, "not_ready") else None
+                if reason:
+                    raise NotReady(reason)
                 if kind == "ask" or not self.session:
                     self.session = self.agent.new_session(head(arg, 60))
                 self.agent.add_services()
@@ -2425,7 +2544,8 @@ class Kortex:
                     self.remember()
                 self.failed(None, error)
                 if error:
-                    self.finish(f"{NAME} did not get the request", str(error))
+                    self.finish(f"{NAME} cannot answer yet" if isinstance(error, NotReady)
+                                else f"{NAME} did not get the request", str(error))
 
             self.reopen(self.opening, menu)
             self.work(send, sent)
@@ -2456,6 +2576,8 @@ class Kortex:
             self.reopen(self.view_query, menu)  # the question itself: its answers are the rows below
         elif kind in ("more", "steps"):
             self.panel()
+        elif kind == "login":
+            self.login()
         elif kind == "hint" and action == "instructions":
             self.instructions()
         elif kind in ("hint", "waiting"):
@@ -2488,6 +2610,19 @@ class Kortex:
                     self.failed(None, error, "Not copied")
 
                 self.work(lambda: self.agent.messages(session), read)
+
+    def login(self):
+        """Log in to the agent's provider, the row under an error that says it has no key:
+        `patina ai login` in a terminal, which also picks another provider, else the
+        agent's own login. Enter on the error then asks again."""
+        self.last_activity = self.now()
+        patina = self.desktop.patina()
+        try:
+            command = [patina, "ai", "login"] if patina else self.agent.login_command()
+        except (AgentError, AttributeError) as e:
+            self.failed(None, e, "Not opened")
+            return
+        self.desktop.launch(terminal_command(command, self.desktop.terminal()), {})
 
     def instructions(self):
         """Edit the agent's instructions, the hint row's action. With patina, `patina ai
@@ -2643,7 +2778,7 @@ class Kortex:
                 and asked_last(state["messages"]) == self.request.strip()
                 and not any(m["info"].get("role") == "assistant" for m in state["messages"][last_user(state["messages"]):])):
             # The agent stored the request and went idle without a reply: nothing more comes.
-            self.problem, self.problem_was, self.problem_at = NOT_TAKEN, "No answer", self.now()
+            # The conversation says so as its answer (view); a notification while closed.
             self.finish(f"{NAME} stopped", NOT_TAKEN)
             return
         if status != "retry":

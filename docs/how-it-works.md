@@ -105,15 +105,29 @@ API:
 | `GET /session/:id/message`, `GET /session/status` | the answer, and whether the agent is at work |
 | `GET /permission`, `POST /permission/:id/reply` | the rows that ask: `once`, `always` or `reject` |
 | `GET /event` | what the two above cannot tell |
+| `GET /config`, `GET /config/providers`, `POST /instance/dispose` | before a request: whether the model's provider has a key |
 
 It reads them when KRunner asks, and every 0.7 s while a conversation is on screen, a
-request runs or the agent works or asks; otherwise not at all until the next look. The event stream fills two gaps of opencode 1.19:
+request runs or the agent works or asks; otherwise not at all until the next look. The event stream fills three gaps of opencode 1.19:
 
 - `GET /session/:id/message` keeps a text or reasoning part empty until the part is
   done, while the stream sends its words (`message.part.delta`); kortex keeps them and
   fills the part in, so the answer and the agent's thoughts grow on screen.
 - `GET /permission` fails as a whole while a web fetch without a timeout waits; kortex
   takes the requests from the stream (`permission.asked`, `permission.replied`).
+- An error that comes before the agent writes a reply (`session.error`, "Model not
+  found" for a provider without a key) is said only on the stream: the request stays
+  stored without a reply. kortex keeps the error and shows it as the reply.
+
+Before a request goes, kortex checks that the provider of opencode's model (`model` of
+`GET /config`) is among those opencode can use (`GET /config/providers`), which holds
+only those with a key or an address. One that is not is said at once ("Mistral has no
+key yet"), the request is not sent, and a row opens `patina ai login` (or opencode's
+own `opencode auth login`) in a terminal. opencode reads its keys as it starts: when its
+keys' file changed since and nothing of it works, kortex has it read them again
+(`POST /instance/dispose`) before it says so. A conversation whose request the agent
+stored and never answered, with an error kortex did not hear (it started after), says
+so when it is opened, with Enter to ask again.
 
 opencode reads its own configuration, so the model, the provider and the permissions
 are the user's (patina writes them at install time).
