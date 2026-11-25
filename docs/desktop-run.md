@@ -7,7 +7,7 @@ run sees what none of them can: what a key does on a row, how the window behaves
 the agent works, the notifications' buttons, the password dialog and the panel's place
 on the screen.
 
-Written for kortex 0.9.1. Tick the boxes in a copy of this file or in an issue
+Written for kortex 0.10.0. Tick the boxes in a copy of this file or in an issue
 ([kortex's issues](https://github.com/patina-os/kortex/issues)); with each box that
 fails, say what you saw instead. What a model does is not what is tested here: when
 the agent takes another step than the one a check expects, ask again in other words
