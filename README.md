@@ -71,8 +71,9 @@ proposes before you allow it.
 - **It asks you, too.** A question of the agent's is a row with its answers; pick
   one or type your own.
 - **Walk away.** Click elsewhere and a notification follows the request to its answer.
-  One that asks for a step takes your answer where it is: Allow once or Deny. Show
-  brings the conversation back.
+  One that asks for a step takes your answer where it is: Allow this once or Don't,
+  stop here; one of the agent's questions, its answers. Show brings the conversation
+  back.
 - **See what it does.** Show every step (or Meta+Shift+A with patina) docks
   the agent's own interface on the conversation at the screen's right edge, full
   height and a fifth of its width, above your windows: every step and command, while

@@ -17,7 +17,7 @@ kortex ›     ⚠ Changes your network
                nmcli connection up home-5G
              ✓ Allow this once
              ✗ Don't, stop here
-             ◉ Waiting for your answer · Shift+Enter allows once
+             ◉ Waiting for your answer
 ```
 
 ## Asking
@@ -52,9 +52,10 @@ window holds still instead of growing and shrinking with each word. It shows:
   12 s · running a command" ("reading a file", "using linear", or how many steps so
   far), or "Thinking · 12 s · …" while a reasoning model thinks (the start of the last
   sentence it finished), so a model that thinks for a minute does not look stuck. Stop,
-  on that row, ends what the agent does (opencode). While a row asks, it says "Waiting
-  for your answer · Shift+Enter allows once" and holds still, so that the rows can be
-  clicked.
+  on that row, ends what the agent does (opencode), and what it wrote until then stays
+  under "You stopped it here". While a row asks, it says "Waiting for your answer" and
+  holds still, so that the rows can be clicked. While the agent tries a provider it
+  cannot reach, it says so at once: "Retrying · 7 s · Can't reach the provider · try 2".
 - **Its last words**: the last whole sentence it wrote, on a row of its own.
 - **Its steps so far, each in a word**: "Done so far: nmcli · iw · ping", a command's
   first word or the tool's name. The commands themselves are the panel's.
@@ -75,20 +76,26 @@ window holds still instead of growing and shrinking with each word. It shows:
   stale cache file", and words may describe the step after this one ("I'll install
   it" over a command that only looks it up). So the row starts with what the step
   would do, in kortex's words, worked out from the step itself: "Deletes", "Runs as
-  root", "Installs or removes software", "Changes something in tracker", "Changes
-  your network", "Changes a file", "Can overwrite a file", "Only looks". A step the
-  agent did not explain shows as what it does alone. Its answers are the rows under
-  it, to pick with Enter or the mouse: **Allow this once**, **Don't, stop here** and,
-  where it may be offered, **Always allow** with what it would let through (`Always
-  allow: du *` lets any `du` through, in this conversation and the next ones, until
-  the agent's server stops). Enter on the asking row itself answers nothing; Shift+Enter
-  on it is Allow once (KRunner runs a row's first action with it), and its two icons
-  are Allow once and Deny. Nothing runs before you choose. When two steps ask at once,
-  the second has its answer rows once the first is answered. Always is offered only
-  for commands that look and change nothing whatever they are given (`du`, `ls`,
-  `wc`, `apt-cache`, `systemctl status` and the like): its rule is the command's start
-  and `*`, so one Always on a `find … | wc -l` let `find -delete` run unasked later,
-  and one on a `sudo` every later `sudo`. A change to a file, a folder outside your
+  root", "Installs or removes software", "Changes a service", "Stops a program",
+  "Reads from tracker", "Changes something in tracker", "Changes your network",
+  "Creates or changes files", "Changes a file", "Can overwrite a file", "Only looks",
+  several at once where a command does several ("Deletes · as root"). kortex reads each
+  part of a command for the program it runs, past `sudo`, wrappers such as `env`,
+  `nice` or `timeout`, the shell's `if … then`, `for … do` and `( … )`, and a path
+  (`/bin/rm`); a command whose program it cannot read ("Runs a command kortex cannot
+  read") asks like one that deletes. A step the agent did not explain shows as what it
+  does alone. Its answers are the rows under it, to pick with Enter or the mouse:
+  **Allow this once**, **Don't, stop here** and, where it may be offered, **Always
+  allow** with what it would let through and for how long (`Always allow: ls …` lets
+  any `ls` through, in this conversation and the next ones, until the agent's server
+  stops). Enter on the asking row itself answers nothing. Nothing runs before you
+  choose. When two steps ask at once, the second has its answer rows once the first
+  is answered. Always is offered only for commands that look and change nothing
+  whatever they are given (`ls`, `df`, `apt-cache`, `systemctl status` and the like):
+  its rule is the command's start and `*`, so one Always on a `find … | wc -l` let
+  `find -delete` run unasked later, and one on a `sudo` every later `sudo`. Not for
+  `du` or `wc` either, which print the lines of a file given `--files0-from`, nor for
+  a web page or a search, which send what they are given out. A change to a file, a folder outside your
   home, a service's tool (one that only reads does not ask) and every other command
   offer Allow once and Deny: one Always on a service's delete would let every later
   delete of it through. With Hermes, which names no rule, the command that asks
@@ -108,22 +115,29 @@ window holds still instead of growing and shrinking with each word. It shows:
 Off unless you turn it on. opencode asks before every change (with patina's rules), and
 a task of five changes is five questions. If you would rather say yes once per task:
 
-- **Turn it on** with the row "Allow the rest of a task: off" in the list `ai` shows
+- **Turn it on** with the row "Allow the rest of this task: off" in the list `ai` shows
   (Meta+A with nothing running), or `patina ai handover on` with patina, or by writing
   `on` into `~/.config/kortex/handover`. The same row, `patina ai handover off` or
   `off` in the file turn it off; `KORTEX_HANDOVER` overrides the file.
 - **A step that asks** then has a third answer, **Allow the rest of this task**: it
   allows this step and every later step of the same request. Typing `go` after
   `kortex ›` while a step asks is the same. The notification that asks has it too.
-- **What still asks, every time:** a step that deletes (`rm`, `rmdir`, `shred`,
-  `truncate`, `git clean` and the like), runs as root (`sudo`, `pkexec`), installs or
-  removes software (`apt`, `flatpak`, `pip`, `npm`, `patina install`), changes
-  something in a connected service, reaches outside your home folder, reads what is in
-  your files (opencode's read and grep, which ask where a file may hold a secret), or
-  is a command kortex cannot judge: one that overwrites a file with `>`, or runs what
-  another command printed (`$(…)`, `xargs`, `sh -c`, `find -exec`). Such a step shows
-  "…: asks every time" in place of the third answer.
-- **While it runs**, a row says "Running the rest on your yes · 2 changes so far";
+- **What still asks, every time** (the row says it in short: deleting, running as
+  root, installing software, changing or enabling a service, and the connected
+  services' changes): a step that deletes (`rm`, `rmdir`, `shred`, `truncate`,
+  `git clean`, `find -delete`, `rsync --delete` and the like), runs as root (`sudo`,
+  `pkexec`), installs or removes software (`apt install`, `flatpak uninstall`,
+  `pip install`, `npm install`, `patina install`; not `flatpak list` or `dpkg -l`),
+  changes or enables a service, a timer or a cron job (`systemctl enable`, `crontab`,
+  a file in `~/.config/systemd/user/` or `~/.config/autostart/`), stops a program
+  (`kill`, `pkill`), changes something in a connected service, reaches outside your
+  home folder, reads what is in your files (opencode's read and grep, which ask where a
+  file may hold a secret), or is a command kortex cannot judge: one that overwrites a
+  file with `>` (not `2>/dev/null`), runs what another command printed or its own words
+  (`$(…)`, `xargs`, `sh -c`, `python3 -c`, `find -exec`), or names its program in a way
+  kortex cannot read (`$CMD`). Such a step shows "…: asks every time" in place of the
+  third answer.
+- **While it runs**, a row says "Allow the rest of this task: on · 2 steps ran on it";
   Enter on it, or typing `ask`, takes it back, and so does a Deny.
 - **The answer** is followed by a row that lists every command that ran without a
   question of its own.

@@ -10,17 +10,19 @@
   `~/.local/share/krunnerstaterc`.
 - **No action without a yes.** kortex answers a permission request only with the
   answer you gave. "Always" is the agent's own rule, which its row spells out (`Always
-  allow: du *` lets any `du` through): with opencode it holds for every conversation
+  allow: ls …` lets any `ls` through): with opencode it holds for every conversation
   until its server stops, after a quiet quarter of an hour, and is not written into its
   configuration. Since that rule takes any arguments, Always is offered only for
-  commands that look and change nothing whatever they are given, and never for a
-  change to a file or a service's tool. A request opencode cannot list comes from its
+  commands that look and change nothing and print no file whatever they are given,
+  and never for a change to a file, a service's tool, a web page or a search. A request opencode cannot list comes from its
   event stream and is answered like any other.
 - **Handing over is your choice, and off until you make it.** With Allow the rest of
   this task turned on, one yes can cover steps you have not seen: kortex then answers
   the later steps of that request for you. That gives up part of what opencode's rules
   are for, so it is off by default, it ends with the request, it never covers what
-  deletes, runs as root, installs or changes a service, and the answer lists what ran
+  deletes, runs as root, installs software, changes or enables a service or changes
+  something in a connected service, nor a command kortex cannot read, and the answer
+  lists what ran
   on it. The list of what it never covers matches a command's shape, not its effect:
   it is a guard, not a proof.
 - **What a step would do is kortex's to say.** The line over a step that asks

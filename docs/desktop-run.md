@@ -63,7 +63,7 @@ Every request below is harmless: the files it makes are empty and are named
 
 Ask `how full is my disk, and which folders in my home are the largest?`
 
-- [ ] a first row within a few seconds: "Waiting for the agent…", then "Working · 2 s"
+- [ ] a first row at once: "Working · 0 s", counting on without a jump
   or "Thinking · 2 s · …"
 - [ ] the seconds count up by themselves, without a key
 - [ ] under it, one line each: the agent's last sentence, "Done so far: df · du" (the
@@ -86,16 +86,15 @@ Ask `how full is my disk, and which folders in my home are the largest?`
 Ask `make an empty file called kortex-test in my home folder`
 
 - [ ] the palette shows, from the top: the row that asks, "Allow this once", "Don't,
-  stop here", "Waiting for your answer · Shift+Enter allows once", in that order
+  stop here", "Waiting for your answer", in that order
 - [ ] the row that asks starts with a bold line of what the step would do ("Runs a
-  command"), then "Allow: …" in the agent's words, then the whole command
-- [ ] its two icons say "Allow once" and "Deny" under the pointer
+  command" or "Creates or changes files"), then "Allow: …" in the agent's words, then
+  the whole command
+- [ ] it has no icons of its own: its answers are the rows below
 - [ ] the rows hold still while they wait: no refresh moves them under the pointer
 - [ ] Enter on the row that asks answers nothing: `ls ~/kortex-test` finds no file
 - [ ] ↓ to "Allow this once", Enter: the file is there, and the palette goes on to the
   answer
-- [ ] ask the same again with another name, and Shift+Enter on the row that asks: the
-  file is there
 - [ ] ask once more, and Enter on "Don't, stop here": no file, and the answer says
   "Stopped: you denied the last step, so it did not run."
 - [ ] `delete the file kortex-test in my home folder`: the bold line says "Deletes"
@@ -103,15 +102,16 @@ Ask `make an empty file called kortex-test in my home folder`
   "Runs as root". Allow it: a notification asks for your password, its dialog is in
   the theme's colours, and the answer follows
 - [ ] `install the flatpak org.kde.kcalc` and then Don't: the bold line says "Installs
-  or removes software" (or "Runs as root" if the agent chose apt)
+  or removes software" (with "· as root" if the agent chose apt); a `flatpak search`
+  before it says "Only looks"
 - [ ] `add a comment line "# kortex test" to the end of my .bashrc`: the bold line
   says "Changes a file", with the file's path and the added line under the words.
   Don't
 - [ ] a long command (ask for three files in one step) shows whole, on as many lines
   as it needs, never cut with "…"
-- [ ] kortex without patina's rules only: a command that only looks (`du`, `ls`) asks,
-  and has a fourth row, "Always allow: du \*", with "In every conversation, until the
-  agent restarts"
+- [ ] kortex without patina's rules only: a command that only looks (`ls`, `df`) asks,
+  and has a fourth row, "Always allow: ls …", with "In every conversation, until the
+  agent restarts" on its second line; `du` and `wc` have none
 
 ## 5. The answer
 
@@ -132,13 +132,13 @@ about maps`, and click on the desktop at once.
 
 - [ ] after about three seconds a notification says "kortex is working on it"
 - [ ] when the step asks, a notification of its own: "kortex asks first · Runs a
-  command", the agent's words and the command, and three buttons: Allow once, Deny,
-  Show
-- [ ] Allow once on it: the file is there, the palette stays closed, and that
+  command", the agent's words and the command, and three buttons: Allow this once,
+  Don't, stop here, Show
+- [ ] Allow this once on it: the file is there, the palette stays closed, and that
   notification goes away by itself (look in the notification history too)
 - [ ] a notification brings the answer, "kortex answered"; its Show, and a click on
   it, open the conversation
-- [ ] ask again with another name, close the palette, and Deny on the notification:
+- [ ] ask again with another name, close the palette, and Don't, stop here on the notification:
   no file, and the next notification says "Stopped: you denied the last step, so it
   did not run."
 - [ ] ask again, close the palette, wait for the notification that asks, then press
@@ -153,34 +153,35 @@ it gives up.
 
 - [ ] while it is off: a step that asks has two answer rows, typing `go` after
   `kortex ›` shows no "Allow the rest of this task", and the notification that asks
-  has no "Allow the rest"
-- [ ] Meta+A with nothing running has the row "Allow the rest of a task: off"; Enter
+  has no "Allow the rest of this task"
+- [ ] Meta+A with nothing running has the row "Allow the rest of this task: off"; Enter
   turns it on, the row says "on", and `cat ~/.config/kortex/handover` says `on`
 - [ ] with patina: `patina ai handover` says it is on; `patina ai handover off`, then
-  `on`, change the same file, and the welcome's AI menu shows "One yes per task ·
-  now on"
+  `on`, change the same file, and the welcome's AI menu shows it on
 
 Ask `make an empty file kortex-test-a in my home folder, then in a second step
 kortex-test-b, then delete kortex-test-a`
 
 - [ ] the first step has a third answer row, "Allow the rest of this task", between
-  "Allow this once" and "Don't, stop here"
+  "Allow this once" and "Don't, stop here", with what still asks on its second line
 - [ ] Enter on it: the first file is there, and the second step runs without a row
-- [ ] while it runs, a row says "Running the rest on your yes · 1 change so far"
+- [ ] while it runs, a row says "Allow the rest of this task: on · 1 step ran on it"
 - [ ] the delete still asks: its bold line says "Deletes", and where the third answer
-  would be a row says "Deletes: asks every time"
+  would be a row says "Deletes: asks every time, also with Allow the rest of this task"
 - [ ] after the answer, a row lists what ran without a question of its own, with the
   command
 - [ ] the next request in the same conversation asks again from its first change
 - [ ] ask the three-step request again, and type `go` after `kortex ›` while the first
   step asks: the first row is "Allow the rest of this task"; Enter does the same
-- [ ] ask again, allow the rest, then Enter on "Running the rest on your yes" (or type
+- [ ] ask again, allow the rest, then Enter on "Allow the rest of this task: on" (or type
   `ask`): the next change asks again
 - [ ] ask again, allow the rest, close the palette: the later steps run without a
-  notification that asks; the delete's notification has no "Allow the rest"
+  notification that asks; the delete's notification has no "Allow the rest of this task"
 - [ ] with the palette closed from the start, the first step's notification has four
-  buttons: Allow once, Allow the rest, Deny, Show. Say whether Plasma shows all four
-- [ ] a step as root, and one that installs, ask every time after "Allow the rest"
+  buttons: Allow this once, Allow the rest of this task, Don't, stop here, Show. Say
+  whether Plasma shows all four, and whether their words fit
+- [ ] a step as root, one that installs, `systemctl --user enable …` and `kill …` ask
+  every time after "Allow the rest of this task"
 - [ ] turn it off again (the row, or `patina ai handover off`): the third answer is
   gone
 
@@ -213,14 +214,14 @@ kortex-test-b, then delete kortex-test-a`
 what it counts as dangerous.
 
 - [ ] Meta+A: the hint's small line says "Hermes answers", and there is no "Allow the
-  rest of a task" row
+  rest of this task" row
 - [ ] `what is 3+3?` is answered; note how long Hermes' first start took
 - [ ] `make a folder kortex-test-dir in my home folder with an empty file in it` runs
   without a row
 - [ ] `delete the folder kortex-test-dir`: a row asks, its bold line says "Deletes",
   with "Allow this once" and "Don't, stop here" under it, and no "Allow the rest of
   this task" even while `~/.config/kortex/handover` says `on`
-- [ ] the notification that asks has Allow once, Deny and Show
+- [ ] the notification that asks has Allow this once, Don't, stop here and Show
 - [ ] a question left unanswered for five minutes leaves the palette
 - [ ] back to opencode (`patina ai on opencode`): the next request is answered by
   opencode, and the hint says so

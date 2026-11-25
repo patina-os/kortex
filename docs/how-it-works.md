@@ -20,7 +20,10 @@ who calls it over D-Bus.
 
 KRunner never waits for the agent: every request to it goes to a thread of its own, and
 a match shows what the agent said last. A request still on its way, or an agent that
-starts, shows as "Waiting for the agent…".
+starts, shows as "Working · 2 s", as the row that follows it; the list `ai` shows,
+before the agent has listed the conversations, as "Loading your conversations…". The
+conversation shown last is kept in `~/.local/state/kortex/session`, so `kortex ›`
+shows it again after kortex restarts.
 
 ## The palette that pulls
 
@@ -56,15 +59,20 @@ answer comes, the two multi-line rows, not with each word.
 ## A step that asks
 
 opencode's permission request becomes a row and its answers. The row's first line is
-what the step would do (`risk` in `kortex.py`): the first word, or first two, of each
-part of the command against four short lists (root, deletes, installs, network), a
-pattern for a command that hides another (`$(…)`, `xargs`, `sh -c`, `find -exec`, a
-`>` that overwrites), and for a step that is no command its kind (a change to a file,
-a service's tool, a folder outside the home folder). Then the agent's words and the
-step itself. The answers are matches of their own (`allow`, `always`, `rest`, `deny`
-and the request's id), ordered by relevance under the row, so they read as words and
-take Enter; the asking row keeps Allow once and Deny as its actions, for Shift+Enter
-and for callers that run it by id.
+what the step would do (`risk` in `kortex.py`): each part of the command, cut where a
+shell cuts it, is read for the program it runs (`program_of`: past the shell's own
+words, wrappers, `sudo` and a path, quotes and backslashes taken off), and that
+program and its verb are matched against short lists (deletes, installs, services,
+stops, network, files, looks); a part whose program kortex cannot read is held. A
+pattern finds a command that hides another (`$(…)`, `xargs`, `sh -c`, `find -exec`),
+a redirect finds a `>` that overwrites (not one to `/dev/null` or `2>&1`), and for a
+step that is no command its kind decides (a change to a file, one in a folder of
+services, a service's tool by its verb, a folder outside the home folder). Then the
+agent's words and the step itself. The answers are matches of their own (`allow`,
+`always`, `rest`, `deny` and the request's id), ordered by relevance under the row,
+so they read as words and take Enter, with what they cover in their own text, since
+KRunner shows a subtext only on the selected row; the asking row has no actions, and
+its id with `allow-once` or `deny` still answers, for callers that run it by id.
 
 Allow the rest of this task (`handover_on`: `KORTEX_HANDOVER`, else
 `~/.config/kortex/handover`) is kortex answering for the user: it remembers the
@@ -86,7 +94,8 @@ closes the notification (`CloseNotification`) once the step is answered anywhere
 
 kortex starts `opencode serve` on 127.0.0.1 with a random port and a password
 (`OPENCODE_SERVER_PASSWORD`, generated once, kept in `~/.config/kortex/` with mode
-0600), and stops it, and itself, after a quiet quarter of an hour. It uses the server's
+0600), and stops it, and itself, after a quiet quarter of an hour: no request, no
+panel open and no conversation of the server's at work (`GET /session/status`). It uses the server's
 API:
 
 | Call | For |
