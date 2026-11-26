@@ -244,6 +244,128 @@ class Events(unittest.TestCase):
         self.assertEqual(oc.asked, {"per_9": FETCH})
 
 
+class NoKey(unittest.TestCase):
+    """A model whose provider has no key: opencode stored the request, said "Model not
+    found" on its event stream only and stopped; the palette said nothing, and the
+    conversation opened later held the request alone (patina 0.1.0-alpha.17, Mistral
+    after an update, the user's own API before)."""
+
+    MISTRAL = "Mistral has no key yet, so the agent cannot answer. Log in with " + kortex.LOGIN + "."
+
+    def server(self, model="mistral/mistral-large-latest", usable=("opencode", "custom")):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+        calls = []
+
+        def request(method, path, body=None, start=True, timeout=10, quiet=False):
+            calls.append((method, path))
+            if path == "/config":
+                return {"model": model}
+            if path == "/config/providers":
+                return {"providers": [{"id": i} for i in usable], "default": {}}
+            raise AssertionError(path)
+
+        oc.request = request
+        return oc, calls
+
+    def test_the_provider_without_a_key_is_named(self):
+        oc, _calls = self.server()
+        with mock.patch.object(kortex, "known_provider_name", return_value="Mistral"):
+            self.assertEqual(oc.not_ready(), self.MISTRAL)
+        self.assertIsNone(self.server(usable=("mistral", "opencode"))[0].not_ready())
+        self.assertIsNone(self.server(model="custom/qwen")[0].not_ready())
+        self.assertIsNone(self.server(model="")[0].not_ready())  # no model set: opencode picks one
+
+    def test_an_opencode_without_the_endpoints_is_not_held_up(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+        error = kortex.AgentError("opencode did not take the request (HTTP 404)")
+        error.__cause__ = kortex.urllib.error.HTTPError("u", 404, "Not Found", {}, None)
+        with mock.patch.object(oc, "request", side_effect=error):
+            self.assertIsNone(oc.not_ready())
+
+    def test_a_key_added_since_the_server_started_is_read_again(self):
+        # opencode reads its keys as it starts; `opencode auth login` after left it without.
+        oc, calls = self.server()
+        usable = [{"id": "opencode"}]
+
+        def request(method, path, body=None, start=True, timeout=10, quiet=False):
+            calls.append((method, path))
+            if path == "/config":
+                return {"model": "mistral/m"}
+            if path == "/instance/dispose":
+                usable.append({"id": "mistral"})
+                return True
+            return {"providers": list(usable)}
+
+        oc.request, oc.process, oc.auth_seen = request, mock.Mock(), 1
+        with mock.patch.object(kortex, "mtime", return_value=2), mock.patch.object(oc, "busy", return_value=False):
+            self.assertIsNone(oc.not_ready())
+        self.assertIn(("POST", "/instance/dispose"), calls)
+        self.assertEqual(oc.auth_seen, 2)
+        calls.clear()
+        usable.pop()
+        with mock.patch.object(kortex, "mtime", return_value=2), \
+                mock.patch.object(kortex, "known_provider_name", return_value="Mistral"):
+            self.assertEqual(oc.not_ready(), self.MISTRAL)  # the same file: no second reload
+        self.assertNotIn(("POST", "/instance/dispose"), calls)
+
+    def test_the_error_on_the_stream_is_the_reply(self):
+        oc = kortex.Opencode("http://127.0.0.1:1", "secret")
+        asked = dict(user("why is wifi slow"), info={"role": "user", "time": {"created": 1000}})
+        with mock.patch.object(kortex.time, "time", return_value=2.0):  # 2000 ms
+            kortex.note_event(oc.asked, event("session.error", {"sessionID": "ses_1", "error": {
+                "name": "UnknownError", "data": {"message": "Model not found: mistral/mistral-large-latest."}}}),
+                oc.streamed, oc.errors)
+        with mock.patch.object(oc, "request", return_value=[asked]), \
+                mock.patch.object(oc, "not_ready", return_value=self.MISTRAL):
+            messages = oc.messages("ses_1")
+        self.assertEqual(kortex.reply_of(messages)[2], self.MISTRAL)
+        rows = kortex.view({"messages": messages, "status": ("idle", ""), "permissions": []}, None, "opencode")
+        self.assertEqual([r[0] for r in rows], ["answer", "login"])
+        self.assertEqual(rows[0][1], self.MISTRAL)
+        self.assertEqual(kortex.ending(messages), ("kortex stopped", self.MISTRAL))
+        # a later request of the conversation is not taken for the one that stopped
+        later = dict(user("and now?"), info={"role": "user", "time": {"created": 3000}})
+        with mock.patch.object(oc, "request", return_value=[asked, later]):
+            self.assertEqual(len(oc.messages("ses_1")), 2)
+        # another error, a provider's, stays as the agent said it
+        with mock.patch.object(kortex.time, "time", return_value=4.0):
+            kortex.note_event(oc.asked, event("session.error", {"sessionID": "ses_1", "error": {
+                "name": "APIError", "data": {"message": "Quota used up"}}}), oc.streamed, oc.errors)
+        with mock.patch.object(oc, "request", return_value=[asked, later]):
+            self.assertEqual(kortex.reply_of(oc.messages("ses_1"))[2], "Quota used up")
+
+    def test_said_before_the_request_goes(self):
+        k, oc, desk, _clock = new()
+        oc.not_ready = lambda: self.MISTRAL
+        desk.has_patina = "/home/u/.local/bin/patina"
+        k.run("ask" + SEP + "why is wifi slow", "", menu=True)
+        self.assertEqual((oc.created, oc.asked), ([], []))  # not sent
+        self.assertEqual(desk.notes[-1][0], "kortex cannot answer yet")
+        rows = k.match("kortex ›")
+        self.assertEqual([r[0] for r in rows[:2]], ["problem" + SEP + "why is wifi slow", "login"])
+        self.assertEqual(rows[0][1], self.MISTRAL)
+        self.assertEqual(rows[0][4]["subtext"], "Not sent · Enter asks again")
+        k.run("login", "")
+        self.assertEqual(desk.launched[-1][0], ["konsole", "-e", "/home/u/.local/bin/patina", "ai", "login"])
+        oc.not_ready = lambda: None  # logged in
+        k.run(rows[0][0], "")  # Enter on the error asks again
+        self.assertEqual(oc.asked, [("ses_1", "why is wifi slow")])
+
+    def test_without_patina_the_agent_s_own_login(self):
+        k, oc, desk, _clock = new()
+        oc.login_command = lambda: ["/usr/bin/opencode", "auth", "login"]
+        k.login()
+        self.assertEqual(desk.launched[-1][0], ["konsole", "-e", "/usr/bin/opencode", "auth", "login"])
+
+    def test_a_conversation_opened_later_says_it_was_not_answered(self):
+        # Opened after a restart of kortex, which did not hear the agent's error: the
+        # request alone showed, or nothing.
+        state = {"messages": [user("why is wifi slow")], "status": ("idle", ""), "permissions": []}
+        [row] = kortex.view(state, None, "opencode")
+        self.assertEqual((row[0], row[1]), ("continue" + SEP + "why is wifi slow", kortex.NOT_TAKEN))
+        self.assertEqual(kortex.view(state, 5, "opencode"), [])  # sent 5 s ago: not begun yet
+
+
 class Parse(unittest.TestCase):
     def test_kinds(self):
         self.assertEqual(kortex.parse("ai why is my wifi slow"), ("ask", "why is my wifi slow"))
@@ -764,7 +886,7 @@ class View(unittest.TestCase):
         self.assertEqual((row[0], row[1]), ("continue" + SEP + "how much zram?",
                                             kortex.NO_ANSWER + "<br>Its last thought: The user is asking"))
         self.assertEqual(row[4]["subtext"], "opencode · Enter asks again")
-        self.assertEqual(kortex.view(dict(state, messages=[user("x")])), [])  # not begun yet
+        self.assertEqual(kortex.view(dict(state, messages=[user("x")]), 0), [])  # sent a moment ago, not begun yet
         k, oc, desk, _clock = new()
         k.run("ask" + SEP + "how much zram?", "", menu=True)
         oc.history = state["messages"]
