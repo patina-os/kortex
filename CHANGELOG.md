@@ -5,7 +5,7 @@ What changed in each release of kortex. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). patina pins a release in its
 `manifest/upstream.yaml`; the next `patina update` installs it where an AI agent is on.
 
-## [Unreleased]
+## [0.10.0] - 2026-11-25
 
 The fixes of patina's test round of 25 November 2026 (`docs/test-round.md` in patina).
 
